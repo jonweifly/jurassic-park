@@ -1,0 +1,20 @@
+[
+  {
+    "title": "t-rex-calls",
+    "author": "CaveboyTup",
+    "page": "https://opengameart.org/content/t-rex-calls",
+    "download": "https://opengameart.org/sites/default/files/t-rex_calls.mp3",
+    "license": "CC0-1.0",
+    "sha256": "2465991ee2e6fc6b8a1275c08f6ca8eb5a60c9c09a9e43102f3eb8531be9c7a5",
+    "bytes": 740352
+  },
+  {
+    "title": "small-dino-raspy-calls",
+    "author": "CaveboyTup",
+    "page": "https://opengameart.org/content/small-dino-raspy-calls",
+    "download": "https://opengameart.org/sites/default/files/small_dino_raspy_calls.mp3",
+    "license": "CC0-1.0",
+    "sha256": "344b1aa510e52c282ef7e0fbac1531fddcb2d8d03f700310cc4d4cab48cde74e",
+    "bytes": 14400
+  }
+]

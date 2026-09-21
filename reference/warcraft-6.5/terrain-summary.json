@@ -1,0 +1,24 @@
+{
+  "vertex_width": 129,
+  "vertex_height": 129,
+  "cell_width": 128,
+  "cell_height": 128,
+  "origin_x": -8192.0,
+  "origin_y": -8192.0,
+  "warcraft_units_per_cell": 128,
+  "ground_tilesets": [
+    "Zdrt",
+    "Zdtr",
+    "Zdrg",
+    "Zbks",
+    "Zsan",
+    "Zbkl",
+    "Zgrs",
+    "Zvin",
+    "cNc1"
+  ],
+  "cliff_tilesets": [
+    "CZdi",
+    "CZlb"
+  ]
+}

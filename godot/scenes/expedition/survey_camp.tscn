@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/models/tent.tscn" id="1"]
+
+[ext_resource type="PackedScene" path="res://assets/models/wood_cargo.glb" id="2"]
+
+[node name="survey_camp" type="Node3D"]
+
+[node name="tent_1" parent="." instance=ExtResource("1")]
+
+position = Vector3(0, 0, 0)
+
+scale = Vector3(0.82, 0.82, 0.82)
+
+rotation = Vector3(0, 0.0, 0)
+
+[node name="wood_cargo_2" parent="." instance=ExtResource("2")]
+
+position = Vector3(0.6, 0.25, 0.45)
+
+scale = Vector3(1, 1, 1)
+
+rotation = Vector3(0, 0.4363323129985824, 0)

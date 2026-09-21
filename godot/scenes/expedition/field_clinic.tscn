@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/models/tent.tscn" id="1"]
+
+[ext_resource type="PackedScene" path="res://assets/expedition/medical_case.glb" id="2"]
+
+[node name="field_clinic" type="Node3D"]
+
+[node name="tent_1" parent="." instance=ExtResource("1")]
+
+position = Vector3(0, 0, 0)
+
+scale = Vector3(0.85, 0.85, 0.85)
+
+rotation = Vector3(0, 1.5707963267948966, 0)
+
+[node name="ore_cargo_2" parent="." instance=ExtResource("2")]
+
+position = Vector3(0.45, 0, 0.6)
+
+scale = Vector3(1, 1, 1)
+
+rotation = Vector3(0, 0.0, 0)

@@ -1,0 +1,92 @@
+[
+  {
+    "file": "trex_call_1.wav",
+    "seconds": 5.241,
+    "peak": 0.7192001525945284,
+    "rms": 0.21999289553523904,
+    "energy_above_500hz": 0.6316801109421135,
+    "sha256": "11f5b0bfb17e647a07d9e4e7cf3dfeb9afdef9b97d4efe492db0dd961e14d14a",
+    "sources": [
+      "t-rex_calls.mp3"
+    ]
+  },
+  {
+    "file": "trex_call_2.wav",
+    "seconds": 5.38,
+    "peak": 0.7091602848350179,
+    "rms": 0.21999206793506149,
+    "energy_above_500hz": 0.5986373906797016,
+    "sha256": "2e46f517c7b0eb36cb342a9bec406429b3aefc6e1477abc73211feeace83f699",
+    "sources": [
+      "t-rex_calls.mp3"
+    ]
+  },
+  {
+    "file": "young_trex_call_1.wav",
+    "seconds": 4.15,
+    "peak": 0.6968278017382129,
+    "rms": 0.2199897504149349,
+    "energy_above_500hz": 0.9055674149219286,
+    "sha256": "4f5abf174b0517e19a30fb6f220953aba147900ac444584403b81b4625110254",
+    "sources": [
+      "t-rex_calls.mp3"
+    ]
+  },
+  {
+    "file": "young_trex_call_2.wav",
+    "seconds": 4.043,
+    "peak": 0.703045456897077,
+    "rms": 0.21997475972445948,
+    "energy_above_500hz": 0.8246518570472597,
+    "sha256": "607bdc1ba2f7b47550f3a890c7168dd70a5f65f8e049776cc79e7b1fe65d0199",
+    "sources": [
+      "t-rex_calls.mp3"
+    ]
+  },
+  {
+    "file": "raptor_call_1.wav",
+    "seconds": 1.56,
+    "peak": 0.88,
+    "rms": 0.16410395182157342,
+    "energy_above_500hz": 0.6769172642304007,
+    "sha256": "01c7aab375aa19b5bb6acc282102e9e2e3a4d619f5bc5c41a5d7ac93cdf17572",
+    "sources": [
+      "small_dino_raspy_calls.mp3",
+      "t-rex_calls.mp3"
+    ]
+  },
+  {
+    "file": "raptor_call_2.wav",
+    "seconds": 1.243,
+    "peak": 0.88,
+    "rms": 0.18923352524297596,
+    "energy_above_500hz": 0.8020973656367596,
+    "sha256": "3a6673185cb97cd948828e7cf2fc4bd3a73cc9e4afefc405660634451291f7f6",
+    "sources": [
+      "small_dino_raspy_calls.mp3",
+      "t-rex_calls.mp3"
+    ]
+  },
+  {
+    "file": "small_raptor_call_1.wav",
+    "seconds": 0.844,
+    "peak": 0.88,
+    "rms": 0.1534812710585633,
+    "energy_above_500hz": 0.8984414719216172,
+    "sha256": "acc628d60f79f6028571b6fc72ec9761bee22a8305999a75f1e95f472c33fd88",
+    "sources": [
+      "small_dino_raspy_calls.mp3"
+    ]
+  },
+  {
+    "file": "small_raptor_call_2.wav",
+    "seconds": 0.598,
+    "peak": 0.88,
+    "rms": 0.17076180127965837,
+    "energy_above_500hz": 0.9259727860863957,
+    "sha256": "333bc5537aca715e397bde6e4c976c3229638b296c201db473bbaff99afd7a13",
+    "sources": [
+      "small_dino_raspy_calls.mp3"
+    ]
+  }
+]

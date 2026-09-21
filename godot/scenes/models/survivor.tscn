@@ -1,0 +1,45 @@
+[gd_scene load_steps=11 format=3]
+[ext_resource type="Script" path="res://scripts/pawn.gd" id="pawn"]
+[ext_resource type="Script" path="res://scripts/pawn_visual.gd" id="visual"]
+[ext_resource type="PackedScene" path="res://assets/models/survivor.glb" id="model"]
+[ext_resource type="PackedScene" path="res://assets/models/axe.glb" id="axe"]
+[ext_resource type="PackedScene" path="res://assets/models/pickaxe.glb" id="pickaxe"]
+[ext_resource type="PackedScene" path="res://assets/models/hammer.glb" id="hammer"]
+[ext_resource type="PackedScene" path="res://assets/models/wood_cargo.glb" id="wood_cargo"]
+[ext_resource type="PackedScene" path="res://assets/models/ore_cargo.glb" id="ore_cargo"]
+[ext_resource type="PackedScene" path="res://assets/models/rifle.glb" id="rifle"]
+
+[node name="survivor" type="Node3D"]
+script = ExtResource("pawn")
+
+[node name="Model" parent="." instance=ExtResource("model")]
+
+[node name="RightHandGrip" type="BoneAttachment3D" parent="Model/Rig/Skeleton3D"]
+bone_name = "handR"
+bone_idx = 9
+[node name="Grip" type="Node3D" parent="Model/Rig/Skeleton3D/RightHandGrip"]
+rotation = Vector3(3.32694, 0, 0)
+[node name="Rifle" parent="Model/Rig/Skeleton3D/RightHandGrip/Grip" instance=ExtResource("rifle")]
+[node name="CarryGrip" type="BoneAttachment3D" parent="Model/Rig/Skeleton3D"]
+bone_name = "spine"
+bone_idx = 1
+[node name="Cargo" type="Node3D" parent="Model/Rig/Skeleton3D/CarryGrip"]
+position = Vector3(0, 0.08, 0.38)
+
+[node name="Visual" type="Node" parent="."]
+script = ExtResource("visual")
+animator_path = NodePath("../Model/AnimationPlayer")
+work_equipment = true
+contact_rig_path = NodePath("../Model/Rig/Skeleton3D")
+hand_socket_path = NodePath("../Model/Rig/Skeleton3D/RightHandGrip/Grip")
+cargo_socket_path = NodePath("../Model/Rig/Skeleton3D/CarryGrip/Cargo")
+rifle_path = NodePath("../Model/Rig/Skeleton3D/RightHandGrip/Grip/Rifle")
+tool_grip = Vector3(0, 0, 0)
+cargo_origin = Vector3(0, 0, 0)
+axe_scene = ExtResource("axe")
+pickaxe_scene = ExtResource("pickaxe")
+hammer_scene = ExtResource("hammer")
+wood_cargo_scene = ExtResource("wood_cargo")
+ore_cargo_scene = ExtResource("ore_cargo")
+
+[editable path="Model"]

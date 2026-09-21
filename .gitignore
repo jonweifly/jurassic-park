@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.tools/
+godot/.godot/
+godot/builds/
+godot/captures/
+*.DS_Store
+__pycache__/
+*.pyc

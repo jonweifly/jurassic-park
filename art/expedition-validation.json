@@ -1,0 +1,51 @@
+{
+  "assets": 5,
+  "errors": [],
+  "results": [
+    {
+      "name": "archive_cabinet",
+      "triangles": 2360,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 70504
+    },
+    {
+      "name": "medical_case",
+      "triangles": 1080,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 36296
+    },
+    {
+      "name": "relay_antenna",
+      "triangles": 3276,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 101376
+    },
+    {
+      "name": "sample_eggs",
+      "triangles": 1568,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 60908
+    },
+    {
+      "name": "weather_mast",
+      "triangles": 3360,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 110472
+    }
+  ]
+}

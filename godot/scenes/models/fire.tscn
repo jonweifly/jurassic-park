@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+[ext_resource type="PackedScene" path="res://assets/models/fire.glb" id="model"]
+[node name="fire" type="Node3D"]
+[node name="Model" parent="." instance=ExtResource("model")]
+
+[node name="FireLight" type="OmniLight3D" parent="."]
+position = Vector3(0, 1.2, 0)
+light_color = Color(1, 0.61, 0.28, 1)
+light_energy = 1.5
+omni_range = 9.0

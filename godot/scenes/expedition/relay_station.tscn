@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/models/generator.tscn" id="1"]
+
+[ext_resource type="PackedScene" path="res://assets/expedition/relay_antenna.glb" id="2"]
+
+[node name="relay_station" type="Node3D"]
+
+[node name="generator_1" parent="." instance=ExtResource("1")]
+
+position = Vector3(0, 0, 0)
+
+scale = Vector3(0.8, 0.8, 0.8)
+
+rotation = Vector3(0, 0.0, 0)
+
+[node name="RelayAntenna" parent="." instance=ExtResource("2")]
+
+position = Vector3(-0.25, 0, 0.15)
+
+scale = Vector3(1, 1, 1)
+
+rotation = Vector3(0, 0.0, 0)

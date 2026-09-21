@@ -1,0 +1,28 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/models/fossil.tscn" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/models/fern.tscn" id="2"]
+
+[ext_resource type="PackedScene" path="res://assets/expedition/sample_eggs.glb" id="3"]
+
+[node name="sample_nest" type="Node3D"]
+
+[node name="fossil_1" parent="." instance=ExtResource("1")]
+
+position = Vector3(0, 0, 0)
+
+scale = Vector3(0.85, 0.85, 0.85)
+
+rotation = Vector3(0, 0.0, 0)
+
+[node name="fern_2" parent="." instance=ExtResource("2")]
+
+position = Vector3(0.5, 0.05, -0.5)
+
+scale = Vector3(0.8, 0.8, 0.8)
+
+rotation = Vector3(0, 0.8726646259971648, 0)
+
+[node name="SampleNest" parent="." instance=ExtResource("3")]
+position = Vector3(0, 0.12, 0)

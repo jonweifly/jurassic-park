@@ -1,0 +1,664 @@
+[
+  {
+    "trigger": "vV",
+    "period_expression_seconds": "GetRandomReal(90.,100.)",
+    "action": "rl",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "e001",
+        "name": "蚊子 (小群)",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "2",
+        "unit_id": "e002",
+        "name": "苍蝇",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "set Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(2,'e001',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\ncall SetUnitAcquireRange(bj_lastCreatedUnit,3000.)\ncall IssuePointOrderByIdLoc(bj_lastCreatedUnit,$D0016,GetRandomLocInRect(bj_mapInitialPlayableArea))\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(2,'e002',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\ncall SetUnitAcquireRange(bj_lastCreatedUnit,3000.)\ncall IssuePointOrderByIdLoc(bj_lastCreatedUnit,$D0016,GetRandomLocInRect(bj_mapInitialPlayableArea))\n"
+  },
+  {
+    "trigger": "eV",
+    "period_expression_seconds": "GetRandomReal(750.,750.)",
+    "action": "il",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o000",
+        "name": "TRIGSTR_4228",
+        "owner_expression": "8"
+      }
+    ],
+    "source": "call PlaySoundBJ(Jr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(2,'o000',Player(8),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\ncall SetUnitAcquireRange(bj_lastCreatedUnit,10000.)\ncall IssuePointOrderByIdLoc(bj_lastCreatedUnit,$D0016,GetRandomLocInRect(bj_mapInitialPlayableArea))\nset zv=(zv+1)\n"
+  },
+  {
+    "trigger": "xV",
+    "period_expression_seconds": "GetRandomReal(300.,350.)",
+    "action": "al",
+    "spawns": [
+      {
+        "count_expression": "3",
+        "unit_id": "o00J",
+        "name": "大型棘龙",
+        "owner_expression": "8"
+      }
+    ],
+    "source": "call PlaySoundBJ(Jr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(3,'o00J',Player(8),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\ncall SetUnitAcquireRange(bj_lastCreatedUnit,10000.)\ncall IssuePointOrderByIdLoc(bj_lastCreatedUnit,$D0016,GetRandomLocInRect(bj_mapInitialPlayableArea))\n"
+  },
+  {
+    "trigger": "oV",
+    "period_expression_seconds": "GetRandomReal(160.,160.)",
+    "action": "Vl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o013",
+        "name": "暴龙[Allosaurus]",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o013",
+        "name": "暴龙[Allosaurus]",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "2",
+        "unit_id": "o00F",
+        "name": "中型的霸王龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o007",
+        "name": "幼年的霸王龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "set Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\nif(nl())then\ncall CreateNUnitsAtLoc(1,'o013',Player(7),Zv,bj_UNIT_FACING)\ncall CreateNUnitsAtLoc(1,'o013',Player(7),Zv,bj_UNIT_FACING)\nelse\ncall PlaySoundBJ(ur)\ncall CreateNUnitsAtLoc(2,'o00F',Player(7),Zv,bj_UNIT_FACING)\nendif\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o007',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "rV",
+    "period_expression_seconds": "GetRandomReal(200.,200.)",
+    "action": "Rl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00Z",
+        "name": "大型暴龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o00L",
+        "name": "成年的霸王龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(ur)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\nif(El())then\ncall CreateNUnitsAtLoc(1,'o00Z',Player(7),Zv,bj_UNIT_FACING)\nelse\ncall CreateNUnitsAtLoc(1,'o00L',Player(7),Zv,bj_UNIT_FACING)\nendif\nif(Xl())then\ncall UnitAddAbility(bj_lastCreatedUnit,'A046')\ncall UnitAddAbility(bj_lastCreatedUnit,'A043')\nendif\nif(Ol())then\ncall UnitAddAbility(bj_lastCreatedUnit,'A045')\ncall UnitAddAbility(bj_lastCreatedUnit,'A044')\nendif\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "iV",
+    "period_expression_seconds": "GetRandomReal(120.,130.)",
+    "action": "Il",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00J",
+        "name": "大型棘龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(Jr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00J',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "aV",
+    "period_expression_seconds": "GetRandomReal(40.,45.)",
+    "action": "Al",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00G",
+        "name": "中型的翼龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(Lr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00G',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "nV",
+    "period_expression_seconds": "GetRandomReal(200.,250.)",
+    "action": "Nl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o008",
+        "name": "小迅猛龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "set Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o008',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\ncall SetUnitAcquireRange(bj_lastCreatedUnit,10000.)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(6,Wv,Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\ncall SetUnitAcquireRange(bj_lastCreatedUnit,10000.)\n"
+  },
+  {
+    "trigger": "VV",
+    "period_expression_seconds": "GetRandomReal(190.,190.)",
+    "action": "bl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o001",
+        "name": "小霸王龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o007",
+        "name": "幼年的霸王龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(ur)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o001',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o007',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "EV",
+    "period_expression_seconds": "GetRandomReal(160.,160.)",
+    "action": "Bl",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o001",
+        "name": "小霸王龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o007",
+        "name": "幼年的霸王龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(ur)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(2,'o001',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o007',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "XV",
+    "period_expression_seconds": "GetRandomReal(170.,170.)",
+    "action": "cl",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o001",
+        "name": "小霸王龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o001",
+        "name": "小霸王龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o007",
+        "name": "幼年的霸王龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(ur)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(2,'o001',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o001',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o007',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "OV",
+    "period_expression_seconds": "GetRandomReal(310.,310.)",
+    "action": "Cl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00B",
+        "name": "三角龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(lr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00B',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "RV",
+    "period_expression_seconds": "GetRandomReal(310.,310.)",
+    "action": "dl",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o00B",
+        "name": "三角龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(lr)\nset Zv=Zv\ncall CreateNUnitsAtLoc(2,'o00B',Player(7),GetRandomLocInRect(bj_mapInitialPlayableArea),bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "IV",
+    "period_expression_seconds": "GetRandomReal(310.,310.)",
+    "action": "Dl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00C",
+        "name": "帆龙[Edaphosaurus]",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(lr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00C',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "AV",
+    "period_expression_seconds": "GetRandomReal(310.,310.)",
+    "action": "fl",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o00C",
+        "name": "帆龙[Edaphosaurus]",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(lr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(2,'o00C',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "NV",
+    "period_expression_seconds": "GetRandomReal(160.,160.)",
+    "action": "Fl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o000",
+        "name": "TRIGSTR_4228",
+        "owner_expression": "8"
+      }
+    ],
+    "source": "call PlaySoundBJ(Jr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o000',Player(8),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "bV",
+    "period_expression_seconds": "GetRandomReal(150.,150.)",
+    "action": "gl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o000",
+        "name": "TRIGSTR_4228",
+        "owner_expression": "8"
+      }
+    ],
+    "source": "call PlaySoundBJ(Jr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o000',Player(8),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "BV",
+    "period_expression_seconds": "GetRandomReal(160.,160.)",
+    "action": "Gl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o000",
+        "name": "TRIGSTR_4228",
+        "owner_expression": "8"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o000",
+        "name": "TRIGSTR_4228",
+        "owner_expression": "8"
+      }
+    ],
+    "source": "call PlaySoundBJ(Jr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o000',Player(8),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o000',Player(8),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "cV",
+    "period_expression_seconds": "GetRandomReal(70.,80.)",
+    "action": "hl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o004",
+        "name": "迅猛龙",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o008",
+        "name": "小迅猛龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(kr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o004',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o008',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "CV",
+    "period_expression_seconds": "GetRandomReal(70.,90.)",
+    "action": "Hl",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o004",
+        "name": "迅猛龙",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o008",
+        "name": "小迅猛龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(kr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(2,'o004',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o008',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "dV",
+    "period_expression_seconds": "GetRandomReal(90.,110.)",
+    "action": "jl",
+    "spawns": [
+      {
+        "count_expression": "3",
+        "unit_id": "o004",
+        "name": "迅猛龙",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o008",
+        "name": "小迅猛龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(kr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(3,'o004',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o008',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "DV",
+    "period_expression_seconds": "GetRandomReal(250.,275.)",
+    "action": "Jl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o008",
+        "name": "小迅猛龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(kr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,Wv,Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o008',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "fV",
+    "period_expression_seconds": "GetRandomReal(35.,50.)",
+    "action": "kl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o002",
+        "name": "双棘龙[Dilophosaurus]",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(sr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o002',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "FV",
+    "period_expression_seconds": "GetRandomReal(200.,210.)",
+    "action": "Kl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o002",
+        "name": "双棘龙[Dilophosaurus]",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(sr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o002',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "gV",
+    "period_expression_seconds": "GetRandomReal(150.,340.)",
+    "action": "ll",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00Y",
+        "name": "大型双棘龙【Dilophosaurus】",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o00Y",
+        "name": "大型双棘龙【Dilophosaurus】",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "set Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00Y',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00Y',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "GV",
+    "period_expression_seconds": "GetRandomReal(45.,50.)",
+    "action": "Ll",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o002",
+        "name": "双棘龙[Dilophosaurus]",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(sr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(2,'o002',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "hV",
+    "period_expression_seconds": "GetRandomReal(35.,50.)",
+    "action": "ml",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o005",
+        "name": "小翼手龙",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o00G",
+        "name": "中型的翼龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(Lr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o005',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00G',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "HV",
+    "period_expression_seconds": "GetRandomReal(100.,200.)",
+    "action": "Ml",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00W",
+        "name": "巨大的翼龙",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o00G",
+        "name": "中型的翼龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(Lr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00W',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00G',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "jV",
+    "period_expression_seconds": "GetRandomReal(100.,200.)",
+    "action": "pl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00W",
+        "name": "巨大的翼龙",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o00G",
+        "name": "中型的翼龙",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o00G",
+        "name": "中型的翼龙",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o00G",
+        "name": "中型的翼龙",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(Lr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00W',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00G',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00G',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o00G',Player(9),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "JV",
+    "period_expression_seconds": "GetRandomReal(30.,45.)",
+    "action": "Pl",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o006",
+        "name": "剑龙[Stegosaurus]",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(jr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o006',Player(9),Zv,bj_UNIT_FACING)\ncall SetUnitColor(bj_lastCreatedUnit,PLAYER_COLOR_BROWN)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "kV",
+    "period_expression_seconds": "GetRandomReal(30.,45.)",
+    "action": "ql",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o006",
+        "name": "剑龙[Stegosaurus]",
+        "owner_expression": "9"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o006",
+        "name": "剑龙[Stegosaurus]",
+        "owner_expression": "9"
+      }
+    ],
+    "source": "call PlaySoundBJ(jr)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o006',Player(9),Zv,bj_UNIT_FACING)\ncall SetUnitColor(bj_lastCreatedUnit,PLAYER_COLOR_BROWN)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(bj_mapInitialPlayableArea)\ncall CreateNUnitsAtLoc(1,'o006',Player(9),Zv,bj_UNIT_FACING)\ncall SetUnitColor(bj_lastCreatedUnit,PLAYER_COLOR_BROWN)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "WV",
+    "period_expression_seconds": "30.",
+    "action": "SL",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "e005",
+        "name": "食人的怪物苍蝇",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call CreateNUnitsAtLoc(2,'e005',Player(7),GetRandomLocInRect(ir),bj_UNIT_FACING)\n"
+  },
+  {
+    "trigger": "YV",
+    "period_expression_seconds": "1100.",
+    "action": "TL",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o001",
+        "name": "小霸王龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o001",
+        "name": "小霸王龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o007",
+        "name": "幼年的霸王龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(ur)\nset Zv=GetRandomLocInRect(xr)\ncall CreateNUnitsAtLoc(2,'o001',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(xr)\ncall CreateNUnitsAtLoc(1,'o001',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(xr)\ncall CreateNUnitsAtLoc(1,'o007',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "zV",
+    "period_expression_seconds": "1200.",
+    "action": "wL",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "o00L",
+        "name": "成年的霸王龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(ur)\nset Zv=GetRandomLocInRect(xr)\ncall CreateNUnitsAtLoc(1,'o00L',Player(7),Zv,bj_UNIT_FACING)\nif(uL())then\ncall UnitAddAbility(bj_lastCreatedUnit,'A046')\ncall UnitAddAbility(bj_lastCreatedUnit,'A043')\nendif\nif(UL())then\ncall UnitAddAbility(bj_lastCreatedUnit,'A045')\ncall UnitAddAbility(bj_lastCreatedUnit,'A044')\nendif\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "ZV",
+    "period_expression_seconds": "1000.",
+    "action": "WL",
+    "spawns": [
+      {
+        "count_expression": "2",
+        "unit_id": "o00F",
+        "name": "中型的霸王龙",
+        "owner_expression": "7"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "o007",
+        "name": "幼年的霸王龙",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "call PlaySoundBJ(ur)\nset Zv=GetRandomLocInRect(er)\ncall CreateNUnitsAtLoc(2,'o00F',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\nset Zv=GetRandomLocInRect(er)\ncall CreateNUnitsAtLoc(1,'o007',Player(7),Zv,bj_UNIT_FACING)\ncall RemoveLocation(Zv)\n"
+  },
+  {
+    "trigger": "xE",
+    "period_expression_seconds": "200.",
+    "action": "ZL",
+    "spawns": [
+      {
+        "count_expression": "$A",
+        "unit_id": "o00X",
+        "name": "迅猛龙Lurker",
+        "owner_expression": "7"
+      }
+    ],
+    "source": "set pe=bb('o00X')\nif(zL())then\ncall CreateNUnitsAtLoc($A,'o00X',Player(7),Pe,bj_UNIT_FACING)\ncall DestroyGroup(pe)\nelse\ncall DestroyGroup(pe)\nendif\n"
+  },
+  {
+    "trigger": "rI",
+    "period_expression_seconds": "360.",
+    "action": "ZW",
+    "spawns": [
+      {
+        "count_expression": "1",
+        "unit_id": "ncrb",
+        "name": null,
+        "owner_expression": "$F"
+      },
+      {
+        "count_expression": "1",
+        "unit_id": "nhmc",
+        "name": null,
+        "owner_expression": "$F"
+      }
+    ],
+    "source": "set Re=GetRandomLocInRect(Ir)\ncall CreateNUnitsAtLoc(1,'ncrb',Player($F),Re,bj_UNIT_FACING)\ncall RemoveLocation(Re)\nset Re=GetRandomLocInRect(Ir)\ncall CreateNUnitsAtLoc(1,'nhmc',Player($F),Re,bj_UNIT_FACING)\ncall RemoveLocation(Re)\n"
+  }
+]

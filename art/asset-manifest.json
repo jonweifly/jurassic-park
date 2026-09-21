@@ -1,0 +1,319 @@
+[
+  {
+    "name": "broadleaf",
+    "triangles": 3428,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3559048,
+    "runtime_bytes": 201912
+  },
+  {
+    "name": "tent",
+    "triangles": 2540,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3476672,
+    "runtime_bytes": 98916
+  },
+  {
+    "name": "tree",
+    "triangles": 4360,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3590776,
+    "runtime_bytes": 260172
+  },
+  {
+    "name": "snow_tree",
+    "triangles": 4360,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3590776,
+    "runtime_bytes": 260172
+  },
+  {
+    "name": "rock",
+    "triangles": 450,
+    "meshes": 1,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3443268,
+    "runtime_bytes": 41828
+  },
+  {
+    "name": "fern",
+    "triangles": 2480,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3517332,
+    "runtime_bytes": 143004
+  },
+  {
+    "name": "broadleaf_lod",
+    "triangles": 1668,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3479068,
+    "runtime_bytes": 92360
+  },
+  {
+    "name": "tree_lod",
+    "triangles": 2056,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3491104,
+    "runtime_bytes": 116728
+  },
+  {
+    "name": "snow_tree_lod",
+    "triangles": 2056,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3491104,
+    "runtime_bytes": 116728
+  },
+  {
+    "name": "axe",
+    "triangles": 196,
+    "meshes": 1,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3420628,
+    "runtime_bytes": 9592
+  },
+  {
+    "name": "pickaxe",
+    "triangles": 212,
+    "meshes": 1,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3420984,
+    "runtime_bytes": 10168
+  },
+  {
+    "name": "hammer",
+    "triangles": 196,
+    "meshes": 1,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3420632,
+    "runtime_bytes": 9592
+  },
+  {
+    "name": "rifle",
+    "triangles": 252,
+    "meshes": 1,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3421800,
+    "runtime_bytes": 11272
+  },
+  {
+    "name": "wood_cargo",
+    "triangles": 236,
+    "meshes": 1,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3421512,
+    "runtime_bytes": 11084
+  },
+  {
+    "name": "ore_cargo",
+    "triangles": 510,
+    "meshes": 1,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3427668,
+    "runtime_bytes": 21320
+  },
+  {
+    "name": "fire",
+    "triangles": 1288,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3447376,
+    "runtime_bytes": 52392
+  },
+  {
+    "name": "generator",
+    "triangles": 1368,
+    "meshes": 3,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3448948,
+    "runtime_bytes": 54448
+  },
+  {
+    "name": "shelter",
+    "triangles": 1020,
+    "meshes": 3,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3441592,
+    "runtime_bytes": 42996
+  },
+  {
+    "name": "gate",
+    "triangles": 1020,
+    "meshes": 3,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3441704,
+    "runtime_bytes": 43108
+  },
+  {
+    "name": "tower",
+    "triangles": 1042,
+    "meshes": 4,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3443076,
+    "runtime_bytes": 45560
+  },
+  {
+    "name": "lab",
+    "triangles": 1424,
+    "meshes": 3,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3450324,
+    "runtime_bytes": 56728
+  },
+  {
+    "name": "fossil",
+    "triangles": 1124,
+    "meshes": 3,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3443348,
+    "runtime_bytes": 45852
+  },
+  {
+    "name": "survivor",
+    "triangles": 3238,
+    "meshes": 1,
+    "bones": 16,
+    "clips": [
+      "attack",
+      "build",
+      "carry",
+      "carry_idle",
+      "chop",
+      "death",
+      "idle",
+      "mine",
+      "walk"
+    ],
+    "bytes": 3605244,
+    "runtime_bytes": 249624
+  },
+  {
+    "name": "raptor",
+    "triangles": 2996,
+    "meshes": 1,
+    "bones": 20,
+    "clips": [
+      "attack",
+      "death",
+      "idle",
+      "walk"
+    ],
+    "bytes": 3572584,
+    "runtime_bytes": 217160
+  },
+  {
+    "name": "trex",
+    "triangles": 2812,
+    "meshes": 1,
+    "bones": 20,
+    "clips": [
+      "attack",
+      "death",
+      "idle",
+      "walk"
+    ],
+    "bytes": 3565388,
+    "runtime_bytes": 206972
+  },
+  {
+    "name": "canopy_tree",
+    "triangles": 3046,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3592580,
+    "runtime_bytes": 193684
+  },
+  {
+    "name": "canopy_tree_lod",
+    "triangles": 1366,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3475400,
+    "runtime_bytes": 76504
+  },
+  {
+    "name": "split_tree",
+    "triangles": 2132,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3534916,
+    "runtime_bytes": 136020
+  },
+  {
+    "name": "split_tree_lod",
+    "triangles": 980,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3454552,
+    "runtime_bytes": 55652
+  },
+  {
+    "name": "palm_tree",
+    "triangles": 3364,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3599720,
+    "runtime_bytes": 200824
+  },
+  {
+    "name": "palm_tree_lod",
+    "triangles": 1636,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3499552,
+    "runtime_bytes": 100652
+  },
+  {
+    "name": "wind_pine",
+    "triangles": 2006,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3516436,
+    "runtime_bytes": 117540
+  },
+  {
+    "name": "wind_pine_lod",
+    "triangles": 1526,
+    "meshes": 2,
+    "bones": 0,
+    "clips": [],
+    "bytes": 3483016,
+    "runtime_bytes": 84120
+  }
+]
