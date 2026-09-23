@@ -89,6 +89,11 @@ func apply(world: Node, display: bool = true) -> void:
 	world.get_viewport().msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][values.quality]
 	var cover := world.get_node_or_null("Island/GroundCover")
 	if cover: cover.visible = values.quality > 0
+	# Settings apply while paused too; do not wait for the next simulation tick.
+	for b in world.session.buildings:
+		if not world.visuals.has(b.id): continue
+		var dressing: Node = world.visuals[b.id].get_node_or_null("CampDressing")
+		if dressing: dressing.visible = b.remaining <= 0 and values.quality > 0
 	if display and DisplayServer.get_name() != "headless":
 		Engine.max_fps = values.fps
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if values.vsync else DisplayServer.VSYNC_DISABLED)

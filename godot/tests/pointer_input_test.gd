@@ -53,12 +53,12 @@ func run() -> void:
 		world._physics_process(0.1)
 		world.update_camera(0.1)
 	expect(world.camera.position.distance_to(before) > 1, "Camera follows after the click without further events")
-	# A click on the actual journal Button goes through Control input and must not move.
+	# A remaining core modal consumes the click and pauses the simulation.
 	world.hud.refresh(0)
-	var journal: Button = world.hud.quest_box.get_child(0).get_child(4)
-	click(journal.get_global_rect().get_center(), MOUSE_BUTTON_LEFT)
+	expect(not world.hud.journal_button.visible, "Archived journal is absent from the focused HUD")
+	click(world.hud.tech_button.get_global_rect().get_center(), MOUSE_BUTTON_LEFT)
 	await process_frame
-	expect(world.hud.expedition_panel.panel.visible and world.paused, "GUI journal click is consumed and opens its modal")
+	expect(world.hud.tech_panel.visible and world.paused, "GUI technology click is consumed and opens its modal")
 	var position: Vector3 = world.hero.position
 	click(screen, MOUSE_BUTTON_RIGHT)
 	world._physics_process(1)
@@ -68,7 +68,7 @@ func run() -> void:
 	escape.pressed = true
 	root.push_input(escape, true)
 	await process_frame
-	expect(not world.hud.expedition_panel.panel.visible and not world.paused, "Escape closes the journal through the native event chain")
+	expect(not world.hud.tech_panel.visible and not world.paused, "Escape closes technology through the native event chain")
 	world.free()
 	print("POINTER INPUT: ", checks, " checks, ", failures, " failures")
 	quit(0 if failures == 0 else 1)

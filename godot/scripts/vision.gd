@@ -1,4 +1,5 @@
 extends RefCounted
+const Features = preload("res://scripts/feature_policy.gd")
 ## Shared vision data drives world shading, enemy rendering, targeting and minimap.
 const Board = preload("res://scripts/board.gd")
 var world: Node
@@ -73,13 +74,13 @@ func tick(dt: float) -> void:
 func update() -> void:
 	visible_cells.clear()
 	# Sight radii are provisional, shared by rendering and combat.
-	if world.hero.health > 0: reveal(world.hero.position, 22.0 if world.session.game_time() < world.session.adventure.get("scan_until", 0.0) else (9.0 if world.night else 15.0))
+	if world.hero.health > 0: reveal(world.hero.position, 22.0 if Features.peripheral_enabled and world.session.game_time() < world.session.adventure.get("scan_until", 0.0) else (9.0 if world.night else 15.0))
 	for b in world.session.buildings:
 		if b.hp <= 0 or b.remaining > 0: continue
 		var radius := 6.0
 		if b.kind == "tent": radius = 10.0
 		if b.kind == "fire": radius = 14.0
-		if b.kind == "tower" and world.session.supply() >= world.session.demand(): radius = 16.0
+		if b.kind == "tower" and world.session.supply() >= world.session.demand(): radius = maxf(16.0, world.Catalog.attack_range(b))
 		reveal(world.board.point(b.cell), radius)
 	image.fill(Color.BLACK)
 	for c in explored: image.set_pixel(c.x, c.y, Color(0.28, 0.28, 0.28))

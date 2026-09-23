@@ -1,6 +1,7 @@
 extends RefCounted
 const Catalog = preload("res://scripts/expedition_catalog.gd")
 const Contracts = preload("res://scripts/expedition_contracts.gd")
+const Features = preload("res://scripts/feature_policy.gd")
 var contracts: RefCounted
 var world: Node
 var visuals: Dictionary = {}
@@ -16,6 +17,7 @@ func data() -> Dictionary:
 	return world.session.adventure
 
 func initialize(content_seed: int = 0) -> void:
+	if not Features.peripheral_enabled: return
 	if data().is_empty(): world.session.adventure = Catalog.empty_state()
 	if data().sites.is_empty():
 		if content_seed > 0: data().run = Catalog.Run.create(content_seed)
@@ -98,6 +100,7 @@ func add_visual(id: String) -> void:
 	n.visible = false
 
 func refresh_visibility() -> void:
+	if not Features.peripheral_enabled: return
 	for id in data().get("sites", {}):
 		var site: Dictionary = data().sites[id]
 		var visible_now: bool = world.vision.is_visible(site.cell)
@@ -111,11 +114,13 @@ func refresh_visibility() -> void:
 		n.get_node("Marker").visible = visible_now and site.status not in ["carried", "completed"]
 
 func note(message: String) -> void:
+	if not Features.peripheral_enabled: return
 	data().history.append({"at": world.session.elapsed, "text": message})
 	while data().history.size() > 32: data().history.pop_front()
 	world.hud.toast(message)
 
 func at_point(p: Vector3) -> String:
+	if not Features.peripheral_enabled: return ""
 	for id in data().get("sites", {}):
 		var site: Dictionary = data().sites[id]
 		if site.status == "hidden": continue
@@ -123,6 +128,7 @@ func at_point(p: Vector3) -> String:
 	return ""
 
 func go_to(id: String, inspect: bool = true) -> String:
+	if not Features.peripheral_enabled: return "调查系统暂缓"
 	if not data().sites.has(id) or data().sites[id].status == "hidden": return "尚未获得此处坐标"
 	if world.session.phase not in ["playing", "evacuate"]: return "本局已结束"
 	var target: Vector3 = world.board.point(data().sites[id].cell)
@@ -138,6 +144,7 @@ func go_to(id: String, inspect: bool = true) -> String:
 	return ""
 
 func choice_error(id: String, choice: int) -> String:
+	if not Features.peripheral_enabled: return "调查系统暂缓"
 	if world.session.phase != "playing": return "正在撤离，无法开始新的调查"
 	if not data().sites.has(id) or choice < 0 or choice >= Catalog.SITES[id].choices.size(): return "调查选项无效"
 	var site: Dictionary = data().sites[id]
@@ -163,6 +170,7 @@ func begin(id: String, choice: int) -> String:
 	return ""
 
 func cancel_job() -> void:
+	if not Features.peripheral_enabled: return
 	if not data().is_empty(): data().job = {}
 
 func repair_blocked(id: String) -> bool:
@@ -173,6 +181,7 @@ func repair_blocked(id: String) -> bool:
 	return false
 
 func update(dt: float) -> void:
+	if not Features.peripheral_enabled: return
 	if data().is_empty() or not world.started: return
 	data().kit_cooldown = maxf(0, data().kit_cooldown - dt)
 	refresh_clock -= dt
@@ -211,6 +220,7 @@ func update(dt: float) -> void:
 	if site.progress >= Catalog.SITES[id].seconds: finish(id)
 
 func finish(id: String) -> void:
+	if not Features.peripheral_enabled: return
 	var site: Dictionary = data().sites[id]
 	if site.status != "discovered" or not site.paid: return
 	world.stop_order()
@@ -227,6 +237,7 @@ func finish(id: String) -> void:
 	refresh_visibility()
 
 func reward(id: String) -> void:
+	if not Features.peripheral_enabled: return
 	var site: Dictionary = data().sites[id]
 	if site.status == "completed": return
 	var choice: Dictionary = Catalog.SITES[id].choices[site.choice]
@@ -243,6 +254,7 @@ func reward(id: String) -> void:
 		note("事故记录已整理完整。额外获得 1 个急救包；撤离后可在日志中回顾。")
 
 func deposit_samples() -> void:
+	if not Features.peripheral_enabled: return
 	if data().cargo.is_empty() or world.hero.health <= 0: return
 	for b in world.session.buildings:
 		if b.hp <= 0 or b.remaining > 0 or b.kind != "tent": continue
@@ -253,6 +265,7 @@ func deposit_samples() -> void:
 		return
 
 func return_samples(require_cargo: bool = true) -> String:
+	if not Features.peripheral_enabled: return "调查系统暂缓"
 	if world.session.phase not in ["playing", "evacuate"] or world.hero.health <= 0: return "当前无法返营"
 	if require_cargo and data().cargo.is_empty(): return "没有待返送的调查资料"
 	var best := INF
@@ -274,6 +287,7 @@ func return_samples(require_cargo: bool = true) -> String:
 	return ""
 
 func use_kit() -> String:
+	if not Features.peripheral_enabled: return "急救包系统暂缓"
 	if world.paused or world.session.phase not in ["playing", "evacuate"] or world.hero.health <= 0: return "当前无法使用急救包"
 	if data().get("kits", 0) <= 0: return "没有急救包：可探索急救站或留意无线电事件"
 	if data().kit_cooldown > 0: return "急救包冷却剩余 %.0f 秒" % data().kit_cooldown
@@ -285,6 +299,7 @@ func use_kit() -> String:
 	return ""
 
 func update_events() -> void:
+	if not Features.peripheral_enabled: return
 	if world.session.phase != "playing": return
 	if not data().offer.is_empty():
 		if world.session.elapsed >= data().offer_until:
@@ -300,6 +315,7 @@ func update_events() -> void:
 		return
 
 func event_error(choice: int) -> String:
+	if not Features.peripheral_enabled: return "无线电事件暂缓"
 	if world.session.phase != "playing" or data().offer.is_empty() or world.session.elapsed >= data().offer_until: return "消息已结束"
 	var event := Catalog.event(data().offer)
 	if choice < 0 or choice >= event.choices.size(): return "选项无效"
@@ -331,6 +347,7 @@ func choose_event(choice: int) -> String:
 	return ""
 
 func summary() -> String:
+	if not Features.peripheral_enabled: return ""
 	if data().is_empty(): return "%s 探索日志 · 发现岛上设施" % world.preferences.key_name("journal")
 	if not data().job.is_empty() and world.order == "expedition":
 		var id: String = data().job.id

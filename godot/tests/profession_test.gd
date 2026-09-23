@@ -11,6 +11,7 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _init() -> void:
+	preload("res://scripts/feature_policy.gd").peripheral_enabled = true
 	var s := Session.new()
 	check(Session.PROFESSIONS.size() == 4, "Four selectable survivor professions are defined")
 	s.profession = "explorer"

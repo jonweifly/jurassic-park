@@ -1,6 +1,7 @@
 extends Node3D
 const Preferences = preload("res://scripts/preferences.gd")
 const Catalog = preload("res://scripts/catalog.gd")
+const Features = preload("res://scripts/feature_policy.gd")
 const SaveStore = preload("res://scripts/save_store.gd")
 const Expedition = preload("res://scripts/expedition.gd")
 const Director = preload("res://scripts/session_director.gd")
@@ -19,7 +20,9 @@ const Scenery = preload("res://scripts/scenery.gd")
 const Weather = preload("res://scripts/weather.gd")
 const ExtractionFeedback = preload("res://scripts/extraction_feedback.gd")
 const BuildAccess = preload("res://scripts/build_access.gd")
+const DefenseFeedback = preload("res://scripts/defense_feedback.gd")
 const SurvivorScene = preload("res://scenes/models/survivor.tscn")
+const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
 const DinoScene = preload("res://scenes/models/raptor.tscn")
 const TrexScene = preload("res://scenes/models/trex.tscn")
 const TreeScene = preload("res://scenes/models/tree.tscn")
@@ -77,6 +80,7 @@ var persistence_enabled := not ("--script" in OS.get_cmdline_args())
 var save_status := "尚未存档"
 var low_health_warned := false
 var outage_warned := false
+var defense_notice_after := 0.0
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
@@ -137,6 +141,9 @@ func _ready() -> void:
 	hud = HUD.new()
 	hud.world = self
 	add_child(hud)
+	var defense_feedback := DefenseFeedback.new()
+	defense_feedback.world = self
+	hud.root.add_child(defense_feedback)
 	pointer_feedback = PointerFeedback.new()
 	pointer_feedback.world = self
 	hud.root.add_child(pointer_feedback)
@@ -392,7 +399,7 @@ func _physics_process(dt: float) -> void:
 		return
 	session.tick(dt)
 	if session.survival_damage > 0.0:
-		hero.health = maxf(0.0, hero.health - session.survival_damage)
+		if Features.peripheral_enabled: hero.health = maxf(0.0, hero.health - session.survival_damage)
 		session.survival_damage = 0.0
 	scenery.clock += dt
 	hero.navigation = board
@@ -401,11 +408,11 @@ func _physics_process(dt: float) -> void:
 	vision.tick(dt)
 	update_order(dt)
 	worker.update(dt)
-	# A completed tent is also a safe rest point. Resting is automatic while idle
-	# nearby, so the player does not need another modal interaction.
-	if order == "idle" and near_completed_tent():
-		session.rest(dt)
-	adventure.update(dt)
+	# Exploration, hunger, fatigue and cooking remain readable in old saves but
+	# are dormant while the core dinosaur/building loop is being polished.
+	if Features.peripheral_enabled:
+		if order == "idle" and near_completed_tent(): session.rest(dt)
+		adventure.update(dt)
 	if paused: return
 	update_buildings(dt)
 	update_dinosaurs(dt)
@@ -474,7 +481,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if not build_mode.is_empty(): build_mode = ""
 			else: toggle_pause()
 			return
-		if preferences.matches(event, "journal") and started:
+		if Features.peripheral_enabled and preferences.matches(event, "journal") and started:
 			hud.expedition_panel.open()
 			return
 		if paused or session.phase in ["won", "lost"]: return
@@ -483,7 +490,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if preferences.matches(event, "upgrade"): research()
 		if preferences.matches(event, "tech"): hud.open_tech()
 		if preferences.matches(event, "heal"): heal()
-		if preferences.matches(event, "kit"): use_medkit()
+		if Features.peripheral_enabled and preferences.matches(event, "kit"): use_medkit()
 		if preferences.matches(event, "stop"): stop_order()
 	if not event is InputEventMouseButton or not event.pressed: return
 	if paused or session.phase in ["won", "lost"]: return
@@ -612,7 +619,7 @@ func context_at(p: Vector3) -> Dictionary:
 	for d in dinosaurs:
 		if d.health > 0 and d.visible and d.position.distance_to(p) < 1.8:
 			return {"kind": "attack", "position": d.position, "id": d.get_instance_id()}
-	var site: String = adventure.at_point(p)
+	var site: String = adventure.at_point(p) if Features.peripheral_enabled else ""
 	if not site.is_empty(): return {"kind": "inspect", "position": board.point(adventure.data().sites[site].cell), "site": site}
 	var b := building_at(cell)
 	var target := board.point(cell)
@@ -622,7 +629,7 @@ func context_at(p: Vector3) -> Dictionary:
 			if b.kind == "gate": return {"kind": "gate", "position": target, "id": b.id}
 			if b.kind == "fossil": return {"kind": "gold", "position": target}
 			if b.kind == "tent" and worker.cargo > 0: return {"kind": "return", "position": target}
-			if b.hp < Catalog.BUILDINGS[b.kind].hp: return {"kind": "repair", "position": target, "id": b.id}
+			if b.hp < Catalog.max_health(b): return {"kind": "repair", "position": target, "id": b.id}
 	if trees.has(cell) and vision.explored.has(cell): return {"kind": "wood", "position": target}
 	return {"kind": "move", "position": target}
 
@@ -725,7 +732,7 @@ func update_buildings(dt: float) -> void:
 		if b.kind not in ["tower", "shelter", "gate"] or session.supply() < session.demand(): continue
 		b.cooldown -= dt
 		var nearest: Node3D = null
-		var best := 15.625 if b.kind == "tower" else 2.8
+		var best := Catalog.attack_range(b)
 		for d in dinosaurs:
 			var distance := n.position.distance_to(d.position)
 			if d.health > 0 and d.visible and distance < best:
@@ -735,9 +742,10 @@ func update_buildings(dt: float) -> void:
 			var direction := nearest.position - n.position
 			if b.kind == "tower": n.get_node("Model/Gun").rotation.y = atan2(direction.x, direction.z)
 			if b.cooldown <= 0:
-				b.cooldown = 1.0
+				b.cooldown = Catalog.attack_interval(b)
 				sound.play_at("bow" if b.kind == "tower" else "electric", n.position)
-				nearest.health -= session.defense_multiplier() * (10 if b.kind == "tower" else 15) * (1.5 if Regions.at(n.position) == "mountain" else 1.0)
+				var damage := session.defense_multiplier() * (10 if b.kind == "tower" else 15) * (1.5 if Regions.at(n.position) == "mountain" else 1.0)
+				nearest.health -= Dinosaurs.received_damage(str(nearest.get_meta("species", "raptor")), damage, b.kind)
 				dino_ai.provoke(nearest, "building", b.id, n.position)
 				dino_ai.emit_noise(n.position, 14.0 if b.kind == "tower" else 8.0, "building", b.id)
 				tracer(n.position + Vector3.UP * 2.1, nearest.position + Vector3.UP * 1.2, Color("f5d087"))
@@ -753,18 +761,20 @@ func spawn_dinosaur(at: Vector3 = Vector3(10000, 0, 0), species: String = "rapto
 				break
 		if not found: return null
 	if not board.is_open(board.cell_at(p)): return null
-	var d: Node3D = (TrexScene if species in ["trex", "young_trex"] else DinoScene).instantiate()
+	var spec: Dictionary = Dinosaurs.spec(species)
+	var model_key: String = "dinosaur_" + spec.model
+	if not model_cache.has(model_key): model_cache[model_key] = load("res://scenes/models/%s.tscn" % spec.model)
+	var d: Node3D = model_cache[model_key].instantiate()
 	d.is_dinosaur = true
 	d.body_radius = Board.species_radius(species)
 	d.set_meta("save_id", session.next_dinosaur_id)
 	session.next_dinosaur_id += 1
-	var spec: Array = {"raptor": [100.0, 350.0, 1.0, 12.0, 1.0], "small_raptor": [65.0, 320.0, 0.72, 6.0, 1.5], "trex": [1000.0, 280.0, 1.5, 20.0, 1.4], "young_trex": [350.0, 215.0, 1.2, 15.0, 1.2]}[species]
-	d.health = spec[0]
+	d.health = spec.hp
 	d.max_health = d.health
-	d.speed = spec[1] / 64.0
-	d.scale *= spec[2]
-	d.attack_damage = spec[3]
-	d.attack_interval = spec[4]
+	d.speed = spec.speed
+	d.scale *= spec.scale
+	d.attack_damage = spec.damage
+	d.attack_interval = spec.interval
 	d.set_meta("base_speed", d.speed)
 	d.set_meta("base_interval", d.attack_interval)
 	d.set_meta("species", species)
@@ -778,6 +788,34 @@ func spawn_dinosaur(at: Vector3 = Vector3(10000, 0, 0), species: String = "rapto
 
 func update_dinosaurs(dt: float) -> void:
 	dino_ai.update(dt)
+
+func damage_building(b: Dictionary, damage: float) -> void:
+	var previous: float = b.hp
+	b.hp = maxf(0.0, b.hp - damage)
+	var now: float = session.game_time()
+	if now < defense_notice_after: return
+	var critical: bool = b.hp <= Catalog.max_health(b) * 0.35
+	if critical or previous >= Catalog.max_health(b):
+		defense_notice_after = now + 10.0
+		hud.toast(Catalog.BUILDINGS[b.kind].name + ("濒临失守！选中后修理，保留撤退通道。" if critical else "正在遭受攻击。"))
+		sound.play_ui("warning")
+
+func refit_selected(option: String) -> void:
+	if paused or selected_id < 0: return
+	var error := session.refit(selected_id, option)
+	if error.is_empty():
+		var b := selected_building()
+		scenery.update_building(visuals[selected_id], b)
+		hud.toast("开始改造：" + Catalog.REFITS[option].name + "。施工完成前防御暂停。")
+	else:
+		hud.toast(error)
+
+func repair_selected() -> void:
+	var b := selected_building()
+	if paused or b.is_empty() or b.remaining > 0 or b.hp >= Catalog.max_health(b): return
+	if session.phase not in ["playing", "evacuate"]: return
+	build_mode = ""
+	worker.assign("repair", board.point(b.cell), b.id)
 
 func tracer(a: Vector3, b: Vector3, color: Color) -> void:
 	if a.distance_squared_to(b) < 0.000001: return
@@ -795,6 +833,9 @@ func update_effects(dt: float) -> void:
 				fx.node.position = fx.follow.position + Vector3.UP * 0.12
 				fx.node.visible = fx.follow.visible
 			else: fx.remaining = 0
+		if fx.has("flight_duration"):
+			var fraction := clampf(1.0 - float(fx.remaining) / float(fx.flight_duration), 0.0, 1.0)
+			fx.node.position = fx.flight_from.lerp(fx.flight_to, fraction) + Vector3.UP * sin(fraction * PI) * 1.4
 		if fx.has("velocity"):
 			fx.velocity.y -= dt * 4
 			fx.node.position += fx.velocity * dt
@@ -829,11 +870,12 @@ func toggle_pause() -> void:
 func start_session(duration: float, mode: String = "classic", content_seed: int = 0, profession: String = "") -> void:
 	session.mode = mode
 	session.duration = duration
-	if not profession.is_empty() and Session.PROFESSIONS.has(profession): session.profession = profession
+	if Features.peripheral_enabled and Session.PROFESSIONS.has(profession): session.profession = profession
 	hero.speed = session.survivor_speed()
 	hero.max_health = session.survivor_max_health()
 	hero.health = hero.max_health
 	if mode == "standard": director.configure()
+	elif mode == "hard": director.configure_hard()
 	started = true
 	paused = false
 	camera_rig.center(true)
@@ -933,6 +975,9 @@ func near_completed_tent() -> bool:
 	return false
 
 func eat_food() -> void:
+	if not Features.peripheral_enabled:
+		hud.toast("生存属性系统暂缓，当前专注营地与恐龙防线。")
+		return
 	if paused or session.phase not in ["playing", "evacuate"]: return
 	if session.eat_food():
 		hud.toast("补充食物，饱腹度恢复。")
@@ -941,6 +986,9 @@ func eat_food() -> void:
 		hud.toast("没有可食用的食物；可在营火烤制肉类。")
 
 func cook_food() -> void:
+	if not Features.peripheral_enabled:
+		hud.toast("烹饪系统暂缓，当前专注营地与恐龙防线。")
+		return
 	if paused or session.phase not in ["playing", "evacuate"]: return
 	if session.cook_food():
 		hud.toast("营火烤制完成，获得熟肉。")
@@ -993,15 +1041,18 @@ func _notification(what: int) -> void:
 func update_lighting() -> void:
 	var daylight := (cos(((session.elapsed + session.evacuation_elapsed) / Catalog.DAY_SECONDS) * TAU - 0.5) + 1.0) / 2.0
 	night = daylight < 0.3
-	sun.light_energy = lerpf(0.16, 0.82, daylight)
-	sun.light_color = Color("849bc1").lerp(Color("fff0d6"), daylight)
-	environment.ambient_light_energy = lerpf(0.28, 0.42, daylight)
-	environment.ambient_light_color = Color("7790af").lerp(Color("b9c8bd"), daylight)
+	sun.light_energy = lerpf(0.16, 0.76, daylight)
+	sun.light_color = Color("849bc1").lerp(Color("f4e9d5"), daylight)
+	environment.ambient_light_energy = lerpf(0.28, 0.44, daylight)
+	environment.ambient_light_color = Color("7790af").lerp(Color("aabac6"), daylight)
 	environment.fog_light_color = Color("253d50").lerp(Color("819794"), daylight)
 	if weather:
 		weather.update()
 		weather.apply_lighting()
 
 func use_medkit() -> void:
+	if not Features.peripheral_enabled:
+		hud.toast("急救包系统暂缓，请使用营地帐篷治疗。")
+		return
 	var error: String = adventure.use_kit()
 	hud.toast("已使用急救包，恢复 50 生命。" if error.is_empty() else error)

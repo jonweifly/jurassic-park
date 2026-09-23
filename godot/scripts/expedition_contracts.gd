@@ -1,5 +1,6 @@
 extends RefCounted
 const Run = preload("res://scripts/expedition_run.gd")
+const Features = preload("res://scripts/feature_policy.gd")
 var world: Node
 
 func _init(owner_world: Node) -> void:
@@ -9,6 +10,7 @@ func data() -> Dictionary:
 	return world.session.adventure.get("run", {})
 
 func accept(id: String) -> String:
+	if not Features.peripheral_enabled: return "委托系统暂缓"
 	var run := data()
 	if world.session.phase != "playing" or run.is_empty(): return "当前无法接受委托"
 	if not run.active.is_empty(): return "本局已选择委托；可自由决定是否完成，不会扣除资源"
@@ -31,6 +33,7 @@ func reward_text(id: String) -> String:
 	return "额外补给：%d 木 / %d 金 / %d 急救包" % [spec.wood, spec.gold, spec.kits]
 
 func settle() -> void:
+	if not Features.peripheral_enabled: return
 	var run := data()
 	if run.is_empty() or run.active.is_empty() or run.claimed or world.hero.health <= 0: return
 	if world.session.phase not in ["playing", "evacuate"] or completed_count(run.active) != 2: return

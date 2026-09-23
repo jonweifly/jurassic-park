@@ -6,6 +6,8 @@ var checks := 0
 var failures := 0
 
 func _initialize() -> void:
+	# Archived content compatibility fixture; production defaults remain disabled.
+	preload("res://scripts/feature_policy.gd").peripheral_enabled = true
 	call_deferred("run")
 
 func expect(value: bool, message: String) -> void:

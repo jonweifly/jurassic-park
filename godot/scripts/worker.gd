@@ -213,7 +213,7 @@ func update(dt: float) -> void:
 			clock += dt
 			if clock < 1: return
 			clock = 0
-			var max_hp: float = world.Catalog.BUILDINGS[b.kind].hp
+			var max_hp: float = world.Catalog.max_health(b)
 			if b.hp >= max_hp or world.session.wood < 1:
 				world.order = "idle"
 				world.hud.toast("修理完成。" if b.hp >= max_hp else "木材不足，修理已停止。")

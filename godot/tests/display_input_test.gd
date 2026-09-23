@@ -28,8 +28,9 @@ func verify_frame(label: String) -> void:
 	var physical := transform * logical
 	expect(physical.position.length() < 2 and physical.size.distance_to(Vector2(root.size)) < 2, label + ": canvas reaches all window edges without bars")
 	expect(absf(transform.x.length() - transform.y.length()) < 0.001, label + ": uniform scaling preserves proportions")
-	for control in [world.hud.top, world.hud.bottom, world.hud.quest_box, world.hud.minimap]:
+	for control in [world.hud.bottom, world.hud.quest_box, world.hud.minimap]:
 		expect(logical.encloses(control.get_global_rect()), label + ": HUD stays inside viewport")
+	expect(world.hud.bottom.offset_bottom >= -8, label + ": bottom HUD panel stays close to viewport edge")
 	var point: Vector3 = world.board.point(world.board.cell_at(world.hero.position) + Vector2i(2, 0))
 	var screen: Vector2 = world.camera.unproject_position(point)
 	expect(world.ground_at(screen).distance_to(point) < 0.15, label + ": terrain picking remains aligned")

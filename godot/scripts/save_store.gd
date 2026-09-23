@@ -2,6 +2,9 @@ extends RefCounted
 ## Versioned data-only saves. Never deserialize objects or write into the project.
 const VERSION := 3
 const ExpeditionCatalog = preload("res://scripts/expedition_catalog.gd")
+const Features = preload("res://scripts/feature_policy.gd")
+const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
+const Hard = preload("res://scripts/hard_difficulty.gd")
 const MAP_ID := "reference-island-65065-v1"
 const SESSION_FIELDS = ["wood", "gold", "elapsed", "phase", "buildings", "next_id", "harvest_level", "duration", "evacuation_elapsed", "kills", "mode", "technologies", "research_job", "completed_notice", "rescue_warned", "finale_wave", "next_dinosaur_id", "healing_spent", "boarding_progress", "adventure", "profession"]
 const SURVIVAL_FIELDS = ["hunger", "fatigue", "food", "raw_meat", "cooked_meat", "berries", "survival_clock"]
@@ -92,14 +95,13 @@ static func validate(data: Dictionary) -> String:
 	if data.has("survival"):
 		if not data.survival is Dictionary: valid = false
 		else:
-			for key in SURVIVAL_FIELDS:
-				if not data.survival.has(key): valid = false
+			if not matches(data.survival, session, SURVIVAL_FIELDS): valid = false
 	for animal in data.animals:
 		if not animal is Dictionary or not animal.get("pawn") is Dictionary or not animal.get("meta") is Dictionary:
 			valid = false
 			break
 		if not matches(animal.pawn, pawn, PAWN_FIELDS) or not valid_visual(animal.get("visual")): valid = false
-		if animal.meta.get("species", "") not in ["raptor", "small_raptor", "trex", "young_trex"]: valid = false
+		if animal.meta.get("species", "") not in Dinosaurs.SPECIES: valid = false
 		for key in ["save_id", "ai_target_id", "ai_last_noise"]:
 			if not animal.meta.get(key) is int: valid = false
 		for key in ["ai_home", "ai_last_known"]:
@@ -108,16 +110,25 @@ static func validate(data: Dictionary) -> String:
 			if not animal.meta.get(key) is String: valid = false
 		for key in ["base_speed", "base_interval", "ai_awareness", "ai_wander_clock", "ai_sense_clock", "ai_retaliation"]:
 			if not animal.meta.get(key) is float: valid = false
+		if animal.meta.has("ai_commit_id") and not animal.meta.ai_commit_id is int: valid = false
+		if animal.meta.has("ai_commit_until") and not animal.meta.ai_commit_until is float: valid = false
+		if animal.meta.has("ai_hard_damage_multiplier"):
+			var multiplier: Variant = animal.meta.ai_hard_damage_multiplier
+			if not multiplier is float: valid = false
+			elif multiplier < 1.0 or multiplier > Hard.MAX_DAMAGE_MULTIPLIER: valid = false
 		if animal.meta.has("ai_strike"):
 			var strike: Variant = animal.meta.ai_strike
 			if not strike is Dictionary: valid = false
 			elif not strike.is_empty():
 				if not strike.get("remaining") is float or strike.get("kind") not in ["hero", "building"] or not strike.get("id") is int: valid = false
+		if animal.meta.has("ai_strike") and animal.meta.ai_strike is Dictionary and animal.meta.ai_strike.has("special"):
+			var strike: Dictionary = animal.meta.ai_strike
+			if strike.special not in ["acid", "pounce", "stomp"] or not strike.get("impact") is Vector3: valid = false
 		if animal.meta.get("ai_state") == "patrol" and (not animal.meta.get("ai_patrol_destination") is Vector3 or not animal.meta.get("ai_patrol_seconds") is float): valid = false
 	pawn.free()
 	if not valid: return "存档实体字段不完整"
 	var s: Dictionary = data.session
-	if s.phase not in ["playing", "evacuate"] or s.mode not in ["classic", "standard"] or s.wood < 0 or s.gold < 0 or s.duration <= 0 or s.elapsed < 0 or s.harvest_level not in range(4): return "存档单局状态无效"
+	if s.phase not in ["playing", "evacuate"] or s.mode not in ["classic", "standard", "hard"] or s.wood < 0 or s.gold < 0 or s.duration <= 0 or s.elapsed < 0 or s.harvest_level not in range(4): return "存档单局状态无效"
 	if data.hero.health <= 0 or data.hero.max_health <= 0 or data.animals.size() > 128: return "存档角色状态无效"
 	if not ExpeditionCatalog.validate(s.adventure): return "探索存档状态无效"
 	if data.order not in ["expedition", "idle", "move", "wood", "gold", "build", "repair", "return", "waiting_dropoff", "attack", "heal"]: return "存档命令无效"
@@ -129,11 +140,17 @@ static func validate(data: Dictionary) -> String:
 			if not b.has(key): return "存档建筑字段缺失"
 		if not b.id is int or not b.cell is Vector2i or not catalog.BUILDINGS.has(b.kind) or not (b.hp is float or b.hp is int) or not (b.remaining is float or b.remaining is int) or not (b.cooldown is float or b.cooldown is int): return "存档建筑类型无效"
 		if b.id <= 0 or b.id >= s.next_id or ids.has(b.id) or not Rect2i(0, 0, 128, 128).has_point(b.cell): return "存档建筑编号或位置无效"
+		if b.has("refit") and (not b.refit is String or (not b.refit.is_empty() and not catalog.REFITS.has(b.refit))): return "存档建筑改造无效"
+		if b.get("refit", "") == "range" or b.get("refit", "") == "rapid":
+			if b.kind != "tower": return "存档建筑改造与类型不符"
+		if b.get("refit", "") == "brace" and b.kind not in ["shelter", "gate"]: return "存档建筑改造与类型不符"
+		if b.hp > catalog.max_health(b): return "存档建筑耐久无效"
 		ids[b.id] = true
 		for resource in ["wood", "gold"]:
 			var key: String = "invested_" + resource
 			if b.has(key):
 				var maximum: int = catalog.BUILDINGS[b.kind][resource] + (5 if b.kind == "laboratory" else 0)
+				if b.has("refit") and catalog.REFITS.has(b.refit): maximum += catalog.REFITS[b.refit][resource]
 				if not b[key] is int or b[key] < 0 or b[key] > maximum: return "存档建筑投入无效"
 	for tech in s.technologies:
 		if not catalog.TECH.has(tech): return "存档科技无效"
@@ -143,11 +160,21 @@ static func validate(data: Dictionary) -> String:
 		if not cell is Vector2i or not data.trees[cell] is int or data.trees[cell] <= 0 or not Rect2i(0, 0, 128, 128).has_point(cell): return "存档树林无效"
 	for cell in data.explored:
 		if not cell is Vector2i or not Rect2i(0, 0, 128, 128).has_point(cell): return "存档迷雾无效"
+	if s.mode == "hard" and data.spawn_clocks.size() != 1: return "存档困难模式刷新计时无效"
 	for clock in data.spawn_clocks:
 		if not clock is Dictionary or not clock.get("period") is float or not clock.get("next") is float or not clock.get("species") is Array: return "存档刷新计时无效"
 		if clock.period <= 0: return "存档刷新间隔无效"
+		if s.mode == "hard":
+			if not clock.get("pressure") is float: return "存档困难模式压力无效"
+			if clock.has("wave") and (not clock.wave is int or clock.wave < 0): return "存档困难波次无效"
+			if clock.has("health_multiplier"):
+				if not clock.health_multiplier is float: return "存档困难生命倍率无效"
+				if clock.health_multiplier < 1.0 or clock.health_multiplier > Hard.MAX_HEALTH_MULTIPLIER: return "存档困难生命倍率超限"
+			if clock.pressure < 0.0 or clock.pressure > 1.0 or clock.period < Hard.MIN_INTERVAL or clock.period > Hard.MAX_INTERVAL: return "存档困难模式压力超限"
+		for flag in ["contact", "recovery_used", "warned"]:
+			if clock.has(flag) and not clock[flag] is bool: return "存档进攻阶段无效"
 		for species in clock.species:
-			if species not in ["raptor", "small_raptor", "trex", "young_trex"]: return "存档恐龙种类无效"
+			if species not in Dinosaurs.SPECIES: return "存档恐龙种类无效"
 	for event in data.noises:
 		if not event is Dictionary: return "存档声源无效"
 		for key in ["id", "position", "radius", "source_kind", "source_id", "remaining"]:
@@ -162,12 +189,12 @@ static func digest(bytes: PackedByteArray) -> String:
 
 static func migrate(data: Dictionary) -> Dictionary:
 	# Preserve old event timelines and exact rewards; never redraw a loaded session.
-	if data.get("version") not in [1, 2] or not data.get("session") is Dictionary: return data
+	if data.get("version") not in [1, 2, 3] or not data.get("session") is Dictionary: return data
 	data = data.duplicate(true)
 	if data.version == 1: data.session["adventure"] = {}
 	if not data.session.has("profession"): data.session["profession"] = "explorer"
 	var adventure: Variant = data.session.get("adventure")
-	if adventure is Dictionary and not adventure.is_empty(): adventure["run"] = {}
+	if data.version in [1, 2] and adventure is Dictionary and not adventure.is_empty(): adventure["run"] = {}
 	data.version = VERSION
 	return data
 
@@ -249,6 +276,10 @@ static func apply(w: Node, data: Dictionary) -> void:
 		w.create_building_visual(b)
 		if b.kind == "gate": w.visuals[b.id].get_node("Model/Leaf").rotation.y = -PI * 0.48 if b.get("open", false) else 0.0
 	restore_fields(w.hero, data.hero, PAWN_FIELDS)
+	w.hero.speed = w.session.survivor_speed()
+	if not Features.peripheral_enabled:
+		w.hero.health = minf(w.hero.health, w.session.survivor_max_health() * w.hero.health / w.hero.max_health)
+		w.hero.max_health = w.session.survivor_max_health()
 	restore_fields(w.worker, data.worker, WORKER_FIELDS)
 	w.hero.target_id = -1
 	for animal in data.animals:
@@ -257,6 +288,7 @@ static func apply(w: Node, data: Dictionary) -> void:
 		if not d: continue
 		restore_fields(d, animal.pawn, PAWN_FIELDS)
 		for key in animal.meta: d.set_meta(key, animal.meta[key])
+		d.attack_damage *= float(animal.meta.get("ai_hard_damage_multiplier", 1.0))
 		d.last_board_revision = w.board.revision
 		restore_visual(d, animal.visual)
 		if d.get_meta("save_id") == data.target_uid: w.hero.target_id = d.get_instance_id()
@@ -265,10 +297,16 @@ static func apply(w: Node, data: Dictionary) -> void:
 	for d in w.dinosaurs:
 		d.last_board_revision = w.board.revision
 		var strike: Dictionary = d.get_meta("ai_strike", {})
-		if strike.get("heavy", false): w.dino_ai.tactics.telegraph(d, strike.remaining)
+		if strike.has("special"): w.dino_ai.specials.telegraph(d, strike)
+		elif strike.get("heavy", false): w.dino_ai.tactics.telegraph(d, strike.remaining)
 	w.hero_route_revision = w.board.revision
 	w.order = data.order
 	w.order_target = data.order_target
+	if not Features.peripheral_enabled and w.order == "expedition":
+		w.order = "idle"
+		w.hero.route.clear()
+		w.hero.work_state = ""
+		w.hero.work_timeout = 0.0
 	w.selected_id = data.selected_id
 	w.spawn_clocks.assign(data.spawn_clocks)
 	w.dino_ai.noises.assign(data.noises)
@@ -289,6 +327,7 @@ static func apply(w: Node, data: Dictionary) -> void:
 	w.update_camera(0)
 	w.hero.advance(0)
 	restore_visual(w.hero, data.hero_visual)
+	if not Features.peripheral_enabled and data.order == "expedition": w.hero.play_animation("idle", 0)
 	w.update_lighting()
 	w.destination.position = w.order_target + Vector3(0, 0.12, 0)
 	w.destination.visible = w.order == "move"

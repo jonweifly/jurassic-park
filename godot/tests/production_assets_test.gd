@@ -15,7 +15,7 @@ func run() -> void:
   var meshes := skeleton.find_children("*","MeshInstance3D",true,false).filter(func(mesh): return mesh.skin != null)
   expect(skeleton.get_bone_count() >= (16 if title == "survivor" else 20),title+" must use an articulated skeleton")
   expect(meshes.size() == 1 and meshes[0].skin != null,title+" must use a weighted surface mesh")
-  expect(meshes[0].mesh.surface_get_material(0) == load("res://assets/materials/expedition.tres"),title+" must reuse the production PBR material")
+  expect(meshes[0].mesh.surface_get_material(0) == load("res://assets/materials/expedition.tres" if title == "survivor" else "res://assets/materials/dinosaur_skin.tres"),title+" must reuse the production PBR material")
   var player: AnimationPlayer = pawn.visual.player
   for clip in (["idle","walk","attack","death","chop","mine","build","carry","carry_idle"] if title == "survivor" else ["idle","walk","attack","death"]):
    expect(player.has_animation(clip),title+" missing action "+clip)

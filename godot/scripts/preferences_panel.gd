@@ -65,6 +65,7 @@ func _init(owner_hud: Node) -> void:
 	grid.add_theme_constant_override("v_separation", 7)
 	scroll.add_child(grid)
 	for action in Preferences.ACTIONS:
+		if action in ["journal", "kit"] and not preload("res://scripts/feature_policy.gd").peripheral_enabled: continue
 		var title: Label = hud.label(Preferences.ACTIONS[action][0], 14)
 		title.custom_minimum_size.x = 190
 		grid.add_child(title)

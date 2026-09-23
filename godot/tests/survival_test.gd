@@ -3,6 +3,7 @@ extends SceneTree
 const Session = preload("res://scripts/session.gd")
 
 func _init() -> void:
+	preload("res://scripts/feature_policy.gd").peripheral_enabled = true
 	var s := Session.new()
 	s.phase = "playing"
 	var before := s.hunger

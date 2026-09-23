@@ -9,6 +9,7 @@ var failures := 0
 var reports := []
 
 func _initialize() -> void:
+	preload("res://scripts/feature_policy.gd").peripheral_enabled = true
 	call_deferred("run")
 
 func expect(ok: bool, message: String) -> void:

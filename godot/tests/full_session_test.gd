@@ -191,7 +191,7 @@ func run() -> void:
 				if world.session.wood < 0 or world.session.gold < 0 or world.director.living_count() > 42: invariant_failure = true
 				await process_frame
 			if world.session.phase in ["won", "lost"]: break
-		var entry := {"seed": 65065 + index, "strategy": strategy, "content_seed": world.session.adventure.run.get("seed", 0), "events_resolved": world.session.adventure.events_done.size(), "radio": use_radio, "invariants": not invariant_failure, "result": world.session.phase, "elapsed": snappedf(world.session.elapsed, 0.1), "hp": world.hero.health, "kills": world.session.kills, "tech": world.session.technologies.keys(), "wood": world.session.wood, "gold": world.session.gold, "buildings": world.session.buildings.size()}
+		var entry := {"seed": 65065 + index, "strategy": strategy, "content_seed": world.session.adventure.get("run", {}).get("seed", 0), "events_resolved": world.session.adventure.get("events_done", []).size(), "radio": use_radio, "invariants": not invariant_failure, "result": world.session.phase, "elapsed": snappedf(world.session.elapsed, 0.1), "hp": world.hero.health, "kills": world.session.kills, "tech": world.session.technologies.keys(), "wood": world.session.wood, "gold": world.session.gold, "buildings": world.session.buildings.size()}
 		report.append(entry)
 		print("FULL SESSION ", JSON.stringify(entry))
 		if world.session.phase == "won": victories[strategy] += 1

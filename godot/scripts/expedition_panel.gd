@@ -1,4 +1,5 @@
 extends RefCounted
+const Features = preload("res://scripts/feature_policy.gd")
 const Catalog = preload("res://scripts/expedition_catalog.gd")
 var hud: Node
 var world: Node
@@ -117,6 +118,7 @@ func _init(owner_hud: Node) -> void:
 	panel.hide()
 
 func open(id: String = "") -> void:
+	if not Features.peripheral_enabled: return
 	if not world.started: return
 	if panel.visible and id.is_empty():
 		close()

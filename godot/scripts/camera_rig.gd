@@ -8,6 +8,7 @@ var target_pitch := deg_to_rad(52)
 var following := false
 var dragging := false
 var initialized := false
+var boom_height := 0.0
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
@@ -79,11 +80,18 @@ func update(dt: float) -> void:
 		pitch = lerpf(pitch, target_pitch, blend)
 	world.camera.size = lerpf(world.camera.size, world.camera_size, blend if dt > 0 else 1.0)
 	var offset := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)) * 68
-	world.camera.position = focus + offset
+	var desired_position := focus + offset
 	# Raise the boom above intervening hills at low pitch.
+	var required_height := desired_position.y
 	for i in range(1, 9):
 		var t := float(i) / 8
-		var p: Vector3 = focus.lerp(world.camera.position, t)
+		var p: Vector3 = focus.lerp(desired_position, t)
 		var floor_y: float = world.board.layout.height_at(p.x, p.z) + 3
-		if p.y < floor_y: world.camera.position.y += (floor_y - p.y) / t
+		if p.y < floor_y: required_height = maxf(required_height, desired_position.y + (floor_y - p.y) / t)
+	if not initialized or dt == 0:
+		boom_height = required_height
+	else:
+		boom_height = lerpf(boom_height, required_height, 1.0 - exp(-10.0 * dt))
+	desired_position.y = boom_height
+	world.camera.position = desired_position
 	world.camera.look_at(focus)

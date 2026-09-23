@@ -12,7 +12,9 @@ func style(node: Node) -> void:
  if node is MeshInstance3D:
   for i in range(node.mesh.get_surface_count()):
    var mat: Material = node.mesh.surface_get_material(i)
-   if mat and "Expedition" in mat.resource_name:
+   if mat and "Dinosaur" in mat.resource_name:
+    node.mesh.surface_set_material(i,load("res://assets/materials/dinosaur_skin.tres"))
+   elif mat and "Expedition" in mat.resource_name:
     node.mesh.surface_set_material(i,load("res://assets/materials/expedition.tres"))
    elif mat is StandardMaterial3D:
     mat.cull_mode = BaseMaterial3D.CULL_DISABLED

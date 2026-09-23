@@ -10,6 +10,8 @@ const FernScene = preload("res://assets/models/fern.glb")
 const Visual = preload("res://scripts/pawn_visual.gd")
 const ObstructionFade = preload("res://scripts/obstruction_fade.gd")
 const TreeVariation = preload("res://scripts/tree_variation.gd")
+const GroundPalette = preload("res://scripts/ground_palette.gd")
+var ground_palette: RefCounted
 var variation: RefCounted
 var ground: ShaderMaterial
 var water: ShaderMaterial
@@ -32,6 +34,10 @@ func _init(owner_world: Node) -> void:
 		ground = ShaderMaterial.new()
 		ground.shader = GroundShader
 		ground.set_shader_parameter("detail_map",load("res://assets/materials/ground_detail.png"))
+		ground_palette = GroundPalette.new(world)
+		ground.set_shader_parameter("usage_map",ground_palette.texture)
+		ground.set_shader_parameter("soil_map",load("res://assets/materials/camp_soil.png"))
+		ground.set_shader_parameter("forest_map",load("res://assets/materials/forest_floor.png"))
 		var mask := Image.create(128,128,false,Image.FORMAT_R8)
 		for y in range(128):
 			for x in range(128): mask.set_pixel(x,y,Color(1 if world.board.layout.build[y*128+x] else 0,0,0))
@@ -50,6 +56,7 @@ func _init(owner_world: Node) -> void:
 
 func update_view(dt: float = 0.0) -> void:
 	obstructions.update(dt)
+	if ground_palette: ground_palette.update()
 	if world.weather:
 		for mat in wind_materials:
 			mat.set_shader_parameter("weather_clock",world.weather.clock)
@@ -89,6 +96,7 @@ func style_leaves(node: Node) -> void:
 				mat.shader = FoliageShader
 				mat.set_shader_parameter("strength", 0.055)
 				mat.set_shader_parameter("canopy_cutout",true)
+				mat.set_shader_parameter("leaf_detail",true)
 				mat.set_shader_parameter("tint", color.lerp(Color("405936"), 0.4))
 				mat.set_shader_parameter("vertex_color", original.vertex_color_use_as_albedo)
 				foliage_cache[key] = mat
@@ -102,14 +110,22 @@ func add_ground_cover(island: Node) -> void:
 	random.seed = 6506502
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for blade in range(5):
-		var angle := blade * TAU / 5
-		var side := Vector3(cos(angle), 0, sin(angle)) * 0.075
-		var base := Vector3(sin(angle), 0, cos(angle)) * 0.10
-		var top := base * 2.5 + Vector3.UP * (0.24 + blade * 0.035)
-		for v in [base-side, base+side, top]:
-			surface.set_color(Color("536643") if v.y < 0.1 else Color("82916a"))
-			surface.add_vertex(v)
+	for blade in range(7):
+		var angle := blade * 2.399
+		var side := Vector3(cos(angle), 0, sin(angle))
+		var bend := Vector3(sin(angle), 0, cos(angle))
+		var base := bend * 0.07
+		var height := 0.19 + (blade % 4) * 0.046
+		for segment in range(3):
+			var low := segment / 3.0
+			var high := (segment + 1) / 3.0
+			var a := base + Vector3.UP * height * low + bend * low * low * 0.18
+			var b := base + Vector3.UP * height * high + bend * high * high * 0.18
+			var wa := side * 0.035 * (1.0 - low)
+			var wb := side * 0.035 * (1.0 - high)
+			for v in [a-wa,a+wa,b+wb,a-wa,b+wb,b-wb]:
+				surface.set_color(Color("3e5137").lerp(Color("78845a"),clampf(v.y/height,0,1)))
+				surface.add_vertex(v)
 	surface.generate_normals()
 	var mesh := surface.commit()
 	var mat := ShaderMaterial.new()
@@ -119,8 +135,11 @@ func add_ground_cover(island: Node) -> void:
 	wind_materials.append(mat)
 	mesh.surface_set_material(0, mat)
 	var chunks := {}
-	for i in range(12000):
+	for i in range(24000):
 		var p := Vector3(random.randf_range(-126,126), 0, random.randf_range(-126,126))
+		# Broad uneven patches, with open lanes between them instead of uniform dots.
+		var patch := sin(p.x*.39+sin(p.z*.17)*1.8)*cos(p.z*.31)
+		if patch < -.15: continue
 		var cell: Vector2i = world.board.cell_at(p)
 		if not world.board.is_open(cell): continue
 		p.y = world.board.layout.height_at(p.x, p.z)
@@ -208,6 +227,12 @@ func add_ferns(parent: Node3D) -> void:
 func prepare_building(node: Node3D, kind: String) -> void:
 	polish_building_materials(node, kind)
 	add_building_contact_shadow(node, kind)
+	var family := "lab" if kind == "laboratory" else kind
+	if family in ["tent", "tower", "generator", "lab"]:
+		var dressing: Node3D = load("res://assets/models/%s_dressing.glb" % family).instantiate()
+		dressing.name = "CampDressing"
+		node.add_child(dressing)
+		world.vision.shade(dressing)
 	var scaffold := Node3D.new()
 	scaffold.name = "Scaffold"
 	node.add_child(scaffold)
@@ -286,15 +311,17 @@ func polish_building_materials(node: Node3D, kind: String) -> void:
 	# Imported building materials vary by asset. Duplicate the surface material
 	# at runtime so every structure shares the same grounded, slightly worn look
 	# without changing the source GLB files.
-	var metal := kind in ["generator", "tower", "gate"]
 	for mesh in node.find_children("*", "MeshInstance3D", true, false):
 		if mesh.material_override != null: continue
 		var source: Material = mesh.get_active_material(0)
 		if not source is StandardMaterial3D: continue
 		var mat: StandardMaterial3D = source.duplicate()
-		mat.roughness = 0.62 if metal else 0.78
-		mat.metallic = 0.28 if metal else 0.04
-		mat.specular_mode = BaseMaterial3D.SPECULAR_TOON if kind == "tent" else BaseMaterial3D.SPECULAR_SCHLICK_GGX
+		# Mixed atlas surfaces include timber, cloth and metal on the same mesh.
+		# Global metallic/toon overrides made wood and canvas look like plastic.
+		mat.roughness = 1.0
+		mat.metallic = 0.0
+		mat.metallic_specular = 0.22
+		mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
 		mesh.material_override = mat
 
 func add_building_contact_shadow(node: Node3D, kind: String) -> void:
@@ -327,6 +354,8 @@ func add_building_contact_shadow(node: Node3D, kind: String) -> void:
 
 func update_building(node: Node3D, data: Dictionary) -> void:
 	var complete: bool = data.remaining <= 0
+	if node.has_node("CampDressing"):
+		node.get_node("CampDressing").visible = complete and world.preferences.values.quality > 0
 	node.scale = Vector3.ONE
 	node.get_node("Scaffold").visible = not complete
 	var progress: float = 1.0 - data.remaining / world.Catalog.BUILDINGS[data.kind].time
@@ -336,10 +365,25 @@ func update_building(node: Node3D, data: Dictionary) -> void:
 		if part is Node3D:
 			var height: float = part.position.y
 			if part is MeshInstance3D: height += part.mesh.get_aabb().get_center().y
-			part.visible = complete or progress >= clampf(height / 2.2,0.05,0.90)
+			part.visible = complete or data.get("upgrading", false) or progress >= clampf(height / 2.2,0.05,0.90)
+	if data.get("refit", "") != "":
+		if not node.has_node("Refit"):
+			var fittings := Node3D.new()
+			fittings.name = "Refit"
+			node.add_child(fittings)
+			if data.refit == "brace":
+				for x in [-0.82, 0.82]:
+					Visual.box(fittings, Vector3(0.20, 1.8, 0.25), Vector3(x, 0.9, 0), Color("60766c"))
+					for y in [0.35, 1.25]: Visual.box(fittings, Vector3(0.30, 0.10, 0.30), Vector3(x, y, 0), Color("b4aa83"))
+			else:
+				# Visible pennants distinguish the two tower roles at normal camera scale.
+				Visual.box(fittings, Vector3(0.05, 1.4, 0.05), Vector3(-0.6, 2.8, -0.5), Color("817e6c"))
+				Visual.box(fittings, Vector3(0.45, 0.32, 0.03), Vector3(-0.4, 3.3, -0.5), Color("7ab3b0") if data.refit == "range" else Color("c8a660"))
+			world.vision.shade(fittings)
+		node.get_node("Refit").visible = complete
 	if data.kind == "fire":
 		node.get_node("FireLight").visible = complete
-		node.get_node("FireLight").light_energy = 1.35 + sin(clock*8)*0.12 + sin(clock*13)*0.08
+		node.get_node("FireLight").light_energy = (0.85 if world.night else 0.28) + sin(clock*8)*0.025 + sin(clock*13)*0.018
 		node.get_node("Embers").emitting = complete and not world.paused
 		node.get_node("Smoke").emitting = complete and not world.paused
 		for name in ["Flame","FlameCore"]:

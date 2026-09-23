@@ -1,4 +1,5 @@
 extends RefCounted
+const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
 const SIDE := 128
 const TerrainData = preload("res://scripts/terrain_data.gd")
 var layout: RefCounted
@@ -102,7 +103,7 @@ func can_build(c: Vector2i) -> bool:
 	return is_open(c) and (not layout or layout.build[c.y * SIDE + c.x])
 
 static func species_radius(species: String) -> float:
-	return {"small_raptor": 0.32, "raptor": 0.48, "young_trex": 0.82, "trex": 1.12}.get(species, 0.3)
+	return Dinosaurs.spec(species).radius
 
 func body_clearance(at: Vector3, radius: float) -> float:
 	var low := cell_at(at - Vector3(radius, 0, radius))

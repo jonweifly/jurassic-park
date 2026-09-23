@@ -1,11 +1,15 @@
 extends RefCounted
 ## Territorial perception. Exact inherited Warcraft acquisition ranges are unresolved;
 ## these meter values are provisional and intentionally local rather than map-wide.
+const Specials = preload("res://scripts/dinosaur_specials.gd")
 const Tactics = preload("res://scripts/dinosaur_tactics.gd")
 const SENSES = {
 	"small_raptor": {"sight": 8.0, "leash": 24.0, "wander": 6.0, "hearing": 0.9},
 	"raptor": {"sight": 10.0, "leash": 30.0, "wander": 8.0, "hearing": 1.0},
 	"young_trex": {"sight": 12.0, "leash": 36.0, "wander": 8.0, "hearing": 1.1},
+	"spitter": {"sight": 17.0, "leash": 40.0, "wander": 8.0, "hearing": 1.1},
+	"elite_raptor": {"sight": 13.0, "leash": 40.0, "wander": 9.0, "hearing": 1.15},
+	"alpha_trex": {"sight": 18.0, "leash": 55.0, "wander": 10.0, "hearing": 1.3},
 	"trex": {"sight": 15.0, "leash": 46.0, "wander": 10.0, "hearing": 1.2},
 }
 
@@ -14,6 +18,7 @@ var noises: Array[Dictionary] = []
 var next_noise_id := 1
 var generator_clock := 0.0
 var tactics: RefCounted
+var specials: RefCounted
 
 func spawn_patrol(species: String, destination_override: Variant = null) -> Node3D:
 	# One member of each timed group approaches a snapshot of the camp location.
@@ -36,7 +41,7 @@ func spawn_patrol(species: String, destination_override: Variant = null) -> Node
 	for i in range(candidates.size()):
 		var p: Vector3 = world.board.point(candidates[(start + i) % candidates.size()])
 		if not safe_spawn(p) or not world.board.body_open(p, world.Board.species_radius(species)): continue
-		var route: PackedVector3Array = world.board.route(p, destination, true, world.Board.species_radius(species))
+		var route := patrol_route(p, destination, world.Board.species_radius(species))
 		if route.is_empty() or route.size() > 70: continue
 		var d: Node3D = world.spawn_dinosaur(p, species)
 		if not is_instance_valid(d): continue
@@ -48,9 +53,45 @@ func spawn_patrol(species: String, destination_override: Variant = null) -> Node
 		return d
 	return world.spawn_dinosaur(Vector3(10000, 0, 0), species)
 
+func patrol_route(from: Vector3, destination: Vector3, radius: float) -> PackedVector3Array:
+	var route: PackedVector3Array = world.board.route(from, destination, true, radius)
+	if not route.is_empty() or world.session.mode != "hard": return route
+	# A sealed camp or narrow landing pad must not turn heavy attackers into
+	# unrelated wilderness spawns. Approach a reachable outer defense first.
+	for b in world.session.buildings:
+		if b.hp <= 0: continue
+		var point: Vector3 = world.board.point(b.cell)
+		if point.distance_to(destination) > 24.0: continue
+		route = world.board.route(from, point, true, radius)
+		if not route.is_empty(): return route
+	# Large bodies can contest the landing pad approaches from open ground without
+	# ignoring collision or clearing vegetation to force a path.
+	var center: Vector2i = world.board.cell_at(destination)
+	for distance in [3, 4, 6, 8]:
+		for offset in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN, Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]:
+			var cell: Vector2i = center + offset * distance
+			if not world.board.inside(cell): continue
+			var point: Vector3 = world.board.point(cell)
+			if not world.board.body_open(point, radius): continue
+			route = world.board.route(from, point, false, radius)
+			if not route.is_empty(): return route
+	return route
+
+func redirect_patrol(d: Node3D, destination: Vector3) -> bool:
+	if d.health <= 0 or state(d) not in ["idle", "wander", "return"]: return false
+	var route := patrol_route(d.position, destination, d.body_radius)
+	if route.is_empty() or route.size() > 70: return false
+	d.set_meta("ai_state", "patrol")
+	d.set_meta("ai_patrol_destination", destination)
+	d.set_meta("ai_patrol_seconds", 60.0)
+	d.route = route
+	d.path_cooldown = 1.0
+	return true
+
 func _init(owner_world: Node) -> void:
 	world = owner_world
 	tactics = Tactics.new(self, world)
+	specials = Specials.new(self, world)
 
 func register(d: Node3D, species: String) -> void:
 	d.set_meta("ai_state", "idle")
@@ -188,6 +229,8 @@ func visible_target(d: Node3D) -> Dictionary:
 		if alive and d.position.distance_to(position) <= best and has_line_of_sight(d.position, position):
 			return {"kind": kind, "id": id, "position": position}
 		return {}
+	var preferred: Dictionary = tactics.preferred_target(d)
+	if not preferred.is_empty(): return preferred
 	if world.hero.health > 0:
 		var distance := d.position.distance_to(world.hero.position)
 		if distance <= best and world.hero.position.distance_to(home) <= senses.leash * 1.5 and has_line_of_sight(d.position, world.hero.position):
@@ -220,6 +263,7 @@ func audible_noise(d: Node3D) -> Dictionary:
 	return heard
 
 func engage(d: Node3D, target: Dictionary) -> void:
+	tactics.commit(d, target)
 	if state(d) == "patrol": d.set_meta("ai_home", d.position)
 	if d.get_meta("ai_target_kind") != target.kind or d.get_meta("ai_target_id") != target.id or state(d) not in ["alert", "investigate"]:
 		d.path_cooldown = 0
@@ -244,6 +288,9 @@ func investigate(d: Node3D, event: Dictionary) -> void:
 
 func pursue_last_known(d: Node3D) -> void:
 	var destination: Vector3 = d.get_meta("ai_last_known")
+	if world.session.mode == "hard" and d.get_meta("species") == "spitter" and d.position.distance_to(destination) <= 11.5 and has_line_of_sight(d.position, destination):
+		d.route.clear()
+		return
 	if d.position.distance_to(destination) <= 2.5 and visible_target(d).is_empty():
 		d.set_meta("ai_awareness", minf(0.6, float(d.get_meta("ai_awareness"))))
 		d.route.clear()
@@ -251,7 +298,7 @@ func pursue_last_known(d: Node3D) -> void:
 	if d.path_cooldown > 0 and d.last_board_revision == world.board.revision: return
 	d.path_cooldown = 0.65
 	d.last_board_revision = world.board.revision
-	d.route = world.board.route(d.position, destination, true, d.body_radius)
+	d.route = patrol_route(d.position, destination, d.body_radius)
 	if d.route.is_empty() and d.position.distance_to(destination) > 3:
 		var blocker := reachable_local_building(d)
 		if blocker.is_empty():
@@ -341,6 +388,7 @@ func attack_if_close(d: Node3D) -> void:
 		if building.is_empty(): return
 		position = world.board.point(building.cell)
 	else: return
+	if specials.begin(d, position, kind, int(d.get_meta("ai_target_id", -1))): return
 	# Adjacent diagonal grid centers are sqrt(8) meters apart.
 	if d.position.distance_to(position) > 3.0 or not has_line_of_sight(d.position, position): return
 	d.route.clear()
@@ -359,6 +407,12 @@ func resolve_strike(d: Node3D, dt: float) -> bool:
 	if strike.is_empty(): return false
 	strike.remaining -= dt
 	d.route.clear()
+	if strike.has("special"):
+		specials.advance(d, strike, dt)
+		if strike.remaining <= 0:
+			d.set_meta("ai_strike", {})
+			specials.resolve(d, strike)
+		return true
 	if strike.remaining <= 0.18 and not strike.get("animated", true):
 		strike.animated = true
 		d.swing = 1
@@ -381,7 +435,7 @@ func resolve_strike(d: Node3D, dt: float) -> bool:
 		if strike.get("heavy", false): damage *= 1.5
 		if building.kind in ["tower", "shelter", "gate"] and world.Regions.at(position) == "mountain": damage /= 1.18
 		if building.kind in ["tower", "shelter", "gate"] and world.session.technologies.has("defense"): damage *= 0.8
-		building.hp -= damage
+		world.damage_building(building, damage)
 	return true
 
 func safe_spawn(position: Vector3) -> bool:

@@ -1,5 +1,6 @@
 extends Control
 const Board = preload("res://scripts/board.gd")
+const Features = preload("res://scripts/feature_policy.gd")
 const EXTENT = Board.SIDE * Board.CELL
 var world: Node
 
@@ -28,6 +29,7 @@ func _draw() -> void:
 	for d in world.dinosaurs:
 		if is_instance_valid(d) and d.health > 0 and world.vision.is_visible(world.board.cell_at(d.position)): draw_circle(project(d.position), 2.0, Color("dc8069"))
 	for id in world.session.adventure.get("sites", {}):
+		if not Features.peripheral_enabled: break
 		var site: Dictionary = world.session.adventure.sites[id]
 		if site.status == "hidden": continue
 		var at: Vector2 = project(world.board.point(site.cell))

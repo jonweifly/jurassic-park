@@ -15,6 +15,21 @@ const BUILDINGS = {
 	"laboratory": {"source_id": "h008", "name": "实验室", "wood": 5, "gold": 5, "power": 2, "supply": 0, "hp": 100.0, "time": 10.0, "requires": ["generator"], "description": "营地实验室。"},
 }
 const ORDER = ["tent", "fire", "generator", "shelter", "tower", "lab", "fossil", "gate"]
+const REFITS = {
+	"range": {"name": "远射", "kinds": ["tower"], "wood": 12, "gold": 10, "time": 12.0, "description": "射程 20 米，攻击间隔 1.35 秒。适合外圈预警和远程支援。"},
+	"rapid": {"name": "速射", "kinds": ["tower"], "wood": 10, "gold": 14, "time": 12.0, "description": "射程 11 米，攻击间隔 0.6 秒。适合覆盖入口和围栏后方。"},
+	"brace": {"name": "加固", "kinds": ["shelter", "gate"], "wood": 14, "gold": 8, "time": 12.0, "description": "耐久上限 +180；保留原有伤势，改造期间停止电击。"},
+}
+
+static func max_health(b: Dictionary) -> float:
+	return float(BUILDINGS[b.kind].hp) + (180.0 if b.get("refit", "") == "brace" else 0.0)
+
+static func attack_range(b: Dictionary) -> float:
+	if b.kind != "tower": return 2.8
+	return {"range": 20.0, "rapid": 11.0}.get(b.get("refit", ""), 15.625)
+
+static func attack_interval(b: Dictionary) -> float:
+	return {"range": 1.35, "rapid": 0.6}.get(b.get("refit", ""), 1.0)
 const SESSION_SECONDS = 3600.0
 const EVACUATION_SECONDS = 300.0
 const BOARDING_SECONDS = 12.0

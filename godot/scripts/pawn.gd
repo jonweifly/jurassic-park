@@ -131,6 +131,9 @@ func advance(dt: float) -> void:
 		if navigation: visual.ground(navigation.layout)
 	health_label.text = "%d / %d" % [maxi(0, int(health)), int(max_health)] if health < max_health else ""
 	health_label.modulate = Color("f68b73") if is_dinosaur else Color("b9e2c0")
+	if is_dinosaur and get_meta("species", "") in ["elite_raptor", "alpha_trex", "spitter"]:
+		health_label.text = preload("res://scripts/dinosaur_catalog.gd").spec(str(get_meta("species"))).name + "\n%d / %d" % [maxi(0, int(health)), int(max_health)]
+		health_label.modulate = Color("edbb68")
 
 func play_animation(state: String, dt: float) -> void:
 	visual.play(state,dt)

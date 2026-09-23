@@ -4,10 +4,12 @@ const GuidePanel = preload("res://scripts/guide_panel.gd")
 const Catalog = preload("res://scripts/catalog.gd")
 const Session = preload("res://scripts/session.gd")
 const ExpeditionPanel = preload("res://scripts/expedition_panel.gd")
+const Features = preload("res://scripts/feature_policy.gd")
 const Mini = preload("res://scripts/minimap.gd")
 var content_seed_input: LineEdit
 var profession_select: OptionButton
 var standard_start_button: Button
+var hard_start_button: Button
 var preferences_panel: RefCounted
 var guide_panel: RefCounted
 var tech_button: Button
@@ -32,7 +34,6 @@ var resume_button: Button
 var research_button: Button
 var demolish_button: Button
 var bottom: PanelContainer
-var top: PanelContainer
 var start_panel: PanelContainer
 var notification_time := 0.0
 var font: SystemFont
@@ -63,6 +64,8 @@ var expedition_panel: RefCounted
 var expedition_summary: Label
 var extraction_button: Button
 var boarding_bar: ProgressBar
+var refit_buttons: Dictionary = {}
+var repair_button: Button
 
 func _ready() -> void:
 	font = SystemFont.new()
@@ -73,51 +76,50 @@ func _ready() -> void:
 	root.add_theme_font_override("font", font)
 	root.add_theme_color_override("font_color", Color("e7e4cc"))
 	add_child(root)
-	top = panel()
-	root.add_child(top)
-	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	top.offset_left = 18
-	top.offset_right = -18
-	top.offset_top = 14
-	top.offset_bottom = 72
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 28)
-	top.add_child(row)
-	row.add_child(label("侏罗纪公园", 24, Color("d8c38d")))
-	row.add_child(label("生 存 营 地", 13, Color("9eae98")))
-	resource_label = label("", 18)
-	resource_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	resource_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	row.add_child(resource_label)
-	clock_label = label("", 16)
-	row.add_child(clock_label)
+	var status_line := HBoxContainer.new()
+	status_line.add_theme_constant_override("separation", 14)
+	resource_label = label("", 16)
+	resource_label.custom_minimum_size.x = 300
+	resource_label.size_flags_horizontal = Control.SIZE_FILL
+	resource_label.clip_text = true
+	resource_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	status_line.add_child(resource_label)
+	clock_label = label("", 14)
+	clock_label.custom_minimum_size.x = 150
+	clock_label.size_flags_horizontal = Control.SIZE_FILL
+	status_line.add_child(clock_label)
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 4)
 	sound_toggle = button("声音")
 	sound_toggle.tooltip_text = "音量与静音"
 	sound_toggle.pressed.connect(func(): sound_panel.visible = not sound_panel.visible)
 	tech_button = button("科技  T")
 	tech_button.pressed.connect(open_tech)
-	row.add_child(tech_button)
+	action_row.add_child(tech_button)
 	heal_button = button("治疗  H")
 	heal_button.tooltip_text = "前往帐篷，每秒消耗 1 黄金恢复 10 生命；医疗研究后恢复 25。"
 	heal_button.pressed.connect(world.heal)
-	row.add_child(heal_button)
+	action_row.add_child(heal_button)
 	eat_button = button("进食")
 	eat_button.tooltip_text = "食用熟肉、浆果或补给，恢复饱腹度。"
 	eat_button.pressed.connect(world.eat_food)
-	row.add_child(eat_button)
+	action_row.add_child(eat_button)
 	cook_button = button("烤肉")
 	cook_button.tooltip_text = "在已建成的营火消耗生肉制作熟肉。"
 	cook_button.pressed.connect(world.cook_food)
-	row.add_child(cook_button)
-	row.add_child(sound_toggle)
+	action_row.add_child(cook_button)
+	action_row.add_child(sound_toggle)
 	var pause := button("暂停  Esc")
 	pause.pressed.connect(world.toggle_pause)
-	row.add_child(pause)
+	action_row.add_child(pause)
+	for action_button in [tech_button, heal_button, eat_button, cook_button, sound_toggle]:
+		action_button.custom_minimum_size.x = 52
+	pause.custom_minimum_size.x = 72
 	quest_box = panel(Color(0.05, 0.10, 0.08, 0.86))
 	root.add_child(quest_box)
-	quest_box.position = Vector2(18, 88)
-	quest_box.custom_minimum_size = Vector2(260, 124)
-	quest_box.tooltip_text = "探索、调查委托和无线电统一收纳在探索日志中。"
+	quest_box.position = Vector2(18, 18)
+	quest_box.custom_minimum_size = Vector2(260, 104)
+	quest_box.tooltip_text = "营地目标与供电状态"
 	var quest_column := VBoxContainer.new()
 	quest_column.add_theme_constant_override("separation", 4)
 	quest_box.add_child(quest_column)
@@ -158,42 +160,69 @@ func _ready() -> void:
 	root.add_child(tip)
 	tip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	tip.offset_top = -247
-	tip.offset_bottom = -216
+	tip.offset_bottom = -220
 	bottom = panel(Color(0.045, 0.085, 0.068, 0.97))
 	root.add_child(bottom)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_left = 18
-	bottom.offset_right = -18
-	bottom.offset_top = -210
-	bottom.offset_bottom = -16
+	bottom.offset_left = 8
+	bottom.offset_right = -8
+	# The compact three-column layout needs a small allowance for wrapped
+	# building labels on short windows; it remains close to the original height.
+	# Content now drives a shorter panel; the right building grid no longer
+	# reserves the old tall column beneath its last row.
+	bottom.offset_top = -190
+	bottom.offset_bottom = -6
+	(bottom.get_theme_stylebox("panel") as StyleBoxFlat).set_content_margin_all(8)
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 24)
+	columns.add_theme_constant_override("separation", 16)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bottom.add_child(columns)
+	var left := HBoxContainer.new()
+	left.custom_minimum_size.x = 300
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.size_flags_stretch_ratio = 1.0
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
 	minimap = Mini.new()
 	minimap.world = world
-	minimap.custom_minimum_size = Vector2(162, 162)
-	columns.add_child(minimap)
+	minimap.custom_minimum_size = Vector2(150, 96)
+	minimap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	left.add_child(minimap)
 	var info := VBoxContainer.new()
-	info.custom_minimum_size.x = 240
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	columns.add_child(info)
-	selection_label = label("幸存者", 22, Color("dbc690"))
+	info.custom_minimum_size.x = 140
+	left.add_child(info)
+	selection_label = label("幸存者", 19, Color("dbc690"))
 	info.add_child(selection_label)
 	health = ProgressBar.new()
-	health.custom_minimum_size.y = 9
+	health.custom_minimum_size.y = 7
 	health.show_percentage = false
 	var hp_style := StyleBoxFlat.new()
 	hp_style.bg_color = Color("8fa877")
 	health.add_theme_stylebox_override("fill", hp_style)
 	info.add_child(health)
-	detail_label = label("", 14, Color("b4c1aa"))
+	detail_label = label("", 12, Color("b4c1aa"))
 	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	info.add_child(detail_label)
-	controls_hint = label("", 12, Color("879d85"))
+	controls_hint = label("", 11, Color("879d85"))
 	info.add_child(controls_hint)
+	var middle := VBoxContainer.new()
+	middle.custom_minimum_size.x = 500
+	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	middle.size_flags_stretch_ratio = 1.15
+	# Status details belong to the bottom panel; keeping their width fixed also
+	# prevents resource/time text from moving neighboring controls every frame.
+	quest_column.remove_child(status_label)
+	middle.add_child(status_line)
+	status_label.custom_minimum_size.x = 340
+	middle.add_child(status_label)
+	middle.add_child(action_row)
+	columns.add_child(middle)
 	var commands := VBoxContainer.new()
-	commands.custom_minimum_size.x = 665
+	commands.custom_minimum_size.x = 430
+	commands.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	commands.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	commands.size_flags_stretch_ratio = 1.55
 	columns.add_child(commands)
 	var command_head := HBoxContainer.new()
 	commands.add_child(command_head)
@@ -204,19 +233,31 @@ func _ready() -> void:
 	demolish_button.pressed.connect(request_demolition)
 	demolish_button.hide()
 	command_head.add_child(demolish_button)
+	repair_button = button("修理")
+	repair_button.tooltip_text = "派幸存者修理；每秒消耗 1 木材恢复 8% 耐久。电门也可修理。"
+	repair_button.pressed.connect(world.repair_selected)
+	command_head.add_child(repair_button)
+	for option in Catalog.REFITS:
+		var refit_button := button(Catalog.REFITS[option].name)
+		refit_button.pressed.connect(world.refit_selected.bind(option))
+		refit_button.visible = false
+		refit_buttons[option] = refit_button
+		command_head.add_child(refit_button)
 	research_button = button("升级实验室  R")
 	research_button.pressed.connect(world.research)
 	command_head.add_child(research_button)
 	var grid := GridContainer.new()
 	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 7)
-	grid.add_theme_constant_override("v_separation", 7)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 5)
+	grid.add_theme_constant_override("v_separation", 5)
 	commands.add_child(grid)
 	for i in range(Catalog.ORDER.size()):
 		var kind: String = Catalog.ORDER[i]
 		var spec: Dictionary = Catalog.BUILDINGS[kind]
 		var b := button("%d  %s\n木 %d   金 %d   电 %d" % [i + 1, spec.name, spec.wood, spec.gold, spec.power])
-		b.custom_minimum_size = Vector2(162, 54)
+		b.custom_minimum_size = Vector2(76, 46)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.tooltip_text = spec.description
 		b.pressed.connect(world.select_build.bind(kind))
 		build_buttons[kind] = b
@@ -240,7 +281,7 @@ func make_camera_panel() -> void:
 	camera_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	camera_panel.offset_left = -294
 	camera_panel.offset_right = -18
-	camera_panel.offset_top = 84
+	camera_panel.offset_top = 18
 	var row := HBoxContainer.new()
 	camera_panel.add_child(row)
 	var center := button("归位")
@@ -264,7 +305,7 @@ func make_sound_panel() -> void:
 	sound_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	sound_panel.offset_left = -370
 	sound_panel.offset_right = -18
-	sound_panel.offset_top = 82
+	sound_panel.offset_top = 18
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	sound_panel.add_child(col)
@@ -334,6 +375,7 @@ func make_start() -> void:
 	content_seed_input.add_theme_font_override("font", font)
 	content_seed_input.add_theme_font_size_override("font_size", 13)
 	seed_row.add_child(content_seed_input)
+	seed_row.visible = Features.peripheral_enabled
 	var profession_row := HBoxContainer.new()
 	profession_row.add_theme_constant_override("separation", 10)
 	col.add_child(profession_row)
@@ -346,11 +388,17 @@ func make_start() -> void:
 		profession_select.add_item("%s：%s" % [spec.name, spec.description])
 		profession_select.set_item_metadata(profession_select.item_count - 1, id)
 	profession_row.add_child(profession_select)
+	profession_row.visible = Features.peripheral_enabled
 	standard_start_button = button("标准生存 · 25 分钟  +  5 分钟撤离")
 	standard_start_button.custom_minimum_size.y = 48
 	standard_start_button.pressed.connect(start_selected_session.bind(1500.0, "standard"))
 	col.add_child(standard_start_button)
-	col.add_child(label("渐进威胁 · 随机无线电 · 可选调查委托 · 撤离遭遇", 13, Color("a6b59e")))
+	hard_start_button = button("困难生存 · 25 分钟  +  5 分钟撤离")
+	hard_start_button.custom_minimum_size.y = 44
+	hard_start_button.tooltip_text = "恐龙群随时间、营地建设和科技逐步增强；数量与属性有上限。"
+	hard_start_button.pressed.connect(start_selected_session.bind(1500.0, "hard"))
+	col.add_child(hard_start_button)
+	col.add_child(label("采集建设 · 防线改造 · 恐龙来袭 · 最终撤离", 13, Color("a6b59e")))
 	col.add_child(label("长局模式 · 保留原有恐龙刷新节奏", 14, Color("a6b59e")))
 	var choices := HBoxContainer.new()
 	choices.add_theme_constant_override("separation", 10)
@@ -461,34 +509,49 @@ func refresh(dt: float) -> void:
 	if s.phase == "evacuate": objective.text = "前往北侧 H 停机坪撤离\n剩余登机时间 %d 秒" % maxi(0, int(Catalog.EVACUATION_SECONDS - s.evacuation_elapsed))
 	if s.phase == "evacuate":
 		objective.text += "\n" + world.extraction_feedback.status()
-		if s.mode == "standard": objective.text += "\n登机 %.1f / %.0f 秒" % [s.boarding_progress, Catalog.BOARDING_SECONDS]
+		if s.mode in ["standard", "hard"]: objective.text += "\n登机 %.1f / %.0f 秒" % [s.boarding_progress, Catalog.BOARDING_SECONDS]
 	extraction_button.visible = world.extraction_feedback.available()
 	extraction_button.disabled = world.paused
-	boarding_bar.visible = s.phase == "evacuate" and s.mode == "standard"
+	boarding_bar.visible = s.phase == "evacuate" and s.mode in ["standard", "hard"]
 	boarding_bar.value = s.boarding_progress
-	status_label.text = "%s · %s · %s · 击退 %d\n%s" % [s.stage_name(), s.profession_name(), world.Regions.NAMES[world.Regions.at(world.hero.position)], s.kills, "断电：防御与研究停止" if s.demand() > s.supply() else "营地供电正常"]
+	status_label.text = "%s · %s · 击退 %d\n%s" % [s.stage_name(), world.Regions.NAMES[world.Regions.at(world.hero.position)], s.kills, "断电：防御与研究停止" if s.demand() > s.supply() else "营地供电正常"]
 	var b: Dictionary = world.selected_building()
 	if b.is_empty():
 		selection_label.text = "幸存者"
 		health.max_value = world.hero.max_health
 		health.value = world.hero.health
-		detail_label.text = "生命 %d / %d\n%s\n%s\n携带 %s %d / %d  ·  %s 停止" % [world.hero.health, world.hero.max_health, world.order_description(), s.survival_status(), ("木材" if world.worker.cargo_kind == "wood" else "化石") if world.worker.cargo > 0 else "空载", world.worker.cargo, world.worker.capacity(), world.preferences.key_name("stop")]
+		detail_label.text = "生命 %d / %d\n%s\n携带 %s %d / %d  ·  %s 停止" % [world.hero.health, world.hero.max_health, world.order_description(), ("木材" if world.worker.cargo_kind == "wood" else "化石") if world.worker.cargo > 0 else "空载", world.worker.cargo, world.worker.capacity(), world.preferences.key_name("stop")]
 	else:
 		var spec: Dictionary = Catalog.BUILDINGS[b.kind]
+		var maximum := Catalog.max_health(b)
 		selection_label.text = spec.name
-		health.max_value = spec.hp
+		health.max_value = maximum
 		health.value = b.hp
-		detail_label.text = "%s\n生命 %d / %d" % ["施工剩余 %.1f 秒 · 右键继续" % b.remaining if b.remaining > 0 else spec.description, b.hp, spec.hp]
+		detail_label.text = "%s\n生命 %d / %d%s" % ["施工剩余 %.1f 秒 · 右键继续" % b.remaining if b.remaining > 0 else spec.description, b.hp, maximum, " · 改造：" + Catalog.REFITS[b.refit].name if b.get("refit", "") in Catalog.REFITS else ""]
+		if b.get("refit", "") in Catalog.REFITS:
+			detail_label.text = "%s\n生命 %d / %d · %s" % [Catalog.REFITS[b.refit].description, b.hp, maximum, "改造剩余 %.0f 秒" % b.remaining if b.remaining > 0 else Catalog.REFITS[b.refit].name]
 	for kind in build_buttons:
 		var reason: String = s.can_afford(kind)
 		build_buttons[kind].tooltip_text = Catalog.BUILDINGS[kind].description + ("\n" + reason if not reason.is_empty() else "")
 		build_buttons[kind].modulate = Color("e6cb89") if world.build_mode == kind else Color.WHITE
 	research_button.disabled = b.is_empty() or b.kind != "lab" or b.remaining > 0
+	research_button.visible = b.is_empty() or b.kind == "lab"
+	repair_button.visible = not b.is_empty() and b.remaining <= 0 and b.hp < Catalog.max_health(b)
+	repair_button.disabled = world.paused or s.wood < 1
 	demolish_button.visible = not b.is_empty()
 	demolish_button.disabled = world.paused or s.phase not in ["playing", "evacuate"]
 	if not b.is_empty():
 		var refund: Dictionary = s.demolition_quote(b.id)
 		demolish_button.tooltip_text = "返还 %d 木 / %d 金；拆除后立即恢复通路。" % [refund.get("wood", 0), refund.get("gold", 0)]
+	for option in refit_buttons:
+		var can_show: bool = not b.is_empty() and b.remaining <= 0 and b.get("refit", "") == "" and b.kind in Catalog.REFITS[option].kinds
+		refit_buttons[option].visible = can_show
+		var error: String = s.refit_error(b.get("id", -1), option)
+		refit_buttons[option].disabled = world.paused or not error.is_empty()
+		refit_buttons[option].tooltip_text = "%s\n%d 木 / %d 金 / %.0f 秒；方向不可更换%s" % [Catalog.REFITS[option].description, Catalog.REFITS[option].wood, Catalog.REFITS[option].gold, Catalog.REFITS[option].time, "\n" + error if not error.is_empty() else ""]
+	eat_button.visible = Features.peripheral_enabled
+	cook_button.visible = Features.peripheral_enabled
+	journal_button.visible = Features.peripheral_enabled
 	notification_time = maxf(0, notification_time - dt)
 	if notification_time <= 0 and not world.build_mode.is_empty():
 		var reason: String = world.placement_error(world.hover_cell)
@@ -516,7 +579,7 @@ func toast(message: String) -> void:
 	notification_time = 4.0
 
 func covers(screen: Vector2) -> bool:
-	return top.get_global_rect().has_point(screen) or quest_box.get_global_rect().has_point(screen) or bottom.get_global_rect().has_point(screen) or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible or confirmation.visible or start_panel.visible or (sound_panel.visible and sound_panel.get_global_rect().has_point(screen)) or (camera_panel and camera_panel.visible and camera_panel.get_global_rect().has_point(screen))
+	return quest_box.get_global_rect().has_point(screen) or bottom.get_global_rect().has_point(screen) or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible or confirmation.visible or start_panel.visible or (sound_panel.visible and sound_panel.get_global_rect().has_point(screen)) or (camera_panel and camera_panel.visible and camera_panel.get_global_rect().has_point(screen))
 
 func make_tech() -> void:
 	modal_shade = ColorRect.new()
@@ -593,7 +656,7 @@ func refresh_save_info() -> void:
 		continue_button.disabled = result.has("error")
 		if not result.has("error"):
 			var s: Dictionary = result.data.session
-			continue_button.text = "继续上次游戏 · %s · %02d:%02d%s" % ["标准生存" if s.mode == "standard" else "长局模式", int(s.elapsed) / 60, int(s.elapsed) % 60, "（完好记录）" if result.recovered else ""]
+			continue_button.text = "继续上次游戏 · %s · %02d:%02d%s" % [Session.mode_name(s.mode), int(s.elapsed) / 60, int(s.elapsed) % 60, "（完好记录）" if result.recovered else ""]
 	if load_button: load_button.disabled = result.has("error")
 	var names := {"manual": "手动存档", "auto0": "自动存档 A", "auto1": "自动存档 B", "auto2": "自动存档 C", "manual_backup": "上次手动备份"}
 	for slot in load_buttons:
@@ -606,7 +669,7 @@ func refresh_save_info() -> void:
 		var s: Dictionary = saved.data.session
 		var timestamp := int(saved.data.saved_at / 1000000) + int(Time.get_time_zone_from_system().bias) * 60
 		var date := Time.get_datetime_string_from_unix_time(timestamp, true)
-		b.text = "%s · %s\n%s · %02d:%02d · 生命 %d · 木 %d / 金 %d" % [names[slot], date, "撤离中" if s.phase == "evacuate" else ("标准生存" if s.mode == "standard" else "长局模式"), int(s.elapsed + s.evacuation_elapsed) / 60, int(s.elapsed + s.evacuation_elapsed) % 60, saved.data.hero.health, s.wood, s.gold]
+		b.text = "%s · %s\n%s · %02d:%02d · 生命 %d · 木 %d / 金 %d" % [names[slot], date, "撤离中" if s.phase == "evacuate" else (Session.mode_name(s.mode)), int(s.elapsed + s.evacuation_elapsed) / 60, int(s.elapsed + s.evacuation_elapsed) % 60, saved.data.hero.health, s.wood, s.gold]
 
 func request_demolition() -> void:
 	if world.paused or not world.started: return

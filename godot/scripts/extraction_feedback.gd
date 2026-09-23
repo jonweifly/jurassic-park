@@ -79,11 +79,11 @@ func update() -> void:
 	var active: bool = s.phase == "evacuate" and world.started
 	var visible: bool = world.vision.is_visible(world.board.cell_at(world.extraction))
 	caption.visible = active and visible
-	arc.visible = active and visible and s.mode == "standard"
+	arc.visible = active and visible and s.mode in ["standard", "hard"]
 	world.extraction_marker.scale = Vector3.ONE
 	world.extraction_marker.material_override.albedo_color = Color("a2c9a6") if active else Color("c9b575")
 	if not active: return
-	caption.text = ("登机 %.1f / %.0f 秒" % [s.boarding_progress, Catalog.BOARDING_SECONDS]) if s.mode == "standard" else "救援已抵达"
+	caption.text = ("登机 %.1f / %.0f 秒" % [s.boarding_progress, Catalog.BOARDING_SECONDS]) if s.mode in ["standard", "hard"] else "救援已抵达"
 	var count := clampi(floori(s.boarding_progress / Catalog.BOARDING_SECONDS * SEGMENTS), 0, SEGMENTS)
 	if count == last_segments: return
 	last_segments = count

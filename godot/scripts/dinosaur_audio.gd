@@ -1,4 +1,5 @@
 extends RefCounted
+const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
 ## Cue timing uses presentation state only and does not consume combat randomness.
 var sound: Node
 var heard := {}
@@ -15,7 +16,7 @@ func cue(d: Node3D, attack: bool = false) -> bool:
 	var now: float = sound.world.session.game_time()
 	if now-heard.get(id,-100.0) < (4.0 if attack else 8.0): return false
 	if gap > 0: return false
-	var species: String = d.get_meta("species","raptor")
+	var species: String = Dinosaurs.spec(str(d.get_meta("species","raptor"))).audio
 	last_key = "%s_call_%d" % [species,1+serial%2]
 	serial += 1
 	cue_count += 1
