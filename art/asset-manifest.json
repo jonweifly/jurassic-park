@@ -327,7 +327,8 @@
       "idle",
       "walk"
     ],
-    "bytes": 1879180
+    "bytes": 1879180,
+    "runtime_bytes": 400640
   },
   {
     "name": "raptor_v2",
@@ -340,7 +341,8 @@
       "idle",
       "walk"
     ],
-    "bytes": 1879184
+    "bytes": 1879184,
+    "runtime_bytes": 400644
   },
   {
     "name": "young_trex_v2",
@@ -353,7 +355,8 @@
       "idle",
       "walk"
     ],
-    "bytes": 1867596
+    "bytes": 1867596,
+    "runtime_bytes": 389056
   },
   {
     "name": "trex_v2",
@@ -366,7 +369,8 @@
       "idle",
       "walk"
     ],
-    "bytes": 1867600
+    "bytes": 1867600,
+    "runtime_bytes": 389060
   },
   {
     "name": "spitter_v2",
@@ -379,7 +383,8 @@
       "idle",
       "walk"
     ],
-    "bytes": 1910540
+    "bytes": 1910540,
+    "runtime_bytes": 431996
   },
   {
     "name": "elite_raptor_v2",
@@ -392,7 +397,8 @@
       "idle",
       "walk"
     ],
-    "bytes": 1935192
+    "bytes": 1935192,
+    "runtime_bytes": 456648
   },
   {
     "name": "alpha_trex_v2",
@@ -405,6 +411,7 @@
       "idle",
       "walk"
     ],
-    "bytes": 1937376
+    "bytes": 1937376,
+    "runtime_bytes": 458836
   }
 ]

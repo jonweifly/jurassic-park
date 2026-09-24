@@ -21,10 +21,9 @@ const Weather = preload("res://scripts/weather.gd")
 const ExtractionFeedback = preload("res://scripts/extraction_feedback.gd")
 const BuildAccess = preload("res://scripts/build_access.gd")
 const DefenseFeedback = preload("res://scripts/defense_feedback.gd")
+const DefenseCombat = preload("res://scripts/defense_combat.gd")
 const SurvivorScene = preload("res://scenes/models/survivor.tscn")
 const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
-const DinoScene = preload("res://scenes/models/raptor.tscn")
-const TrexScene = preload("res://scenes/models/trex.tscn")
 const TreeScene = preload("res://scenes/models/tree.tscn")
 const RockScene = preload("res://scenes/models/rock.tscn")
 const FossilScene = preload("res://scenes/models/fossil.tscn")
@@ -36,6 +35,7 @@ var worker: RefCounted
 var build_access: RefCounted
 var vision: RefCounted
 var dino_ai: RefCounted
+var defense: RefCounted
 var hero: Node3D
 var camera: Camera3D
 var pointer_feedback: Control
@@ -113,6 +113,7 @@ func _ready() -> void:
 	add_child(hero)
 	camera_focus = hero.position
 	director = Director.new(self)
+	defense = DefenseCombat.new(self)
 	worker = Worker.new(self)
 	build_access = BuildAccess.new(self)
 	vision = Vision.new(self)
@@ -478,7 +479,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not paused and started and session.phase in ["playing", "evacuate"] and camera_rig.handle(event): return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
-			if not build_mode.is_empty(): build_mode = ""
+			if defense.marking: defense.marking = false
+			elif not build_mode.is_empty(): build_mode = ""
 			else: toggle_pause()
 			return
 		if Features.peripheral_enabled and preferences.matches(event, "journal") and started:
@@ -495,6 +497,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not event is InputEventMouseButton or not event.pressed: return
 	if paused or session.phase in ["won", "lost"]: return
 	var p := ground_at(event.position)
+	if defense.marking:
+		if event.button_index == MOUSE_BUTTON_LEFT: defense.mark_at(p)
+		elif event.button_index == MOUSE_BUTTON_RIGHT: defense.marking = false
+		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if not build_mode.is_empty(): place_building(board.cell_at(p))
 		else:
@@ -509,6 +515,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func select_build(kind: String) -> void:
 	if paused or session.phase != "playing": return
+	defense.marking = false
 	build_mode = kind
 	hud.notification_time = 0
 
@@ -731,21 +738,16 @@ func update_buildings(dt: float) -> void:
 			if b.get("open", false): continue
 		if b.kind not in ["tower", "shelter", "gate"] or session.supply() < session.demand(): continue
 		b.cooldown -= dt
-		var nearest: Node3D = null
-		var best := Catalog.attack_range(b)
-		for d in dinosaurs:
-			var distance := n.position.distance_to(d.position)
-			if d.health > 0 and d.visible and distance < best:
-				best = distance
-				nearest = d
+		var nearest: Node3D = defense.choose(b, n.position)
 		if nearest:
 			var direction := nearest.position - n.position
 			if b.kind == "tower": n.get_node("Model/Gun").rotation.y = atan2(direction.x, direction.z)
 			if b.cooldown <= 0:
 				b.cooldown = Catalog.attack_interval(b)
 				sound.play_at("bow" if b.kind == "tower" else "electric", n.position)
-				var damage := session.defense_multiplier() * (10 if b.kind == "tower" else 15) * (1.5 if Regions.at(n.position) == "mountain" else 1.0)
-				nearest.health -= Dinosaurs.received_damage(str(nearest.get_meta("species", "raptor")), damage, b.kind)
+				var multiplier := session.defense_multiplier() * (1.5 if Regions.at(n.position) == "mountain" else 1.0)
+				nearest.health -= DefenseCombat.hit_damage(b, str(nearest.get_meta("species", "raptor")), multiplier)
+				if b.kind == "shelter": DefenseCombat.apply_slow(nearest)
 				dino_ai.provoke(nearest, "building", b.id, n.position)
 				dino_ai.emit_noise(n.position, 14.0 if b.kind == "tower" else 8.0, "building", b.id)
 				tracer(n.position + Vector3.UP * 2.1, nearest.position + Vector3.UP * 1.2, Color("f5d087"))

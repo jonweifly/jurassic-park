@@ -29,7 +29,7 @@ for file in sorted((ROOT/args.assets).glob('*.glb')):
      if abs(sum(row)-1)>.002: errors.append(f'{file.name}: unnormalized skin weights');break
      blends+=sum(v>.01 for v in row)>1
  clips=[a.get('name') for a in doc.get('animations',[])]
- if file.stem in ['survivor','raptor','trex']:
+ if file.stem in ['survivor','raptor','trex'] or file.stem in {r['name'] for r in json.loads((ROOT/'art/dinosaur-roster-manifest.json').read_text())}:
   if weighted==0 or blends==0:errors.append(f'{file.name}: missing actual weighted deformation')
   for clip in ['idle','walk','attack','death']+(['chop','mine','build','carry','carry_idle'] if file.stem=='survivor' else []):
    if clip not in clips:errors.append(f'{file.name}: missing {clip}')

@@ -143,7 +143,8 @@ func update_one(d: Node3D, dt: float) -> void:
 		update_death(d, dt)
 		return
 	var frozen: bool = world.Regions.at(d.position) == "ice"
-	if not d.get_meta("stationary_test", false): d.speed = d.get_meta("base_speed") * (0.7 if frozen else 1.0)
+	if not d.get_meta("stationary_test", false): d.speed = d.get_meta("base_speed") * (0.7 if frozen else 1.0) * world.DefenseCombat.slow_factor(d)
+	if d.has_meta("ai_electric_slow"): d.set_meta("ai_electric_slow", maxf(0.0, float(d.get_meta("ai_electric_slow")) - dt))
 	d.attack_interval = d.get_meta("base_interval") / (0.7 if frozen else 1.0)
 	d.set_meta("ai_awareness", maxf(0, float(d.get_meta("ai_awareness")) - dt))
 	d.set_meta("ai_wander_clock", float(d.get_meta("ai_wander_clock")) - dt)
@@ -369,7 +370,7 @@ func update_patrol(d: Node3D, dt: float) -> void:
 		return
 	if d.path_cooldown > 0: return
 	d.path_cooldown = 1.0
-	d.route = world.board.route(d.position, destination, true, d.body_radius)
+	d.route = patrol_route(d.position, destination, d.body_radius)
 	if d.route.is_empty():
 		var blocker := reachable_local_building(d)
 		if not blocker.is_empty():

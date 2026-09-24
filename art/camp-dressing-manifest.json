@@ -1,0 +1,26 @@
+[
+  {
+    "name": "tent_dressing",
+    "vertices": 2096,
+    "polygons": 1962,
+    "collision": false
+  },
+  {
+    "name": "tower_dressing",
+    "vertices": 2100,
+    "polygons": 1968,
+    "collision": false
+  },
+  {
+    "name": "generator_dressing",
+    "vertices": 1848,
+    "polygons": 1694,
+    "collision": false
+  },
+  {
+    "name": "lab_dressing",
+    "vertices": 1496,
+    "polygons": 1394,
+    "collision": false
+  }
+]

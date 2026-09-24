@@ -23,6 +23,9 @@ var clock_label: Label
 var status_label: Label
 var selection_label: Label
 var detail_label: Label
+var priority_button: OptionButton
+var focus_button: Button
+var clear_focus_button: Button
 var health: ProgressBar
 var objective: Label
 var tip: Label
@@ -217,6 +220,29 @@ func _ready() -> void:
 	status_label.custom_minimum_size.x = 340
 	middle.add_child(status_label)
 	middle.add_child(action_row)
+	var tactics := HBoxContainer.new()
+	tactics.add_theme_constant_override("separation", 4)
+	middle.add_child(tactics)
+	priority_button = OptionButton.new()
+	for text in world.DefenseCombat.LABELS: priority_button.add_item(text)
+	priority_button.item_selected.connect(func(index):
+		var selected: Dictionary = world.selected_building()
+		if not world.paused and not selected.is_empty() and selected.kind == "tower": selected.priority = world.DefenseCombat.PRIORITIES[index])
+	priority_button.tooltip_text = "设置选中箭塔的目标优先级；没有对应目标时攻击最近的恐龙。集火标记优先。"
+	tactics.add_child(priority_button)
+	focus_button = button("集火标记")
+	focus_button.tooltip_text = "点击后在场景中左键选择恐龙；不改变人物命令。右键或 Esc 取消选择。"
+	focus_button.pressed.connect(func():
+		if world.paused: return
+		world.build_mode = ""
+		world.defense.marking = not world.defense.marking)
+	tactics.add_child(focus_button)
+	clear_focus_button = button("取消集火")
+	clear_focus_button.pressed.connect(func():
+		if world.paused: return
+		world.defense.focus_uid = -1
+		world.defense.marking = false)
+	tactics.add_child(clear_focus_button)
 	columns.add_child(middle)
 	var commands := VBoxContainer.new()
 	commands.custom_minimum_size.x = 430
@@ -242,7 +268,7 @@ func _ready() -> void:
 		refit_button.pressed.connect(world.refit_selected.bind(option))
 		refit_button.visible = false
 		refit_buttons[option] = refit_button
-		command_head.add_child(refit_button)
+		tactics.add_child(refit_button)
 	research_button = button("升级实验室  R")
 	research_button.pressed.connect(world.research)
 	command_head.add_child(research_button)
@@ -530,6 +556,19 @@ func refresh(dt: float) -> void:
 		detail_label.text = "%s\n生命 %d / %d%s" % ["施工剩余 %.1f 秒 · 右键继续" % b.remaining if b.remaining > 0 else spec.description, b.hp, maximum, " · 改造：" + Catalog.REFITS[b.refit].name if b.get("refit", "") in Catalog.REFITS else ""]
 		if b.get("refit", "") in Catalog.REFITS:
 			detail_label.text = "%s\n生命 %d / %d · %s" % [Catalog.REFITS[b.refit].description, b.hp, maximum, "改造剩余 %.0f 秒" % b.remaining if b.remaining > 0 else Catalog.REFITS[b.refit].name]
+		if b.kind == "tower" and b.remaining <= 0:
+			var damage: float = Catalog.attack_damage(b) * s.defense_multiplier() * (1.5 if world.Regions.at(world.board.point(b.cell)) == "mountain" else 1.0)
+			var target: Node3D = world.defense.choose(b, world.board.point(b.cell))
+			var status: String = "断电" if s.supply() < s.demand() else ("等待目标" if target == null else "攻击：" + world.Dinosaurs.spec(target.get_meta("species")).name)
+			detail_label.text = "生命 %d / %d\n%.1f 伤害 / %.2f 秒 · %.1f 米\n%s" % [b.hp, maximum, damage, Catalog.attack_interval(b), Catalog.attack_range(b), status]
+			if b.get("refit", "") in Catalog.REFITS: selection_label.text = Catalog.REFITS[b.refit].name + "塔"
+	priority_button.visible = not b.is_empty() and b.kind == "tower"
+	priority_button.disabled = world.paused
+	if priority_button.visible: priority_button.select(world.DefenseCombat.PRIORITIES.find(Catalog.target_priority(b)))
+	focus_button.disabled = world.paused
+	focus_button.text = "点击恐龙…" if world.defense.marking else "集火标记"
+	clear_focus_button.visible = world.defense.focused() != null or world.defense.marking
+	clear_focus_button.disabled = world.paused
 	for kind in build_buttons:
 		var reason: String = s.can_afford(kind)
 		build_buttons[kind].tooltip_text = Catalog.BUILDINGS[kind].description + ("\n" + reason if not reason.is_empty() else "")
@@ -553,7 +592,9 @@ func refresh(dt: float) -> void:
 	cook_button.visible = Features.peripheral_enabled
 	journal_button.visible = Features.peripheral_enabled
 	notification_time = maxf(0, notification_time - dt)
-	if notification_time <= 0 and not world.build_mode.is_empty():
+	if world.defense.marking:
+		tip.text = "左键恐龙：标记集火 · 右键 / Esc：取消"
+	elif notification_time <= 0 and not world.build_mode.is_empty():
 		var reason: String = world.placement_error(world.hover_cell)
 		if reason.is_empty(): reason = world.placement_warning(world.hover_cell)
 		tip.text = "左键建造 %s · 右键取消%s" % [Catalog.BUILDINGS[world.build_mode].name, "  |  " + reason if not reason.is_empty() else ""]

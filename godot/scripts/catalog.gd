@@ -9,15 +9,16 @@ const BUILDINGS = {
 	"tent": {"source_id": "h002", "name": "帐篷", "wood": 0, "gold": 0, "power": 0, "supply": 0, "hp": 100.0, "time": 10.0, "requires": [], "description": "营地的起点。建成后可以建造营火和发电站。"},
 	"fire": {"source_id": "h001", "name": "营火", "wood": 5, "gold": 0, "power": 0, "supply": 0, "hp": 75.0, "time": 4.0, "requires": ["tent"], "description": "照亮夜间营地。需要已完成的帐篷。"},
 	"generator": {"source_id": "h004", "name": "发电站", "wood": 10, "gold": 10, "power": 0, "supply": 5, "hp": 100.0, "time": 10.0, "requires": ["tent"], "description": "提供 5 点电力，解锁防御设施。需要帐篷。"},
-	"shelter": {"source_id": "h006", "name": "电栅栏", "wood": 12, "gold": 12, "power": 1, "supply": 0, "hp": 280.0, "time": 10.0, "requires": ["generator"], "description": "阻挡恐龙的通路，并电击附近敌人。需要发电站。"},
+	"shelter": {"source_id": "h006", "name": "电栅栏", "wood": 12, "gold": 12, "power": 1, "supply": 0, "hp": 280.0, "time": 10.0, "requires": ["generator"], "description": "电击并减速 1.2 秒：小型 35%、大型 15%、首领 8%；不叠加。需供电。"},
 	"tower": {"source_id": "h005", "name": "弓箭塔", "wood": 15, "gold": 15, "power": 1, "supply": 0, "hp": 200.0, "time": 18.0, "requires": ["generator"], "description": "自动攻击附近恐龙。射程 15.625 米，需要发电站。"},
 	"lab": {"source_id": "h00D", "name": "基础建筑", "wood": 5, "gold": 5, "power": 1, "supply": 0, "hp": 50.0, "time": 5.0, "requires": ["generator"], "description": "建成后选中，使用升级功能变为实验室。"},
 	"laboratory": {"source_id": "h008", "name": "实验室", "wood": 5, "gold": 5, "power": 2, "supply": 0, "hp": 100.0, "time": 10.0, "requires": ["generator"], "description": "营地实验室。"},
 }
 const ORDER = ["tent", "fire", "generator", "shelter", "tower", "lab", "fossil", "gate"]
 const REFITS = {
-	"range": {"name": "远射", "kinds": ["tower"], "wood": 12, "gold": 10, "time": 12.0, "description": "射程 20 米，攻击间隔 1.35 秒。适合外圈预警和远程支援。"},
+	"range": {"name": "远射", "kinds": ["tower"], "wood": 12, "gold": 10, "time": 12.0, "description": "射程 20 米，间隔 1.35 秒；对喷毒龙伤害 +50%，默认优先远程目标。"},
 	"rapid": {"name": "速射", "kinds": ["tower"], "wood": 10, "gold": 14, "time": 12.0, "description": "射程 11 米，攻击间隔 0.6 秒。适合覆盖入口和围栏后方。"},
+	"heavy": {"name": "重弩", "kinds": ["tower"], "wood": 18, "gold": 22, "time": 18.0, "description": "射程 17 米，36 伤害 / 2.4 秒；大型伤害 +35%，忽略 75% 箭甲，默认优先大型目标。"},
 	"brace": {"name": "加固", "kinds": ["shelter", "gate"], "wood": 14, "gold": 8, "time": 12.0, "description": "耐久上限 +180；保留原有伤势，改造期间停止电击。"},
 }
 
@@ -26,10 +27,17 @@ static func max_health(b: Dictionary) -> float:
 
 static func attack_range(b: Dictionary) -> float:
 	if b.kind != "tower": return 2.8
-	return {"range": 20.0, "rapid": 11.0}.get(b.get("refit", ""), 15.625)
+	return {"range": 20.0, "rapid": 11.0, "heavy": 17.0}.get(b.get("refit", ""), 15.625)
 
 static func attack_interval(b: Dictionary) -> float:
-	return {"range": 1.35, "rapid": 0.6}.get(b.get("refit", ""), 1.0)
+	return {"range": 1.35, "rapid": 0.6, "heavy": 2.4}.get(b.get("refit", ""), 1.0)
+
+static func attack_damage(b: Dictionary) -> float:
+	if b.kind != "tower": return 15.0
+	return 36.0 if b.get("refit", "") == "heavy" else 10.0
+
+static func target_priority(b: Dictionary) -> String:
+	return b.get("priority", {"range": "ranged", "heavy": "large"}.get(b.get("refit", ""), "nearest"))
 const SESSION_SECONDS = 3600.0
 const EVACUATION_SECONDS = 300.0
 const BOARDING_SECONDS = 12.0

@@ -378,7 +378,14 @@ func update_building(node: Node3D, data: Dictionary) -> void:
 			else:
 				# Visible pennants distinguish the two tower roles at normal camera scale.
 				Visual.box(fittings, Vector3(0.05, 1.4, 0.05), Vector3(-0.6, 2.8, -0.5), Color("817e6c"))
-				Visual.box(fittings, Vector3(0.45, 0.32, 0.03), Vector3(-0.4, 3.3, -0.5), Color("7ab3b0") if data.refit == "range" else Color("c8a660"))
+				Visual.box(fittings, Vector3(0.45, 0.32, 0.03), Vector3(-0.4, 3.3, -0.5), {"range": Color("7ab3b0"), "heavy": Color("b98676")}.get(data.refit, Color("c8a660")))
+				if data.refit == "heavy":
+					var mount := Node3D.new()
+					mount.name = "HeavyBow"
+					model.get_node("Gun").add_child(mount)
+					Visual.box(mount, Vector3(1.65, 0.14, 0.18), Vector3(0, 0.1, 0.25), Color("635444"))
+					Visual.box(mount, Vector3(0.15, 0.16, 1.65), Vector3(0, 0.16, 0.35), Color("9a9f96"))
+					world.vision.shade(mount)
 			world.vision.shade(fittings)
 		node.get_node("Refit").visible = complete
 	if data.kind == "fire":

@@ -56,6 +56,7 @@ static func snapshot(w: Node) -> Dictionary:
 		"explored": w.vision.explored.duplicate(), "rng_seed": w.rng.seed, "rng_state": w.rng.state,
 		"spawn_clocks": w.spawn_clocks.duplicate(true), "order": w.order, "order_target": w.order_target,
 		"target_uid": target_uid, "selected_id": w.selected_id,
+		"defense_focus_uid": w.defense.focus_uid,
 		"noises": w.dino_ai.noises.duplicate(true), "next_noise_id": w.dino_ai.next_noise_id,
 		"generator_clock": w.dino_ai.generator_clock, "night": w.night,
 		"camera": fields(w.camera_rig, CAMERA_FIELDS), "camera_focus": w.camera_focus, "camera_size": w.camera_size,
@@ -84,6 +85,7 @@ static func validate(data: Dictionary) -> String:
 	if data.get("version") != VERSION: return "存档版本不兼容"
 	if data.get("map") != MAP_ID: return "存档地图版本不兼容"
 	if not safe_data(data): return "存档含无效数据"
+	if data.has("defense_focus_uid") and (not data.defense_focus_uid is int or data.defense_focus_uid < -1): return "存档集火目标无效"
 	var shape := {"saved_at": TYPE_INT, "session": TYPE_DICTIONARY, "worker": TYPE_DICTIONARY, "hero": TYPE_DICTIONARY, "hero_visual": TYPE_DICTIONARY, "animals": TYPE_ARRAY, "trees": TYPE_DICTIONARY, "explored": TYPE_DICTIONARY, "rng_seed": TYPE_INT, "rng_state": TYPE_INT, "spawn_clocks": TYPE_ARRAY, "order": TYPE_STRING, "order_target": TYPE_VECTOR3, "target_uid": TYPE_INT, "selected_id": TYPE_INT, "noises": TYPE_ARRAY, "next_noise_id": TYPE_INT, "generator_clock": TYPE_FLOAT, "night": TYPE_BOOL, "camera": TYPE_DICTIONARY, "camera_focus": TYPE_VECTOR3, "camera_size": TYPE_FLOAT, "scenery_clock": TYPE_FLOAT}
 	for key in shape:
 		if not data.has(key) or typeof(data[key]) != shape[key]: return "存档字段不完整：" + key
@@ -111,6 +113,9 @@ static func validate(data: Dictionary) -> String:
 		for key in ["base_speed", "base_interval", "ai_awareness", "ai_wander_clock", "ai_sense_clock", "ai_retaliation"]:
 			if not animal.meta.get(key) is float: valid = false
 		if animal.meta.has("ai_commit_id") and not animal.meta.ai_commit_id is int: valid = false
+		if animal.meta.has("ai_electric_slow"):
+			if not animal.meta.ai_electric_slow is float: valid = false
+			elif animal.meta.ai_electric_slow < 0.0 or animal.meta.ai_electric_slow > 1.2: valid = false
 		if animal.meta.has("ai_commit_until") and not animal.meta.ai_commit_until is float: valid = false
 		if animal.meta.has("ai_hard_damage_multiplier"):
 			var multiplier: Variant = animal.meta.ai_hard_damage_multiplier
@@ -124,6 +129,10 @@ static func validate(data: Dictionary) -> String:
 		if animal.meta.has("ai_strike") and animal.meta.ai_strike is Dictionary and animal.meta.ai_strike.has("special"):
 			var strike: Dictionary = animal.meta.ai_strike
 			if strike.special not in ["acid", "pounce", "stomp"] or not strike.get("impact") is Vector3: valid = false
+			if strike.get("special") != {"spitter": "acid", "elite_raptor": "pounce", "alpha_trex": "stomp"}.get(animal.meta.get("species", ""), ""): valid = false
+			if strike.has("duration"):
+				if not strike.duration is float: valid = false
+				elif strike.duration <= 0 or strike.duration > 2.0: valid = false
 		if animal.meta.get("ai_state") == "patrol" and (not animal.meta.get("ai_patrol_destination") is Vector3 or not animal.meta.get("ai_patrol_seconds") is float): valid = false
 	pawn.free()
 	if not valid: return "存档实体字段不完整"
@@ -141,9 +150,8 @@ static func validate(data: Dictionary) -> String:
 		if not b.id is int or not b.cell is Vector2i or not catalog.BUILDINGS.has(b.kind) or not (b.hp is float or b.hp is int) or not (b.remaining is float or b.remaining is int) or not (b.cooldown is float or b.cooldown is int): return "存档建筑类型无效"
 		if b.id <= 0 or b.id >= s.next_id or ids.has(b.id) or not Rect2i(0, 0, 128, 128).has_point(b.cell): return "存档建筑编号或位置无效"
 		if b.has("refit") and (not b.refit is String or (not b.refit.is_empty() and not catalog.REFITS.has(b.refit))): return "存档建筑改造无效"
-		if b.get("refit", "") == "range" or b.get("refit", "") == "rapid":
-			if b.kind != "tower": return "存档建筑改造与类型不符"
-		if b.get("refit", "") == "brace" and b.kind not in ["shelter", "gate"]: return "存档建筑改造与类型不符"
+		if b.get("refit", "") in catalog.REFITS and b.kind not in catalog.REFITS[b.refit].kinds: return "存档建筑改造与类型不符"
+		if b.has("priority") and (b.kind != "tower" or b.priority not in ["nearest", "large", "ranged"]): return "存档防御优先级无效"
 		if b.hp > catalog.max_health(b): return "存档建筑耐久无效"
 		ids[b.id] = true
 		for resource in ["wood", "gold"]:
@@ -308,6 +316,8 @@ static func apply(w: Node, data: Dictionary) -> void:
 		w.hero.work_state = ""
 		w.hero.work_timeout = 0.0
 	w.selected_id = data.selected_id
+	w.defense.focus_uid = data.get("defense_focus_uid", -1)
+	w.defense.marking = false
 	w.spawn_clocks.assign(data.spawn_clocks)
 	w.dino_ai.noises.assign(data.noises)
 	w.dino_ai.next_noise_id = data.next_noise_id
