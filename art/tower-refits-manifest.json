@@ -1,0 +1,26 @@
+[
+  {
+    "name": "range",
+    "triangles": 3412,
+    "meshes": 2,
+    "height": 2.8,
+    "weapon": "Gun/Recoil/Muzzle",
+    "footprint": "existing 2m cell"
+  },
+  {
+    "name": "rapid",
+    "triangles": 4620,
+    "meshes": 2,
+    "height": 1.55,
+    "weapon": "Gun/Recoil/Muzzle",
+    "footprint": "existing 2m cell"
+  },
+  {
+    "name": "heavy",
+    "triangles": 3348,
+    "meshes": 2,
+    "height": 1.8,
+    "weapon": "Gun/Recoil/Muzzle",
+    "footprint": "existing 2m cell"
+  }
+]
