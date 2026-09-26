@@ -26,6 +26,7 @@ cases.extend(['kill_stats', 'kill_stats_input'])
 cases.extend(['tower_upgrade', 'tower_upgrade_input'])
 cases.extend(['barrier_rotation', 'barrier_rotation_input', 'ground_surfaces'])
 cases.extend(['coop_rules', 'coop_input'])
+cases.append('tent_shelter')
 if args.full_session:
     cases.extend(['full_session', 'varied_session'])
 if args.audio:

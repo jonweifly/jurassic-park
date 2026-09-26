@@ -1,6 +1,6 @@
 extends RefCounted
 ## Versioned data-only saves. Never deserialize objects or write into the project.
-const VERSION := 3
+const VERSION := 4
 const ExpeditionCatalog = preload("res://scripts/expedition_catalog.gd")
 const Features = preload("res://scripts/feature_policy.gd")
 const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
@@ -9,7 +9,7 @@ const MAP_ID := "reference-island-65065-v1"
 const SESSION_FIELDS = ["wood", "gold", "elapsed", "phase", "buildings", "next_id", "harvest_level", "duration", "evacuation_elapsed", "kills", "mode", "technologies", "research_job", "completed_notice", "rescue_warned", "finale_wave", "next_dinosaur_id", "healing_spent", "boarding_progress", "adventure", "profession"]
 const SURVIVAL_FIELDS = ["hunger", "fatigue", "food", "raw_meat", "cooked_meat", "berries", "survival_clock"]
 const WORKER_FIELDS = ["cargo_kind", "cargo", "resource_kind", "resource_target", "target_id", "clock", "retry_clock", "delivered", "noise_clock", "recovery", "pose_clock"]
-const PAWN_FIELDS = ["position", "rotation", "health", "max_health", "route", "attack_cooldown", "path_cooldown", "swing", "dying", "death_clock", "current_speed", "travelled", "age", "carrying", "cargo_kind", "work_state", "work_timeout"]
+const PAWN_FIELDS = ["position", "rotation", "health", "max_health", "route", "attack_cooldown", "path_cooldown", "swing", "dying", "death_clock", "current_speed", "travelled", "age", "carrying", "cargo_kind", "work_state", "work_timeout", "sheltered_id"]
 const CAMERA_FIELDS = ["focus", "yaw", "target_yaw", "pitch", "target_pitch", "following"]
 static var directory := "user://saves"
 static var pending: Dictionary = {}
@@ -215,6 +215,12 @@ static func migrate(data: Dictionary) -> Dictionary:
 	data = data.duplicate(true)
 	if data.version == 1: data.session["adventure"] = {}
 	if not data.session.has("profession"): data.session["profession"] = "explorer"
+	# Saves made before tents were shelter have nobody inside one.
+	if data.get("hero") is Dictionary and not data.hero.has("sheltered_id"): data.hero["sheltered_id"] = -1
+	if data.get("animals") is Array:
+		for animal in data.animals:
+			if animal is Dictionary and animal.get("pawn") is Dictionary and not animal.pawn.has("sheltered_id"):
+				animal.pawn["sheltered_id"] = -1
 	var adventure: Variant = data.session.get("adventure")
 	if data.version in [1, 2] and adventure is Dictionary and not adventure.is_empty(): adventure["run"] = {}
 	data.version = VERSION
@@ -356,3 +362,5 @@ static func apply(w: Node, data: Dictionary) -> void:
 	w.update_lighting()
 	w.destination.position = w.order_target + Vector3(0, 0.12, 0)
 	w.destination.visible = w.order == "move"
+	w.refresh_shelters()
+	w.update_shelter_visuals()

@@ -24,7 +24,7 @@ func preferred_target(d: Node3D) -> Dictionary:
 	var survivors: Array = world.survivors()
 	survivors.sort_custom(func(a,b): return a.position.distance_squared_to(d.position)<b.position.distance_squared_to(d.position))
 	for survivor in survivors:
-		if survivor.health <= 0: continue
+		if survivor.health <= 0 or survivor.is_sheltered(): continue
 		var target := exposed_target(d,survivor,senses,home)
 		if not target.is_empty(): return target
 	return {}

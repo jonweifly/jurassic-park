@@ -29,7 +29,8 @@ func world_packet(full: bool = false) -> Dictionary:
 
 func pawn_packet(pawn: Node3D) -> Dictionary:
 	return {"position":pawn.position,"health":pawn.health,"max_health":pawn.max_health,
-		"carrying":pawn.carrying,"cargo_kind":pawn.cargo_kind,"visual":Save.visual_state(pawn)}
+		"carrying":pawn.carrying,"cargo_kind":pawn.cargo_kind,"sheltered_id":pawn.sheltered_id,
+		"visual":Save.visual_state(pawn)}
 
 func actor_packet() -> Dictionary:
 	sequence += 1
@@ -77,6 +78,10 @@ func apply_world(data: Dictionary) -> void:
 		if not world.visuals.has(b.id): world.create_building_visual(b)
 		world.scenery.update_building(world.visuals[b.id],b)
 		if b.kind=="gate": world.visuals[b.id].get_node("Model/Leaf").rotation.y = -PI*.48 if b.get("open",false) else 0.0
+		# Clients never run update_buildings(), so the occupant marker is applied here.
+		if b.kind=="tent":
+			var occupied: bool = net.pawns.values().any(func(p): return p.sheltered_id==b.id and p.health>0)
+			world.scenery.show_tent_occupant(world.visuals[b.id],occupied)
 	for cell in data.explored: world.vision.explored[cell] = true
 	world.defense.focus_uid = data.focus
 	apply_actors(data.players)
@@ -91,10 +96,13 @@ func apply_pawn(pawn: Node3D, packet: Dictionary) -> void:
 	pawn.max_health=packet.max_health
 	pawn.carrying=packet.carrying
 	pawn.cargo_kind=packet.cargo_kind
+	pawn.sheltered_id=int(packet.get("sheltered_id",-1))
 	Save.restore_visual(pawn,packet.visual)
+	var sheltered: bool = pawn.is_sheltered() and pawn.health>0
+	pawn.visual.model.visible=not sheltered
 	pawn.health_label.text="%d / %d" %[maxi(0,int(pawn.health)),int(pawn.max_health)]
-	pawn.health_label.visible=pawn.health>0 and pawn.health<pawn.max_health
-	pawn.selection.visible=not pawn.is_dinosaur and pawn.health>0
+	pawn.health_label.visible=pawn.health>0 and pawn.health<pawn.max_health and not sheltered
+	pawn.selection.visible=not pawn.is_dinosaur and pawn.health>0 and not sheltered
 
 func apply_actors(data: Dictionary) -> void:
 	if data.seq<=received_sequence: return

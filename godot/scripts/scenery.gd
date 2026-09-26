@@ -355,6 +355,38 @@ func add_building_contact_shadow(node: Node3D, kind: String) -> void:
 	shadow.mesh = quad
 	node.add_child(shadow)
 
+func show_tent_occupant(node: Node3D, occupied: bool) -> void:
+	# The survivor's own model is hidden while inside, so the tent has to say "someone
+	# is in here" or it just looks like the character died.
+	if not node.has_node("Occupant"):
+		if not occupied: return
+		var marker := Node3D.new()
+		marker.name = "Occupant"
+		node.add_child(marker)
+		var glow := MeshInstance3D.new()
+		var quad := QuadMesh.new()
+		quad.size = Vector2(0.62, 0.62)
+		glow.mesh = quad
+		glow.position = Vector3(0, 1.55, 0)
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color("ffd98a")
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		material.no_depth_test = true
+		glow.material_override = material
+		marker.add_child(glow)
+		var label := Label3D.new()
+		label.text = "有人在里面"
+		label.font_size = 26
+		label.pixel_size = 0.011
+		label.position = Vector3(0, 2.25, 0)
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.no_depth_test = true
+		label.modulate = Color("ffe6a8")
+		marker.add_child(label)
+	node.get_node("Occupant").visible = occupied
+
 func update_building(node: Node3D, data: Dictionary) -> void:
 	var complete: bool = data.remaining <= 0
 	if data.kind == "tower": TowerVisuals.update(self, node, data)

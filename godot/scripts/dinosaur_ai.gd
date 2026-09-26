@@ -214,7 +214,17 @@ func visible_target(d: Node3D) -> Dictionary:
 	var best := float(senses.sight)
 	var result: Dictionary = {}
 	# Briefly prioritize the actual attacker over a nearer, unrelated camp building.
-	if float(d.get_meta("ai_retaliation")) > 0:
+	var retaliating: bool = float(d.get_meta("ai_retaliation")) > 0
+	if retaliating:
+		var kind: String = d.get_meta("ai_target_kind")
+		var id: int = d.get_meta("ai_target_id")
+		var survivor: Node3D = world.survivor_by_id(id)
+		# Give up retaliation against someone who reached a tent, otherwise the early
+		# return below skips the building fallback and the dinosaur freezes on nothing.
+		if kind == "hero" and survivor and survivor.is_sheltered():
+			d.set_meta("ai_retaliation", 0.0)
+			retaliating = false
+	if retaliating:
 		var position: Vector3 = d.get_meta("ai_last_known")
 		var kind: String = d.get_meta("ai_target_kind")
 		var id: int = d.get_meta("ai_target_id")
@@ -234,7 +244,7 @@ func visible_target(d: Node3D) -> Dictionary:
 	var preferred: Dictionary = tactics.preferred_target(d)
 	if not preferred.is_empty(): return preferred
 	for survivor in world.survivors():
-		if survivor.health <= 0: continue
+		if survivor.health <= 0 or survivor.is_sheltered(): continue
 		var distance := d.position.distance_to(survivor.position)
 		if distance <= best and survivor.position.distance_to(home) <= senses.leash * 1.5 and has_line_of_sight(d.position, survivor.position):
 			best = distance
@@ -430,7 +440,7 @@ func resolve_strike(d: Node3D, dt: float) -> bool:
 		building = world.session.building(strike.id)
 		if building.is_empty(): return true
 		position = world.board.point(building.cell)
-	elif not survivor or survivor.health <= 0: return true
+	elif not survivor or survivor.health <= 0 or survivor.is_sheltered(): return true
 	# Damage is committed at contact; a survivor who leaves reach can dodge the bite.
 	if d.position.distance_to(position) > 3.0 or not has_line_of_sight(d.position, position): return true
 	world.sound.play_at("hit", position)

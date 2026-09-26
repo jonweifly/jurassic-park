@@ -28,7 +28,11 @@ var carrying := false
 var work_state := ""
 var work_timeout := 0.0
 var cargo_kind := ""
+var sheltered_id := -1
 @onready var visual: Node = $Visual
+
+func is_sheltered() -> bool:
+	return sheltered_id > 0
 
 func _ready() -> void:
 	health_label = Label3D.new()

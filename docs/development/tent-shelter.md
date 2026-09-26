@@ -72,7 +72,11 @@
 
 ## 存档与联机
 
-**存档**：`sheltered_id` 加入 `save_store.gd:12` 的 `PAWN_FIELDS`，并把 `save_store.gd:3` 的 `VERSION` 从 3 升到 4。必须升版本：`restore_fields()` 无键存在性保护，而 `matches()` 缺键即判定不兼容；靠版本号在 `save_store.gd:85` 提前挡掉旧档，会得到"存档版本不兼容"的正常提示，而不是崩溃。不做兼容垫片。
+**存档**：`sheltered_id` 加入 `save_store.gd:12` 的 `PAWN_FIELDS`，并把 `VERSION` 从 3 升到 4。必须升版本：`restore_fields()` 无键存在性保护，而 `matches()` 缺键即判定不兼容。
+
+但旧档不是被拒绝，而是被迁移——设计初稿在这里写错了。`migrate()` 已经在处理 1/2/3 版存档，所以升版本必须同时补一条迁移规则：给 `hero` 和每个 `animals[].pawn` 补 `sheltered_id = -1`（旧世界里没人待在帐篷里）。少了这一步，旧档会带着新版本号通过 `migrate()`、却在 `validate()` 因缺键失败。
+
+顺带修掉三处把"当前版本"写死成 3 的断言（`expedition_variety_test.gd` 两处、`core_focus_test.gd` 一处），改为引用 `Save.VERSION`，以后再升版本就不会假失败。
 
 **联机**：`sheltered_id` 加入 `coop_replication.gd:30` `pawn_packet()`，由 `apply_pawn()` 应用。
 
@@ -84,7 +88,9 @@
 - 帐篷被摧毁后驱逐并恢复可被攻击。
 - 黄金耗尽保持庇护、停止回血、只提示一次。
 - 40% 警告在防御提示节流生效期间仍然出现。
-- 存档往返保留 `sheltered_id`；旧存档被干净拒绝。
+- 存档往返保留 `sheltered_id`；读档后要重刷可见性，否则人物位置对了却还是显形的。
+- 旧版本存档迁移后补上 `sheltered_id` 并通过校验。
+- 完整治疗流程：下令→走到→进入→回血→满血离开。
 - 合作模式下庇护状态同步到客户端。
 - 撤离判定不受庇护影响（`all_inside()` 仍看坐标）。
 

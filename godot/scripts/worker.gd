@@ -12,6 +12,7 @@ var delivered := 0
 var noise_clock := 0.0
 var recovery := 0.0
 var pose_clock := 0.0
+var broke_notified := false
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
@@ -166,6 +167,7 @@ func update(dt: float) -> void:
 			world.stop_order()
 			world.hud.toast("治疗中止：帐篷已不可用。")
 			return
+		world.enter_shelter(world.hero, tent)
 		if world.hero.health >= world.hero.max_health:
 			world.stop_order()
 			world.hud.toast("治疗完成。")
@@ -173,10 +175,14 @@ func update(dt: float) -> void:
 		clock += dt
 		if clock >= 1.0:
 			clock -= 1.0
+			# Running out of gold pauses regeneration but keeps the shelter; being
+			# inside is the reward for staying put, not something to lose to a price.
 			if world.session.gold < 1:
-				world.stop_order()
-				world.hud.toast("治疗中止：每秒治疗需要 1 黄金。")
+				if not broke_notified:
+					broke_notified = true
+					world.hud.toast("黄金不足，暂停治疗。留在帐篷里仍然安全。")
 				return
+			broke_notified = false
 			world.session.gold -= 1
 			world.session.healing_spent += 1
 			world.hero.health = minf(world.hero.max_health, world.hero.health + world.session.healing_amount())

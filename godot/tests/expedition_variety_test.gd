@@ -238,8 +238,8 @@ func test_save_validation() -> void:
 	world.adventure.update_events()
 	world.adventure.contracts.accept(world.session.adventure.run.offers[0])
 	var snap := Save.snapshot(world)
-	expect(snap.version == 3 and Save.validate(snap).is_empty(), "Active random plan and accepted contract use save version three")
-	expect(Save.write(world).is_empty(), "Version-three disk save succeeds")
+	expect(snap.version == Save.VERSION and Save.validate(snap).is_empty(), "Active random plan and accepted contract use the current save version")
+	expect(Save.write(world).is_empty(), "Current-version disk save succeeds")
 	var disk := Save.read_slot("manual")
 	expect(disk.has("data") and disk.data.session.adventure.run == snap.session.adventure.run, "Disk roundtrip preserves exact content draw")
 	for key in ["seed", "plan", "offers", "active", "claimed"]:
@@ -267,7 +267,7 @@ func test_save_validation() -> void:
 	legacy.session.adventure.events_done = ["map"]
 	write_legacy(legacy, "legacy2")
 	var loaded := Save.read_slot("legacy2")
-	expect(loaded.has("data") and loaded.data.version == 3 and loaded.data.session.adventure.run.is_empty(), "Real version-two file migrates to legacy timeline")
+	expect(loaded.has("data") and loaded.data.version == Save.VERSION and loaded.data.session.adventure.run.is_empty(), "Real version-two file migrates to legacy timeline")
 	expect(loaded.data.session.adventure.offer == "battery" and loaded.data.session.adventure.offer_until == 391 and loaded.data.rng_state == legacy.rng_state, "Migration preserves active choice, deadline, and combat RNG")
 	expect(not legacy.session.adventure.has("run") and legacy.version == 2, "Migration leaves original source untouched")
 	world.free()

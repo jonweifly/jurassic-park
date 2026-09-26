@@ -94,7 +94,10 @@ func resolve(d: Node3D, strike: Dictionary) -> void:
 	var multiplier := 1.35 if strike.special == "stomp" else 1.0
 	if strike.special == "pounce" and d.position.distance_to(impact) > 3.0: return
 	# No target tracking after wind-up, no damage through trees/walls and no friendly hits.
+	# Area damage bypasses resolve_strike(), so shelter needs its own guard here or acid
+	# and stomps would still kill someone inside a tent.
 	for survivor in world.survivors():
+		if survivor.is_sheltered(): continue
 		if survivor.health > 0 and within_impact(survivor.position, impact, radius) and ai.has_line_of_sight(d.position, survivor.position):
 			survivor.health -= d.attack_damage * multiplier
 	for b in world.session.buildings:

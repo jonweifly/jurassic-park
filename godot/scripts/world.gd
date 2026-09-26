@@ -85,6 +85,7 @@ var save_status := "尚未存档"
 var low_health_warned := false
 var outage_warned := false
 var defense_notice_after := 0.0
+var shelter_warned: Dictionary = {}
 var coop: Node
 
 func _ready() -> void:
@@ -805,6 +806,7 @@ func update_order(dt: float) -> void:
 				tracer(hero.position + Vector3.UP * 1.5, target.position + Vector3.UP, Color("e6cd8e"))
 
 func update_buildings(dt: float) -> void:
+	refresh_shelters()
 	for b in session.buildings:
 		if b.hp <= 0:
 			if visuals.has(b.id):
@@ -882,6 +884,13 @@ func damage_building(b: Dictionary, damage: float) -> void:
 	var previous: float = b.hp
 	b.hp = maxf(0.0, b.hp - damage)
 	var now: float = session.game_time()
+	# Deliberately ahead of the defence-notice throttle below: a 10s global cooldown
+	# could swallow exactly the warning that tells someone their shelter is failing.
+	if b.kind == "tent" and b.hp > 0 and b.hp <= Catalog.max_health(b) * 0.4 and not shelter_warned.has(b.id):
+		if survivors().any(func(s): return s.sheltered_id == b.id and s.health > 0):
+			shelter_warned[b.id] = true
+			hud.toast("帐篷快撑不住了，快出来或者修好它！")
+			sound.play_ui("warning")
 	if now < defense_notice_after: return
 	var critical: bool = b.hp <= Catalog.max_health(b) * 0.35
 	if critical or previous >= Catalog.max_health(b):
@@ -1030,6 +1039,7 @@ func stop_order() -> void:
 	if coop.route("stop"): return
 	if pointer_feedback: pointer_feedback.pulse_left = 0
 	if adventure: adventure.cancel_job()
+	leave_shelter(hero)
 	order = "idle"
 	hero.route.clear()
 	hero.current_speed = 0
@@ -1063,6 +1073,42 @@ func heal() -> void:
 		return
 	worker.assign("heal", board.point(nearest.cell), nearest.id)
 	hud.toast("返回帐篷治疗，每秒消耗 1 黄金。右键或 X 可中断。")
+
+func enter_shelter(survivor: Node3D, tent: Dictionary) -> void:
+	if survivor.sheltered_id == tent.id: return
+	survivor.sheltered_id = tent.id
+	shelter_warned.erase(tent.id)
+	update_shelter_visuals()
+
+func leave_shelter(survivor: Node3D) -> void:
+	if survivor.sheltered_id < 0: return
+	survivor.sheltered_id = -1
+	update_shelter_visuals()
+
+func refresh_shelters() -> void:
+	# A tent that collapses, gets demolished or is rebuilt evicts whoever is inside.
+	for survivor in survivors():
+		if survivor.sheltered_id < 0: continue
+		var tent: Dictionary = session.building(survivor.sheltered_id)
+		var usable: bool = not tent.is_empty() and tent.kind == "tent" and tent.hp > 0 and tent.remaining <= 0
+		if usable and survivor.health > 0: continue
+		leave_shelter(survivor)
+		# Only worth saying out loud when the tent failed; dying speaks for itself.
+		if not usable and survivor == hero: hud.toast("帐篷没了，你暴露在外面！")
+
+func update_shelter_visuals() -> void:
+	for survivor in survivors():
+		var hidden: bool = survivor.is_sheltered() and survivor.health > 0
+		survivor.visual.model.visible = not hidden
+		# The dead already hide their own label and ring; don't resurrect either.
+		var alive: bool = survivor.health > 0
+		survivor.health_label.visible = not hidden and alive
+		if survivor.selection: survivor.selection.visible = not hidden and alive and not survivor.is_dinosaur
+	for b in session.buildings:
+		if b.kind != "tent" or not visuals.has(b.id): continue
+		var occupied: bool = survivors().any(func(s): return s.sheltered_id == b.id and s.health > 0)
+		visuals[b.id].set_meta("occupied", occupied)
+		scenery.show_tent_occupant(visuals[b.id], occupied)
 
 func near_completed_tent() -> bool:
 	for b in session.buildings:

@@ -64,7 +64,10 @@ func test_freeze_and_load() -> void:
 	var saved := Save.snapshot(world)
 	expect(Save.validate(saved).is_empty(), "Archived snapshot is valid before migration")
 	var earlier := saved.duplicate(true)
+	earlier.version = 3
 	earlier.session.erase("profession")
+	earlier.hero.erase("sheltered_id")
+	for animal in earlier.animals: animal.pawn.erase("sheltered_id")
 	var migrated := Save.migrate(earlier)
 	expect(Save.validate(migrated).is_empty() and migrated.session.adventure == earlier.session.adventure, "Earlier version-three saves gain profession without losing run history")
 	world.free()
