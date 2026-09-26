@@ -21,6 +21,7 @@ func run() -> void:
 	world.sound.set_process(false)
 	world.start_session(1500, "hard")
 	world.prepare_demo()
+	world.session.technologies.tower_engineering = true
 	world.session.wood = 1000
 	world.session.gold = 1000
 	world.weather.preview_kind = 0

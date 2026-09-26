@@ -29,6 +29,7 @@ func run() -> void:
 	w.start_session(1500, "hard")
 	w.session.wood = 1000
 	w.session.gold = 1000
+	w.session.technologies.tower_engineering = true
 	for x in range(54, 75):
 		for y in range(77, 94): w.clear_tree(Vector2i(x,y))
 	build("tent", Vector2i(60,81))
@@ -65,7 +66,7 @@ func run() -> void:
 	w.update_buildings(0.1)
 	expect(is_equal_approx(boss_hp - large.health, 36.0 * 1.35 * 0.94), "Heavy live shot uses large bonus and partial armor penetration")
 	expect(is_equal_approx(tower.cooldown, 2.4), "Heavy real shot respects slow firing interval")
-	expect(w.visuals[tower.id].has_node("Model/Gun/HeavyBow"), "Heavy refit has distinct weapon geometry")
+	expect(w.visuals[tower.id].has_node("Model/Gun/Recoil/Weapon"), "Heavy refit has distinct weapon geometry")
 	expect(Combat.hit_damage({"kind":"tower", "refit":"range"}, "spitter", 1) == 15, "Range tower bonuses remote attackers")
 	expect(Combat.hit_damage({"kind":"tower", "refit":"range"}, "raptor", 1) == 10, "Range baseline remains unchanged")
 	expect(Combat.hit_damage({"kind":"tower", "refit":"rapid"}, "raptor", 1) / 0.6 > Combat.hit_damage(tower, "raptor", 1) / 2.4, "Rapid retains better sustained light-target output")

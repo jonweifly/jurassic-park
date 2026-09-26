@@ -18,6 +18,9 @@ func focused() -> Node3D:
 	return null
 
 func mark_at(point: Vector3) -> bool:
+	if world.coop.route("focus",[point]):
+		marking=false
+		return true
 	var target: Node3D
 	var best := 2.4
 	for d in world.dinosaurs:

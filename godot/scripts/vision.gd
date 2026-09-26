@@ -74,7 +74,8 @@ func tick(dt: float) -> void:
 func update() -> void:
 	visible_cells.clear()
 	# Sight radii are provisional, shared by rendering and combat.
-	if world.hero.health > 0: reveal(world.hero.position, 22.0 if Features.peripheral_enabled and world.session.game_time() < world.session.adventure.get("scan_until", 0.0) else (9.0 if world.night else 15.0))
+	for survivor in world.survivors():
+		if survivor.health > 0: reveal(survivor.position, 22.0 if Features.peripheral_enabled and world.session.game_time() < world.session.adventure.get("scan_until", 0.0) else (9.0 if world.night else 15.0))
 	for b in world.session.buildings:
 		if b.hp <= 0 or b.remaining > 0: continue
 		var radius := 6.0

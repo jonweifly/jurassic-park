@@ -51,7 +51,7 @@ static func snapshot(w: Node) -> Dictionary:
 		if d.get_instance_id() == w.hero.target_id: target_uid = d.get_meta("save_id")
 	return {
 		"version": VERSION, "map": MAP_ID, "saved_at": int(Time.get_unix_time_from_system() * 1000000),
-		"session": fields(w.session, SESSION_FIELDS), "survival": fields(w.session, SURVIVAL_FIELDS), "worker": fields(w.worker, WORKER_FIELDS),
+		"session": fields(w.session, SESSION_FIELDS + ["kills_by_species"]), "survival": fields(w.session, SURVIVAL_FIELDS), "worker": fields(w.worker, WORKER_FIELDS),
 		"hero": fields(w.hero, PAWN_FIELDS), "hero_visual": visual_state(w.hero), "animals": animals, "trees": stocks,
 		"explored": w.vision.explored.duplicate(), "rng_seed": w.rng.seed, "rng_state": w.rng.state,
 		"spawn_clocks": w.spawn_clocks.duplicate(true), "order": w.order, "order_target": w.order_target,
@@ -137,6 +137,16 @@ static func validate(data: Dictionary) -> String:
 	pawn.free()
 	if not valid: return "存档实体字段不完整"
 	var s: Dictionary = data.session
+	# Older version-three saves retain their total without inventing species history.
+	if s.kills < 0: return "存档击杀总数无效"
+	if s.has("kills_by_species"):
+		if not s.kills_by_species is Dictionary: return "存档击杀统计无效"
+		var remaining: int = s.kills
+		for species in s.kills_by_species:
+			var amount: Variant = s.kills_by_species[species]
+			if species not in Dinosaurs.SPECIES or not amount is int: return "存档击杀分类无效"
+			if amount < 0 or amount > remaining: return "存档击杀数量无效"
+			remaining -= amount
 	if s.phase not in ["playing", "evacuate"] or s.mode not in ["classic", "standard", "hard"] or s.wood < 0 or s.gold < 0 or s.duration <= 0 or s.elapsed < 0 or s.harvest_level not in range(4): return "存档单局状态无效"
 	if data.hero.health <= 0 or data.hero.max_health <= 0 or data.animals.size() > 128: return "存档角色状态无效"
 	if not ExpeditionCatalog.validate(s.adventure): return "探索存档状态无效"
@@ -149,6 +159,10 @@ static func validate(data: Dictionary) -> String:
 			if not b.has(key): return "存档建筑字段缺失"
 		if not b.id is int or not b.cell is Vector2i or not catalog.BUILDINGS.has(b.kind) or not (b.hp is float or b.hp is int) or not (b.remaining is float or b.remaining is int) or not (b.cooldown is float or b.cooldown is int): return "存档建筑类型无效"
 		if b.id <= 0 or b.id >= s.next_id or ids.has(b.id) or not Rect2i(0, 0, 128, 128).has_point(b.cell): return "存档建筑编号或位置无效"
+		if b.has("rotation"):
+			if not (b.rotation is float or b.rotation is int): return "存档建筑方向无效"
+			if b.kind not in ["shelter", "gate"] or b.rotation < 0 or b.rotation >= TAU: return "存档建筑方向无效"
+			if not is_equal_approx(float(b.rotation) / (PI * 0.5), roundf(float(b.rotation) / (PI * 0.5))): return "存档建筑方向无效"
 		if b.has("refit") and (not b.refit is String or (not b.refit.is_empty() and not catalog.REFITS.has(b.refit))): return "存档建筑改造无效"
 		if b.get("refit", "") in catalog.REFITS and b.kind not in catalog.REFITS[b.refit].kinds: return "存档建筑改造与类型不符"
 		if b.has("priority") and (b.kind != "tower" or b.priority not in ["nearest", "large", "ranged"]): return "存档防御优先级无效"
@@ -272,6 +286,7 @@ static func write(w: Node, automatic: bool = false) -> String:
 static func apply(w: Node, data: Dictionary) -> void:
 	# Only call on a freshly instantiated island, after validate().
 	restore_fields(w.session, data.session, SESSION_FIELDS)
+	w.session.kills_by_species = data.session.get("kills_by_species", {}).duplicate(true)
 	var survival: Dictionary = data.get("survival", {})
 	for key in SURVIVAL_FIELDS:
 		if survival.has(key): w.session.set(key, survival[key])

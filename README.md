@@ -3,6 +3,7 @@
 当前主项目位于 `godot/`，原网页原型继续保留。
 
 - 双击 [启动游戏.command](启动游戏.command) 运行游戏。
+- [双人合作试玩：创建房间、加入、保存及重连](docs/coop-play.md)
 - 双击 [预览模型.command](预览模型.command) 查看独立模型与动作。
 - [最新：随机无线电、调查委托与探索风险收益](docs/development/expedition-variety-delivery.md)
 - [游戏设置、键位配置与生存手册](docs/development/settings-guide-delivery.md)

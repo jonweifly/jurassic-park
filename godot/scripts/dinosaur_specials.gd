@@ -94,8 +94,9 @@ func resolve(d: Node3D, strike: Dictionary) -> void:
 	var multiplier := 1.35 if strike.special == "stomp" else 1.0
 	if strike.special == "pounce" and d.position.distance_to(impact) > 3.0: return
 	# No target tracking after wind-up, no damage through trees/walls and no friendly hits.
-	if world.hero.health > 0 and within_impact(world.hero.position, impact, radius) and ai.has_line_of_sight(d.position, world.hero.position):
-		world.hero.health -= d.attack_damage * multiplier
+	for survivor in world.survivors():
+		if survivor.health > 0 and within_impact(survivor.position, impact, radius) and ai.has_line_of_sight(d.position, survivor.position):
+			survivor.health -= d.attack_damage * multiplier
 	for b in world.session.buildings:
 		if b.hp <= 0: continue
 		var point: Vector3 = world.board.point(b.cell)

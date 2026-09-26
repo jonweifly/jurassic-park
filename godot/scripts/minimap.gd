@@ -37,6 +37,8 @@ func _draw() -> void:
 		draw_rect(Rect2(at - Vector2(2.5, 2.5), Vector2(5, 5)), color, false, 1.2)
 		if world.session.adventure.get("tracked", "") == id: draw_circle(at, 5.5, Color("fff0b2"), false, 1)
 	draw_circle(project(world.hero.position), 3.5, Color("c7f4d6"))
+	for survivor in world.survivors():
+		if survivor != world.hero: draw_circle(project(survivor.position),3.5,Color("83c9f1"))
 	draw_circle(project(world.extraction), 4.0, Color("c4ac6b"), false, 1.5)
 	var corners := PackedVector2Array()
 	var viewport_size: Vector2 = world.get_viewport().get_visible_rect().size

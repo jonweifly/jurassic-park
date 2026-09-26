@@ -56,12 +56,17 @@ func living_count() -> int:
 func camp_in_combat() -> bool:
 	for d in world.dinosaurs:
 		if d.health <= 0 or world.dino_ai.state(d) != "alert": continue
-		if d.position.distance_to(world.hero.position) < 12: return true
+		for survivor in world.survivors():
+			if survivor.health>0 and d.position.distance_to(survivor.position)<12: return true
 		for b in world.session.buildings:
 			if b.hp > 0 and d.position.distance_to(world.board.point(b.cell)) < 10: return true
 	return false
 
 func spawn_group(species: Array, finale: bool = false, pressure: float = 0.0, health_multiplier: float = -1.0) -> void:
+	species = species.duplicate()
+	# The opening remains calm. Two survivors add support animals, not unlimited stats.
+	if world.coop.active and world.coop.pawns.size()==2 and world.session.game_time()>=180:
+		for i in range(mini(4,ceili(species.size()*.5))): species.append("raptor" if i%2==0 else "small_raptor")
 	var limit := 36 if world.session.mode == "standard" else 72
 	var hard: bool = world.session.mode == "hard"
 	if hard: limit = Hard.LIVING_LIMIT

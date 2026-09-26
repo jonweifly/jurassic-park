@@ -151,6 +151,7 @@ func slider(parent: Node, key: String, title: String) -> void:
 
 func open() -> void:
 	if panel.visible: return
+	if hud.kill_stats.panel.visible: hud.kill_stats.close()
 	if hud.expedition_panel.panel.visible: hud.expedition_panel.close()
 	if hud.guide_panel.panel.visible: hud.guide_panel.close()
 	if hud.tech_panel.visible: hud.close_tech()

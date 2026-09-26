@@ -120,6 +120,7 @@ func _init(owner_hud: Node) -> void:
 func open(id: String = "") -> void:
 	if not Features.peripheral_enabled: return
 	if not world.started: return
+	if hud.kill_stats.panel.visible: hud.kill_stats.close()
 	if panel.visible and id.is_empty():
 		close()
 		return

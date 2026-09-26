@@ -1,6 +1,7 @@
 extends RefCounted
 const Catalog = preload("res://scripts/catalog.gd")
 const Features = preload("res://scripts/feature_policy.gd")
+const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
 
 var wood: int = 0 # Provisional: inherited starting lumber still needs verification.
 var gold: int = 10
@@ -12,7 +13,18 @@ var harvest_level: int = 0
 var duration: float = Catalog.SESSION_SECONDS
 var evacuation_elapsed: float = 0.0
 var kills: int = 0
+var kills_by_species: Dictionary = {}
 var mode := "classic"
+
+func record_kill(species: String) -> void:
+	kills += 1
+	if Dinosaurs.SPECIES.has(species):
+		kills_by_species[species] = int(kills_by_species.get(species, 0)) + 1
+
+func unclassified_kills() -> int:
+	var classified := 0
+	for amount in kills_by_species.values(): classified += int(amount)
+	return maxi(0, kills - classified)
 
 static func mode_name(value: String) -> String:
 	return {"classic": "长局模式", "standard": "标准生存", "hard": "困难生存"}.get(value, "长局模式")
@@ -183,12 +195,14 @@ func can_afford(kind: String) -> String:
 	if spec.power > 0 and demand() + spec.power > supply(): return "电力不足，请先建成发电站"
 	return ""
 
-func build(kind: String, cell: Vector2i) -> Dictionary:
+func build(kind: String, cell: Vector2i, rotation: float = 0.0) -> Dictionary:
+	if not is_finite(rotation): return {}
 	if not can_afford(kind).is_empty(): return {}
 	var spec: Dictionary = Catalog.BUILDINGS[kind]
 	wood -= spec.wood
 	gold -= spec.gold
 	var b := {"id": next_id, "kind": kind, "cell": cell, "hp": spec.hp, "remaining": spec.time, "cooldown": 0.0, "invested_wood": spec.wood, "invested_gold": spec.gold}
+	if kind in ["shelter", "gate"]: b.rotation = fposmod(roundf(rotation / (PI * 0.5)), 4.0) * PI * 0.5
 	next_id += 1
 	buildings.append(b)
 	return b
@@ -289,6 +303,7 @@ func refit_error(id: int, option: String) -> String:
 	if b.kind not in spec.kinds: return "此建筑不支持该改造"
 	if b.remaining > 0: return "请先完成施工"
 	if not b.get("refit", "").is_empty(): return "已选定改造方向"
+	if b.kind == "tower" and not technologies.has("tower_engineering"): return "需要实验室研究「箭塔工程」"
 	if supply() < demand(): return "改造需要正常供电"
 	if wood < spec.wood or gold < spec.gold: return "需要 %d 木材和 %d 黄金" % [spec.wood, spec.gold]
 	return ""

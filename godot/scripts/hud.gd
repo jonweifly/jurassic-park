@@ -6,6 +6,10 @@ const Session = preload("res://scripts/session.gd")
 const ExpeditionPanel = preload("res://scripts/expedition_panel.gd")
 const Features = preload("res://scripts/feature_policy.gd")
 const Mini = preload("res://scripts/minimap.gd")
+const KillStatsPanel = preload("res://scripts/kill_stats_panel.gd")
+var kill_stats: RefCounted
+var kill_stats_button: Button
+var pause_stats_button: Button
 var content_seed_input: LineEdit
 var profession_select: OptionButton
 var standard_start_button: Button
@@ -67,8 +71,11 @@ var expedition_panel: RefCounted
 var expedition_summary: Label
 var extraction_button: Button
 var boarding_bar: ProgressBar
+const TowerCommands = preload("res://scripts/tower_commands.gd")
+var tower_commands: RefCounted
 var refit_buttons: Dictionary = {}
 var repair_button: Button
+var rotate_build_button: Button
 
 func _ready() -> void:
 	font = SystemFont.new()
@@ -115,6 +122,10 @@ func _ready() -> void:
 	var pause := button("暂停  Esc")
 	pause.pressed.connect(world.toggle_pause)
 	action_row.add_child(pause)
+	kill_stats_button = button("击杀统计")
+	kill_stats_button.tooltip_text = "查看本局各类恐龙的击杀数量；打开时暂停。"
+	kill_stats_button.pressed.connect(func(): kill_stats.open())
+	action_row.add_child(kill_stats_button)
 	for action_button in [tech_button, heal_button, eat_button, cook_button, sound_toggle]:
 		action_button.custom_minimum_size.x = 52
 	pause.custom_minimum_size.x = 72
@@ -227,7 +238,7 @@ func _ready() -> void:
 	for text in world.DefenseCombat.LABELS: priority_button.add_item(text)
 	priority_button.item_selected.connect(func(index):
 		var selected: Dictionary = world.selected_building()
-		if not world.paused and not selected.is_empty() and selected.kind == "tower": selected.priority = world.DefenseCombat.PRIORITIES[index])
+		if not world.paused and not selected.is_empty(): world.set_tower_priority(selected.id,index))
 	priority_button.tooltip_text = "设置选中箭塔的目标优先级；没有对应目标时攻击最近的恐龙。集火标记优先。"
 	tactics.add_child(priority_button)
 	focus_button = button("集火标记")
@@ -240,7 +251,7 @@ func _ready() -> void:
 	clear_focus_button = button("取消集火")
 	clear_focus_button.pressed.connect(func():
 		if world.paused: return
-		world.defense.focus_uid = -1
+		world.clear_focus()
 		world.defense.marking = false)
 	tactics.add_child(clear_focus_button)
 	columns.add_child(middle)
@@ -263,7 +274,7 @@ func _ready() -> void:
 	repair_button.tooltip_text = "派幸存者修理；每秒消耗 1 木材恢复 8% 耐久。电门也可修理。"
 	repair_button.pressed.connect(world.repair_selected)
 	command_head.add_child(repair_button)
-	for option in Catalog.REFITS:
+	for option in ["brace"]:
 		var refit_button := button(Catalog.REFITS[option].name)
 		refit_button.pressed.connect(world.refit_selected.bind(option))
 		refit_button.visible = false
@@ -272,6 +283,10 @@ func _ready() -> void:
 	research_button = button("升级实验室  R")
 	research_button.pressed.connect(world.research)
 	command_head.add_child(research_button)
+	rotate_build_button = button("旋转")
+	rotate_build_button.pressed.connect(world.rotate_building_preview)
+	rotate_build_button.hide()
+	command_head.add_child(rotate_build_button)
 	var grid := GridContainer.new()
 	grid.columns = 4
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -288,6 +303,7 @@ func _ready() -> void:
 		b.pressed.connect(world.select_build.bind(kind))
 		build_buttons[kind] = b
 		grid.add_child(b)
+	tower_commands = TowerCommands.new(self, commands, command_head, title, grid)
 	make_pause()
 	make_start()
 	make_sound_panel()
@@ -298,6 +314,7 @@ func _ready() -> void:
 	expedition_panel = ExpeditionPanel.new(self)
 	preferences_panel = PreferencesPanel.new(self)
 	guide_panel = GuidePanel.new(self)
+	kill_stats = KillStatsPanel.new(self)
 	refresh_key_hints()
 	refresh_save_info()
 
@@ -444,6 +461,7 @@ func make_start() -> void:
 	start_hint = label("", 13, Color("a6b59e"))
 	col.add_child(start_hint)
 	add_help_settings(col)
+	load("res://scripts/coop_panel.gd").new(self,col)
 
 func panel(color: Color = Color(0.055, 0.10, 0.082, 0.96)) -> PanelContainer:
 	var p := PanelContainer.new()
@@ -497,7 +515,14 @@ func make_pause() -> void:
 	col.add_child(pause_title)
 	resume_button = button("继续生存")
 	resume_button.pressed.connect(world.toggle_pause)
-	col.add_child(resume_button)
+	var resume_row := HBoxContainer.new()
+	col.add_child(resume_row)
+	resume_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	resume_row.add_child(resume_button)
+	pause_stats_button = button("击杀统计")
+	pause_stats_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pause_stats_button.pressed.connect(func(): kill_stats.open())
+	resume_row.add_child(pause_stats_button)
 	save_label = label("", 13, Color("a6b59e"))
 	save_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	save_label.custom_minimum_size.x = 390
@@ -510,15 +535,19 @@ func make_pause() -> void:
 	col.add_child(load_button)
 	add_help_settings(col)
 	var restart := button("重新开始")
+	restart.name="RestartGame"
 	restart.pressed.connect(func(): confirm_discard("返回开始界面？未保存的进度将丢失。", func(): get_tree().reload_current_scene()))
 	col.add_child(restart)
 	var exit_button := button("保存并退出")
+	exit_button.name="ExitGame"
 	exit_button.pressed.connect(world.exit_game)
 	col.add_child(exit_button)
 	pause_panel.hide()
 
 func refresh(dt: float) -> void:
 	preferences_panel.update()
+	if kill_stats.panel.visible: kill_stats.refresh()
+	kill_stats_button.disabled = not world.started
 	if expedition_panel.panel.visible: expedition_panel.refresh()
 	expedition_summary.text = world.adventure.summary()
 	if follow_button:
@@ -526,7 +555,7 @@ func refresh(dt: float) -> void:
 		follow_button.text = "跟随中" if world.camera_rig.following else "自由视角"
 	var s = world.session
 	sound_toggle.text = "已静音" if world.sound.muted or world.sound.levels.Master <= 0 else "声音"
-	resource_label.text = "木材  %d       黄金  %d       电力  %d / %d" % [s.wood, s.gold, s.demand(), s.supply()]
+	resource_label.text = "木材 %d   黄金 %d   电力 %d/%d" % [s.wood, s.gold, s.demand(), s.supply()]
 	clock_label.text = "%s·%s  %02d:%02d" % ["夜" if world.night else "昼", world.weather.NAMES[world.weather.kind], int(s.elapsed) / 60, int(s.elapsed) % 60]
 	var left := maxi(0, int(s.duration - s.elapsed))
 	objective.text = "坚守营地，等待撤离\n救援倒计时  %02d:%02d" % [left / 60, left % 60]
@@ -575,6 +604,11 @@ func refresh(dt: float) -> void:
 		build_buttons[kind].modulate = Color("e6cb89") if world.build_mode == kind else Color.WHITE
 	research_button.disabled = b.is_empty() or b.kind != "lab" or b.remaining > 0
 	research_button.visible = b.is_empty() or b.kind == "lab"
+	rotate_build_button.visible = world.build_mode in ["shelter", "gate"]
+	rotate_build_button.disabled = world.paused or not world.started or s.phase != "playing"
+	rotate_build_button.text = "旋转  " + world.preferences.key_name("upgrade")
+	rotate_build_button.tooltip_text = "每次旋转 90°；预览显示实际朝向，Shift 连续建造会保留朝向。"
+	if rotate_build_button.visible: research_button.hide()
 	repair_button.visible = not b.is_empty() and b.remaining <= 0 and b.hp < Catalog.max_health(b)
 	repair_button.disabled = world.paused or s.wood < 1
 	demolish_button.visible = not b.is_empty()
@@ -588,6 +622,7 @@ func refresh(dt: float) -> void:
 		var error: String = s.refit_error(b.get("id", -1), option)
 		refit_buttons[option].disabled = world.paused or not error.is_empty()
 		refit_buttons[option].tooltip_text = "%s\n%d 木 / %d 金 / %.0f 秒；方向不可更换%s" % [Catalog.REFITS[option].description, Catalog.REFITS[option].wood, Catalog.REFITS[option].gold, Catalog.REFITS[option].time, "\n" + error if not error.is_empty() else ""]
+	tower_commands.refresh(b)
 	eat_button.visible = Features.peripheral_enabled
 	cook_button.visible = Features.peripheral_enabled
 	journal_button.visible = Features.peripheral_enabled
@@ -597,7 +632,8 @@ func refresh(dt: float) -> void:
 	elif notification_time <= 0 and not world.build_mode.is_empty():
 		var reason: String = world.placement_error(world.hover_cell)
 		if reason.is_empty(): reason = world.placement_warning(world.hover_cell)
-		tip.text = "左键建造 %s · 右键取消%s" % [Catalog.BUILDINGS[world.build_mode].name, "  |  " + reason if not reason.is_empty() else ""]
+		var rotate_hint := " · %s 旋转 · Shift 连建" % world.preferences.key_name("upgrade") if world.build_mode in ["shelter", "gate"] else ""
+		tip.text = "左键建造 %s%s · 右键取消%s" % [Catalog.BUILDINGS[world.build_mode].name, rotate_hint, "  |  " + reason if not reason.is_empty() else ""]
 	elif notification_time <= 0: tip.text = ""
 	heal_button.disabled = not world.started or world.paused or world.hero.health >= world.hero.max_health or s.phase not in ["playing", "evacuate"]
 	eat_button.disabled = not world.started or world.paused or s.phase not in ["playing", "evacuate"] or (s.food + s.berries + s.cooked_meat) <= 0
@@ -609,17 +645,23 @@ func refresh(dt: float) -> void:
 	if tech_panel.visible: refresh_tech()
 	minimap.queue_redraw()
 	start_panel.visible = not world.started and not load_panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible
-	pause_panel.visible = world.started and not confirmation.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible and (world.paused or s.phase in ["won", "lost"])
-	if camera_panel: camera_panel.visible = not sound_panel.visible and not start_panel.visible and not pause_panel.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible
-	modal_shade.visible = confirmation.visible or start_panel.visible or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible
+	pause_panel.visible = world.started and not kill_stats.panel.visible and not confirmation.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible and (world.paused or s.phase in ["won", "lost"])
+	if camera_panel: camera_panel.visible = not kill_stats.panel.visible and not sound_panel.visible and not start_panel.visible and not pause_panel.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible
+	modal_shade.visible = kill_stats.panel.visible or confirmation.visible or start_panel.visible or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible
 	resume_button.visible = not s.phase in ["won", "lost"]
 	pause_title.text = "成功撤离侏罗纪公园" if s.phase == "won" else (("幸存者已阵亡" if world.hero.health <= 0 else "未能及时撤离") if s.phase == "lost" else "营地已暂停")
+	if world.coop.ui: world.coop.ui.refresh()
 
 func toast(message: String) -> void:
+	if world.coop and world.coop.forward_notice(message): return
 	tip.text = message
 	notification_time = 4.0
 
 func covers(screen: Vector2) -> bool:
+	if world.coop.ui:
+		var ui = world.coop.ui
+		if ui.panel.visible or (ui.room_button.visible and ui.room_button.get_global_rect().has_point(screen)) or (ui.revive_button.visible and ui.revive_button.get_global_rect().has_point(screen)): return true
+	if kill_stats.panel.visible: return true
 	return quest_box.get_global_rect().has_point(screen) or bottom.get_global_rect().has_point(screen) or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible or confirmation.visible or start_panel.visible or (sound_panel.visible and sound_panel.get_global_rect().has_point(screen)) or (camera_panel and camera_panel.visible and camera_panel.get_global_rect().has_point(screen))
 
 func make_tech() -> void:
@@ -633,7 +675,8 @@ func make_tech() -> void:
 	tech_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	tech_panel.offset_left = -345
 	tech_panel.offset_right = 345
-	tech_panel.offset_top = -330
+	tech_panel.offset_top = -300
+	tech_panel.offset_bottom = 300
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	tech_panel.add_child(col)
@@ -642,6 +685,14 @@ func make_tech() -> void:
 	tech_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tech_status.custom_minimum_size = Vector2(640, 52)
 	col.add_child(tech_status)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	col.add_child(scroll)
+	var entries := VBoxContainer.new()
+	entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	entries.add_theme_constant_override("separation", 5)
+	scroll.add_child(entries)
 	for tech in Catalog.TECH_ORDER:
 		var spec: Dictionary = Catalog.TECH[tech]
 		var b := button("")
@@ -650,7 +701,7 @@ func make_tech() -> void:
 		b.pressed.connect(world.begin_technology.bind(tech))
 		b.tooltip_text = spec.description
 		tech_buttons[tech] = b
-		col.add_child(b)
+		entries.add_child(b)
 	col.add_child(label("面板打开时游戏暂停；关闭后研究随游戏时间推进。", 13, Color("a6b59e")))
 	var close := button("返回营地  Esc")
 	close.pressed.connect(close_tech)
@@ -659,6 +710,7 @@ func make_tech() -> void:
 
 func open_tech() -> void:
 	if not world.started or world.session.phase not in ["playing", "evacuate"]: return
+	if kill_stats.panel.visible: kill_stats.close()
 	if tech_panel.visible:
 		close_tech()
 		return
@@ -773,6 +825,10 @@ func make_load_panel() -> void:
 	load_panel.hide()
 
 func request_load() -> void:
+	if world.coop.active:
+		toast("合作局请返回菜单后选择继续合作存档。")
+		return
+	if kill_stats.panel.visible: kill_stats.close()
 	if load_panel.visible:
 		close_load()
 		return

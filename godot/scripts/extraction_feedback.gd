@@ -62,6 +62,7 @@ func inside() -> bool:
 func status() -> String:
 	var s = world.session
 	if s.phase != "evacuate": return "救援即将抵达 · 可提前查看路线"
+	if world.coop.active and inside() and not world.coop.all_inside(): return "等待存活队友进入 H 圈，共同撤离"
 	if s.mode == "classic": return "进入 H 圈即可撤离"
 	if inside(): return "正在登机 · 留在 H 圈内"
 	if s.boarding_progress > 0: return "已离开 H 圈 · 登机进度缓慢回退"

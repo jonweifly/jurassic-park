@@ -20,8 +20,17 @@ func preferred_target(d: Node3D) -> Dictionary:
 			var point: Vector3 = world.board.point(b.cell)
 			if d.position.distance_to(point) <= senses.sight and point.distance_to(home) <= senses.leash * 1.5 and ai.has_line_of_sight(d.position, point):
 				return {"kind": "building", "id": b.id, "position": point}
-	if d.get_meta("species") not in ["raptor", "small_raptor", "elite_raptor"] or world.hero.health <= 0: return {}
-	var point: Vector3 = world.hero.position
+	if d.get_meta("species") not in ["raptor", "small_raptor", "elite_raptor"]: return {}
+	var survivors: Array = world.survivors()
+	survivors.sort_custom(func(a,b): return a.position.distance_squared_to(d.position)<b.position.distance_squared_to(d.position))
+	for survivor in survivors:
+		if survivor.health <= 0: continue
+		var target := exposed_target(d,survivor,senses,home)
+		if not target.is_empty(): return target
+	return {}
+
+func exposed_target(d: Node3D, survivor: Node3D, senses: Dictionary, home: Vector3) -> Dictionary:
+	var point: Vector3 = survivor.position
 	var distance := d.position.distance_to(point)
 	if distance > senses.sight or point.distance_to(home) > senses.leash * 1.5 or not ai.has_line_of_sight(d.position, point): return {}
 	# Prefer an exposed survivor only if the body-sized path reaches them. An
@@ -34,7 +43,7 @@ func preferred_target(d: Node3D) -> Dictionary:
 		length += previous.distance_to(step)
 		previous = step
 	if length > minf(18.0, distance * 1.8 + 2.0): return {}
-	return {"kind": "hero", "id": -1, "position": point}
+	return {"kind": "hero", "id": world.survivor_id(survivor), "position": point}
 
 func commit(d: Node3D, target: Dictionary) -> void:
 	if not enabled(d) or d.get_meta("species") not in ["trex", "alpha_trex"] or target.kind != "building": return

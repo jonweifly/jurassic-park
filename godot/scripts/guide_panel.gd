@@ -51,6 +51,7 @@ func text_page(title: String) -> RichTextLabel:
 
 func open() -> void:
 	if panel.visible: close(); return
+	if hud.kill_stats.panel.visible: hud.kill_stats.close()
 	if hud.preferences_panel.panel.visible: hud.preferences_panel.close()
 	if hud.expedition_panel.panel.visible: hud.expedition_panel.close()
 	if hud.tech_panel.visible: hud.close_tech()

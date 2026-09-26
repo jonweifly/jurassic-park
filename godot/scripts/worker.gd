@@ -202,7 +202,7 @@ func update(dt: float) -> void:
 			world.sound.play_at("hammer", world.hero.visual.work_tip(), -3)
 			world.work_impact(world.order_target, Color("bfa47a"))
 		if noise_clock <= 0:
-			world.dino_ai.emit_noise(world.hero.position, 5.0, "hero")
+			world.dino_ai.emit_noise(world.hero.position, 5.0, "hero", world.survivor_id(world.hero))
 			noise_clock = 1.0
 		if world.order == "build":
 			if world.session.work(target_id, dt * world.session.work_multiplier()):
@@ -257,7 +257,7 @@ func update(dt: float) -> void:
 			world.hud.toast("化石挖掘场已枯竭。")
 			return
 	cargo_kind = world.order
-	world.dino_ai.emit_noise(world.hero.position, 6.0 if cargo_kind == "wood" else 7.0, "hero")
+	world.dino_ai.emit_noise(world.hero.position, 6.0 if cargo_kind == "wood" else 7.0, "hero", world.survivor_id(world.hero))
 	world.sound.play_at("chop" if cargo_kind == "wood" else "mine", world.hero.visual.work_tip())
 	world.work_impact(world.order_target, Color("ad8756") if cargo_kind == "wood" else Color("bdb69c"))
 	cargo += amount

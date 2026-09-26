@@ -26,6 +26,7 @@ const SurvivorScene = preload("res://scenes/models/survivor.tscn")
 const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
 const TreeScene = preload("res://scenes/models/tree.tscn")
 const RockScene = preload("res://scenes/models/rock.tscn")
+const Coop = preload("res://scripts/coop_session.gd")
 const FossilScene = preload("res://scenes/models/fossil.tscn")
 
 var preferences = Preferences.new()
@@ -58,6 +59,9 @@ var ghost: MeshInstance3D
 var destination: MeshInstance3D
 var hover_cell := Vector2i.ZERO
 var build_mode := ""
+var build_rotation := 0.0
+var barrier_preview: Node3D
+var barrier_preview_kind := ""
 var selected_id := -1
 var paused := false
 var night := false
@@ -81,6 +85,7 @@ var save_status := "尚未存档"
 var low_health_warned := false
 var outage_warned := false
 var defense_notice_after := 0.0
+var coop: Node
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
@@ -139,6 +144,9 @@ func _ready() -> void:
 	sound.world = self
 	add_child(sound)
 	weather = Weather.new(self)
+	coop = Coop.new()
+	coop.name = "Coop"
+	add_child(coop)
 	hud = HUD.new()
 	hud.world = self
 	add_child(hud)
@@ -390,8 +398,27 @@ func update_build_preview() -> void:
 		ghost.material_override.albedo_color = Color(0.43, 0.9, 0.58, 0.6) if error.is_empty() else Color(0.9, 0.32, 0.23, 0.6)
 		if error.is_empty() and not placement_warning(hover_cell).is_empty():
 			ghost.material_override.albedo_color = Color(0.95, 0.68, 0.23, 0.65)
+	var show_barrier := ghost.visible and build_mode in ["shelter", "gate"] and board.inside(hover_cell)
+	if show_barrier:
+		if barrier_preview_kind != build_mode:
+			if is_instance_valid(barrier_preview): barrier_preview.free()
+			barrier_preview = load("res://scenes/models/%s.tscn" % build_mode).instantiate()
+			barrier_preview_kind = build_mode
+			add_child(barrier_preview)
+			for part in barrier_preview.find_children("*", "MeshInstance3D", true, false):
+				var preview_mat := StandardMaterial3D.new()
+				preview_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				preview_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				part.material_override = preview_mat
+				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		barrier_preview.position = board.point(hover_cell)
+		barrier_preview.rotation.y = build_rotation
+		for part in barrier_preview.find_children("*", "MeshInstance3D", true, false):
+			part.material_override.albedo_color = ghost.material_override.albedo_color
+	if is_instance_valid(barrier_preview): barrier_preview.visible = show_barrier
 
 func _physics_process(dt: float) -> void:
+	if coop.active and (not coop.hosting or coop.room_paused()): return
 	if paused: return
 	if session.phase in ["won", "lost"]:
 		if hero.health <= 0 and hero.death_clock > 0:
@@ -407,8 +434,10 @@ func _physics_process(dt: float) -> void:
 	hero.advance(dt)
 	hero.position.y = board.layout.height_at(hero.position.x, hero.position.z)
 	vision.tick(dt)
-	update_order(dt)
-	worker.update(dt)
+	if hero.health > 0:
+		update_order(dt)
+		worker.update(dt)
+	if coop.active: coop.tick_partner(dt)
 	# Exploration, hunger, fatigue and cooking remain readable in old saves but
 	# are dormant while the core dinosaur/building loop is being polished.
 	if Features.peripheral_enabled:
@@ -430,11 +459,11 @@ func _physics_process(dt: float) -> void:
 		hud.toast("营地断电：防御与研究停止，请修复或补建发电站。")
 		sound.play_ui("warning")
 	outage_warned = outage
-	if hero.health <= 0:
+	if (coop.all_down() if coop.active else hero.health <= 0):
 		session.phase = "lost"
 		hud.toast("幸存者阵亡。调整基地选址与防线，再试一次。")
 	if session.phase == "evacuate":
-		if extraction_feedback.inside():
+		if (coop.all_inside() if coop.active else extraction_feedback.inside()):
 			if session.mode == "classic": session.phase = "won"
 			else:
 				session.boarding_progress += dt
@@ -450,7 +479,11 @@ func _input(event: InputEvent) -> void:
 	if hud and hud.preferences_panel and hud.preferences_panel.handle(event): get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if coop.ui and coop.ui.panel.visible: return
 	if hud.confirmation.visible or hud.preferences_panel.panel.visible: return
+	if hud.kill_stats.panel.visible:
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE: hud.kill_stats.close()
+		return
 	if hud.guide_panel.panel.visible:
 		if event is InputEventKey and event.pressed and (event.keycode == KEY_ESCAPE or preferences.matches(event, "guide")): hud.guide_panel.close()
 		return
@@ -487,6 +520,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			hud.expedition_panel.open()
 			return
 		if paused or session.phase in ["won", "lost"]: return
+		if build_mode in ["shelter", "gate"] and preferences.matches(event, "upgrade"):
+			rotate_building_preview()
+			return
 		for i in range(Catalog.ORDER.size()):
 			if preferences.matches(event, "build_%d" % i): select_build(Catalog.ORDER[i])
 		if preferences.matches(event, "upgrade"): research()
@@ -502,21 +538,55 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_RIGHT: defense.marking = false
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
-		if not build_mode.is_empty(): place_building(board.cell_at(p))
+		if not build_mode.is_empty(): place_building(board.cell_at(p),false,event.shift_pressed)
 		else:
-			selected_id = -1
-			for b in session.buildings:
-				if b.hp > 0 and board.point(b.cell).distance_to(p) < 1.5: selected_id = b.id
+			selected_id = pick_building(event.position)
 	if event.button_index == MOUSE_BUTTON_RIGHT:
 		if not build_mode.is_empty():
 			build_mode = ""
 			return
 		command(p)
 
+func pick_building(screen: Vector2) -> int:
+	# Selection uses render bounds, independent of pathfinding collision. Tall
+	# tower decks and rotating weapons must be clickable above their ground cell.
+	var ray := camera.project_ray_origin(screen)
+	var direction := camera.project_ray_normal(screen)
+	var nearest := INF
+	var chosen := -1
+	for b in session.buildings:
+		if b.hp <= 0 or not visuals.has(b.id): continue
+		var model: Node3D = visuals[b.id].get_node("Model")
+		for mesh in model.find_children("*", "MeshInstance3D", true, false):
+			if not mesh.is_visible_in_tree() or mesh.mesh == null: continue
+			var local: Transform3D = mesh.global_transform.affine_inverse()
+			var hit: Variant = mesh.get_aabb().intersects_ray(local * ray, local.basis * direction)
+			if hit == null: continue
+			var distance: float = ray.distance_squared_to(mesh.global_transform * hit)
+			if distance < nearest:
+				nearest = distance
+				chosen = b.id
+	if chosen >= 0: return chosen
+	# Preserve the forgiving footprint selection for foundations and empty frames.
+	var point := ground_at(screen)
+	for b in session.buildings:
+		var distance: float = board.point(b.cell).distance_to(point)
+		if b.hp > 0 and distance < 1.5 and distance < nearest:
+			nearest = distance
+			chosen = b.id
+	return chosen
+
 func select_build(kind: String) -> void:
 	if paused or session.phase != "playing": return
 	defense.marking = false
 	build_mode = kind
+	build_rotation = 0.0
+	hud.notification_time = 0
+
+func rotate_building_preview() -> void:
+	if paused or not started or session.phase != "playing" or build_mode not in ["shelter", "gate"]: return
+	build_rotation = fposmod(build_rotation + PI * 0.5, TAU)
+	update_build_preview()
 	hud.notification_time = 0
 
 func placement_error(cell: Vector2i) -> String:
@@ -527,7 +597,8 @@ func placement_error(cell: Vector2i) -> String:
 	if not board.can_build(cell): return "坡地或地表不适合建造，请选择平坦区域"
 	var p: Vector3 = board.point(cell)
 	if p.distance_to(extraction) < 5: return "请保持撤离区畅通"
-	if p.distance_to(hero.position) < 1.5: return "幸存者占据此位置"
+	for survivor in survivors():
+		if p.distance_to(survivor.position) < 1.5: return "幸存者占据此位置"
 	for d in dinosaurs:
 		if d.health > 0 and p.distance_to(d.position) < 1.7: return "恐龙占据此位置"
 	if board.route(hero.position, p, true).is_empty() and p.distance_to(hero.position) > 3: return "无法到达施工位置"
@@ -540,38 +611,47 @@ func placement_warning(cell: Vector2i) -> String:
 	if not warning.is_empty() and build_mode == "gate": warning += "；电门施工完成并打开后可通行"
 	return warning
 
-func place_building(cell: Vector2i, accepted_risk: bool = false) -> void:
+func place_building(cell: Vector2i, accepted_risk: bool = false, continuous: bool = false) -> void:
 	if paused or not started: return
+	var keep_building := continuous or Input.is_physical_key_pressed(KEY_SHIFT)
+	if coop.active and hero.health <= 0: return
 	var error := placement_error(cell)
 	if not error.is_empty():
 		hud.toast(error)
 		sound.play_ui("warning")
-		pointer_feedback.confirm({"kind": "blocked", "position": board.point(cell)}, false)
+		if pointer_feedback: pointer_feedback.confirm({"kind": "blocked", "position": board.point(cell)}, false)
 		return
 	var warning := placement_warning(cell)
 	if not warning.is_empty() and not accepted_risk:
 		var kind := build_mode
+		var facing := build_rotation
 		hud.confirm_discard(warning + "。\n建议换个位置或预留电门。仍要在此建造%s吗？\n确认前不扣资源；建成后也可拆除。" % Catalog.BUILDINGS[kind].name, func():
 			paused = hud.confirmation_was_paused
 			build_mode = kind
-			place_building(cell,true))
+			build_rotation = facing
+			place_building(cell,true,keep_building))
 		return
-	var b: Dictionary = session.build(build_mode, cell)
+	if coop.route("place",[build_mode,cell,build_rotation,accepted_risk]):
+		if pointer_feedback: pointer_feedback.confirm({"kind":"build","position":board.point(cell)})
+		if not keep_building: build_mode=""
+		return
+	var b: Dictionary = session.build(build_mode, cell, build_rotation)
 	if b.is_empty(): return
 	b.remaining = Regions.construction_remaining(b.kind, board.point(cell), b.remaining)
 	board.block_building(cell, b.id)
 	create_building_visual(b)
 	selected_id = b.id
 	worker.assign("build", board.point(cell), b.id)
-	pointer_feedback.confirm({"kind": "build", "position": board.point(cell)})
+	if pointer_feedback: pointer_feedback.confirm({"kind": "build", "position": board.point(cell)})
 	sound.play_ui("click")
 	hud.toast("开始建造：" + Catalog.BUILDINGS[build_mode].name)
-	if not Input.is_physical_key_pressed(KEY_SHIFT): build_mode = ""
+	if not keep_building: build_mode = ""
 
 func create_building_visual(b: Dictionary) -> void:
 	if not model_cache.has(b.kind): model_cache[b.kind] = load("res://scenes/models/%s.tscn" % ("lab" if b.kind == "laboratory" else b.kind))
 	var n: Node3D = model_cache[b.kind].instantiate()
 	n.position = board.point(b.cell)
+	n.rotation.y = float(b.get("rotation", 0.0)) if b.kind in ["shelter", "gate"] else 0.0
 	add_child(n)
 	if vision: vision.shade(n)
 	scenery.prepare_building(n, b.kind)
@@ -589,6 +669,7 @@ func selected_building() -> Dictionary:
 	return {}
 
 func demolish_building(id: int) -> void:
+	if coop.route("demolish",[id]): return
 	if not started or paused or hero.health <= 0: return
 	var b: Dictionary = session.building(id)
 	var refund: Dictionary = session.demolish(id)
@@ -641,6 +722,10 @@ func context_at(p: Vector3) -> Dictionary:
 	return {"kind": "move", "position": target}
 
 func command(p: Vector3) -> void:
+	if coop.active and hero.health <= 0: return
+	if coop.route("command",[p]):
+		if pointer_feedback: pointer_feedback.confirm(context_at(p))
+		return
 	var target := context_at(p)
 	var kind: String = target.kind
 	if kind == "blocked":
@@ -710,8 +795,8 @@ func update_order(dt: float) -> void:
 			hero.route.clear()
 			if hero.attack_cooldown <= 0:
 				target.health -= session.survivor_damage()
-				dino_ai.provoke(target, "hero", -1, hero.position)
-				dino_ai.emit_noise(hero.position, 22.0, "hero")
+				dino_ai.provoke(target, "hero", survivor_id(hero), hero.position)
+				dino_ai.emit_noise(hero.position, 22.0, "hero", survivor_id(hero))
 				hero.attack_cooldown = 0.7
 				hero.swing = 1
 				hero.visual.face(target.position - hero.position, 1)
@@ -750,7 +835,9 @@ func update_buildings(dt: float) -> void:
 				if b.kind == "shelter": DefenseCombat.apply_slow(nearest)
 				dino_ai.provoke(nearest, "building", b.id, n.position)
 				dino_ai.emit_noise(n.position, 14.0 if b.kind == "tower" else 8.0, "building", b.id)
-				tracer(n.position + Vector3.UP * 2.1, nearest.position + Vector3.UP * 1.2, Color("f5d087"))
+				var shot_origin: Vector3 = scenery.TowerVisuals.fire(n, scenery.clock) if b.kind == "tower" else n.position + Vector3.UP * 2.1
+				if b.kind=="tower": coop.effect("tower",[b.id])
+				tracer(shot_origin, nearest.position + Vector3.UP * 1.2, Color("f5d087"))
 
 func spawn_dinosaur(at: Vector3 = Vector3(10000, 0, 0), species: String = "raptor") -> Node3D:
 	var p := at
@@ -803,6 +890,7 @@ func damage_building(b: Dictionary, damage: float) -> void:
 		sound.play_ui("warning")
 
 func refit_selected(option: String) -> void:
+	if coop.route("refit",[selected_id,option]): return
 	if paused or selected_id < 0: return
 	var error := session.refit(selected_id, option)
 	if error.is_empty():
@@ -813,6 +901,7 @@ func refit_selected(option: String) -> void:
 		hud.toast(error)
 
 func repair_selected() -> void:
+	if coop.route("repair",[selected_id]): return
 	var b := selected_building()
 	if paused or b.is_empty() or b.remaining > 0 or b.hp >= Catalog.max_health(b): return
 	if session.phase not in ["playing", "evacuate"]: return
@@ -820,6 +909,7 @@ func repair_selected() -> void:
 	worker.assign("repair", board.point(b.cell), b.id)
 
 func tracer(a: Vector3, b: Vector3, color: Color) -> void:
+	if coop: coop.effect("tracer",[a,b,color])
 	if a.distance_squared_to(b) < 0.000001: return
 	var n := mesh_box(Vector3(0.045, 0.045, a.distance_to(b)), color, (a + b) / 2)
 	var direction := (b - a).normalized()
@@ -855,6 +945,7 @@ func work_impact(at: Vector3, color: Color) -> void:
 		effects.append({"node":chip,"remaining":0.45,"velocity":Vector3(cos(angle)*0.7,0.6+i*0.12,sin(angle)*0.7)})
 
 func research() -> void:
+	if coop.route("research",[selected_id]): return
 	if paused: return
 	var result: String = session.research(selected_id)
 	if result.is_empty():
@@ -920,9 +1011,10 @@ func update_gate(b: Dictionary, dt: float) -> void:
 	b.gate_timer = maxf(0, b.gate_timer - dt)
 	if b.gate_timer > 0: return
 	if b.get("open", false):
-		if board.cell_at(hero.position) == b.cell:
-			hud.toast("门口有人，无法关闭电门。")
-			return
+		for survivor in survivors():
+			if board.cell_at(survivor.position) == b.cell:
+				hud.toast("门口有人，无法关闭电门。")
+				return
 		for d in dinosaurs:
 			if d.health > 0 and board.cell_at(d.position) == b.cell:
 				hud.toast("门口有恐龙，无法关闭电门。")
@@ -935,6 +1027,7 @@ func update_gate(b: Dictionary, dt: float) -> void:
 	visuals[b.id].get_node("Model/Leaf").rotation.y = -PI * 0.48 if b.open else 0.0
 
 func stop_order() -> void:
+	if coop.route("stop"): return
 	if pointer_feedback: pointer_feedback.pulse_left = 0
 	if adventure: adventure.cancel_job()
 	order = "idle"
@@ -947,6 +1040,7 @@ func stop_order() -> void:
 	destination.visible = false
 
 func heal() -> void:
+	if coop.route("heal"): return
 	if paused or session.phase not in ["playing", "evacuate"]: return
 	if hero.health >= hero.max_health:
 		hud.toast("生命已满，无需治疗。")
@@ -999,12 +1093,18 @@ func cook_food() -> void:
 		hud.toast("需要生肉和已建成的营火。")
 
 func begin_technology(tech: String) -> void:
+	if coop.route("tech",[tech]): return
 	var error: String = session.begin_research(tech)
 	hud.toast("开始研究：" + Catalog.TECH[tech].name if error.is_empty() else error)
 	hud.refresh_tech()
 
 func save_game(automatic: bool = false) -> void:
 	if demo_mode: return
+	if coop.active:
+		var result: String = coop.save_game()
+		save_status = "合作局已保存" if result.is_empty() else result
+		if not automatic: hud.toast(save_status)
+		return
 	var error: String = SaveStore.write(self, automatic)
 	if error.is_empty():
 		save_status = ("自动存档" if automatic else "手动存档") + " · " + Time.get_time_string_from_system()
@@ -1015,6 +1115,9 @@ func save_game(automatic: bool = false) -> void:
 	hud.refresh_save_info()
 
 func load_game(slot: String = "") -> void:
+	if coop.active:
+		hud.toast("合作局请返回菜单，选择继续合作存档。")
+		return
 	var result: Dictionary = SaveStore.latest() if slot.is_empty() else SaveStore.read_slot(slot)
 	if result.has("error"):
 		hud.toast(result.error)
@@ -1027,6 +1130,17 @@ func load_game(slot: String = "") -> void:
 		hud.toast("载入失败，当前游戏仍保留。")
 
 func exit_game() -> void:
+	if coop.active:
+		if coop.hosting and session.phase in ["playing","evacuate"]:
+			var error: String = coop.save_game()
+			if not error.is_empty():
+				hud.confirm_discard(error+"\n仍然退出？未保存的合作进度将丢失。",func():
+					coop.close_transport()
+					get_tree().quit())
+				return
+		coop.close_transport()
+		get_tree().quit()
+		return
 	if started and session.phase in ["playing", "evacuate"]:
 		var error: String = SaveStore.write(self, true)
 		if not error.is_empty():
@@ -1037,8 +1151,27 @@ func exit_game() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_instance_valid(hud): exit_game()
-	if persistence_enabled and what == NOTIFICATION_APPLICATION_FOCUS_OUT and started and session.phase in ["playing", "evacuate"]:
+	if persistence_enabled and what == NOTIFICATION_APPLICATION_FOCUS_OUT and started and session.phase in ["playing", "evacuate"] and not (coop and coop.active):
 		paused = true
+
+func survivors() -> Array:
+	return coop.pawns.values() if coop and coop.active else [hero]
+
+func survivor_id(pawn: Node3D) -> int:
+	return int(pawn.get_meta("coop_slot",-1)) if coop and coop.active else -1
+
+func survivor_by_id(id: int) -> Node3D:
+	if coop and coop.active: return coop.pawns.get(1 if id==-1 else id)
+	return hero if id==-1 else null
+
+func set_tower_priority(id: int, index: int) -> void:
+	if coop.route("priority",[id,index]): return
+	var b: Dictionary = session.building(id)
+	if not paused and not b.is_empty() and b.kind=="tower" and index in range(3): b.priority=DefenseCombat.PRIORITIES[index]
+
+func clear_focus() -> void:
+	if coop.route("clear_focus"): return
+	defense.focus_uid=-1
 
 func update_lighting() -> void:
 	var daylight := (cos(((session.elapsed + session.evacuation_elapsed) / Catalog.DAY_SECONDS) * TAU - 0.5) + 1.0) / 2.0

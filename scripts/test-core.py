@@ -22,6 +22,10 @@ cases.append('hud_layout')
 cases.append('hard_difficulty')
 cases.append('dinosaur_roster')
 cases.extend(['defense_tactics', 'defense_input'])
+cases.extend(['kill_stats', 'kill_stats_input'])
+cases.extend(['tower_upgrade', 'tower_upgrade_input'])
+cases.extend(['barrier_rotation', 'barrier_rotation_input', 'ground_surfaces'])
+cases.extend(['coop_rules', 'coop_input'])
 if args.full_session:
     cases.extend(['full_session', 'varied_session'])
 if args.audio:
@@ -35,7 +39,7 @@ if args.only:
 results = []
 for case in cases:
     cmd = ['sh', str(root / 'scripts/godot.sh')]
-    if case not in ['audio', 'environment_audio', 'pointer_input', 'preferences_input', 'variety_input', 'demolition_input', 'camp_flow_input', 'display_input', 'core_focus_input', 'defense_input']:
+    if case not in ['audio', 'environment_audio', 'pointer_input', 'preferences_input', 'variety_input', 'demolition_input', 'camp_flow_input', 'display_input', 'core_focus_input', 'defense_input', 'kill_stats_input', 'tower_upgrade_input', 'barrier_rotation_input', 'coop_input']:
         cmd.append('--headless')
     cmd += ['--script', f'res://tests/{case}_test.gd']
     try:

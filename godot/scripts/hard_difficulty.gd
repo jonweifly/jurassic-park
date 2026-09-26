@@ -29,7 +29,7 @@ static func camp_metrics(session: RefCounted) -> Dictionary:
 		# Melee electricity has lower simultaneous coverage than a ranged tower.
 		result.dps += damage / Catalog.attack_interval(b) * (1.0 if b.kind == "tower" else 0.35)
 	for tech in session.technologies:
-		if session.technologies[tech]: result.tech += 1.0
+		if tech != "tower_engineering" and session.technologies[tech]: result.tech += 1.0 # Unlock only; actual tower DPS is already counted.
 	return result
 
 static func camp_strength(session: RefCounted) -> float:

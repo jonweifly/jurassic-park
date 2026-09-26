@@ -1,4 +1,5 @@
 extends RefCounted
+const TowerVisuals = preload("res://scripts/tower_visuals.gd")
 ## Render-only decoration. Never consumes gameplay RNG or changes navigation.
 const FlameShader = preload("res://shaders/flame.gdshader")
 const GroundShader = preload("res://shaders/ground.gdshader")
@@ -38,6 +39,8 @@ func _init(owner_world: Node) -> void:
 		ground.set_shader_parameter("usage_map",ground_palette.texture)
 		ground.set_shader_parameter("soil_map",load("res://assets/materials/camp_soil.png"))
 		ground.set_shader_parameter("forest_map",load("res://assets/materials/forest_floor.png"))
+		for surface in ["turf", "soil", "litter", "rock"]:
+			ground.set_shader_parameter(surface + "_surface", load("res://assets/materials/terrain/%s.png" % surface))
 		var mask := Image.create(128,128,false,Image.FORMAT_R8)
 		for y in range(128):
 			for x in range(128): mask.set_pixel(x,y,Color(1 if world.board.layout.build[y*128+x] else 0,0,0))
@@ -354,8 +357,9 @@ func add_building_contact_shadow(node: Node3D, kind: String) -> void:
 
 func update_building(node: Node3D, data: Dictionary) -> void:
 	var complete: bool = data.remaining <= 0
+	if data.kind == "tower": TowerVisuals.update(self, node, data)
 	if node.has_node("CampDressing"):
-		node.get_node("CampDressing").visible = complete and world.preferences.values.quality > 0
+		node.get_node("CampDressing").visible = complete and world.preferences.values.quality > 0 and not (data.kind == "tower" and not data.get("refit", "").is_empty())
 	node.scale = Vector3.ONE
 	node.get_node("Scaffold").visible = not complete
 	var progress: float = 1.0 - data.remaining / world.Catalog.BUILDINGS[data.kind].time
@@ -366,26 +370,14 @@ func update_building(node: Node3D, data: Dictionary) -> void:
 			var height: float = part.position.y
 			if part is MeshInstance3D: height += part.mesh.get_aabb().get_center().y
 			part.visible = complete or data.get("upgrading", false) or progress >= clampf(height / 2.2,0.05,0.90)
-	if data.get("refit", "") != "":
+	if data.get("refit", "") == "brace":
 		if not node.has_node("Refit"):
 			var fittings := Node3D.new()
 			fittings.name = "Refit"
 			node.add_child(fittings)
-			if data.refit == "brace":
-				for x in [-0.82, 0.82]:
-					Visual.box(fittings, Vector3(0.20, 1.8, 0.25), Vector3(x, 0.9, 0), Color("60766c"))
-					for y in [0.35, 1.25]: Visual.box(fittings, Vector3(0.30, 0.10, 0.30), Vector3(x, y, 0), Color("b4aa83"))
-			else:
-				# Visible pennants distinguish the two tower roles at normal camera scale.
-				Visual.box(fittings, Vector3(0.05, 1.4, 0.05), Vector3(-0.6, 2.8, -0.5), Color("817e6c"))
-				Visual.box(fittings, Vector3(0.45, 0.32, 0.03), Vector3(-0.4, 3.3, -0.5), {"range": Color("7ab3b0"), "heavy": Color("b98676")}.get(data.refit, Color("c8a660")))
-				if data.refit == "heavy":
-					var mount := Node3D.new()
-					mount.name = "HeavyBow"
-					model.get_node("Gun").add_child(mount)
-					Visual.box(mount, Vector3(1.65, 0.14, 0.18), Vector3(0, 0.1, 0.25), Color("635444"))
-					Visual.box(mount, Vector3(0.15, 0.16, 1.65), Vector3(0, 0.16, 0.35), Color("9a9f96"))
-					world.vision.shade(mount)
+			for x in [-0.82, 0.82]:
+				Visual.box(fittings, Vector3(0.20, 1.8, 0.25), Vector3(x, 0.9, 0), Color("60766c"))
+				for y in [0.35, 1.25]: Visual.box(fittings, Vector3(0.30, 0.10, 0.30), Vector3(x, y, 0), Color("b4aa83"))
 			world.vision.shade(fittings)
 		node.get_node("Refit").visible = complete
 	if data.kind == "fire":

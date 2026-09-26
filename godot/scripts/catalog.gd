@@ -45,8 +45,9 @@ const EXTRACTION_RADIUS = 3.0
 const DAY_SECONDS = 150.0 # Still provisional, not Warcraft's verified day length.
 
 # Original single-player progression, not verified Warcraft 6.5 rules.
-const TECH_ORDER = ["pack_1", "pack_2", "pack_3", "tools", "defense", "medicine", "radio"]
+const TECH_ORDER = ["tower_engineering", "pack_1", "pack_2", "pack_3", "tools", "defense", "medicine", "radio"]
 const TECH = {
+	"tower_engineering": {"name": "箭塔工程", "wood": 20, "gold": 15, "time": 25.0, "requires": "", "description": "解锁远射塔、速射塔与重弩塔。研究后选中箭塔，支付费用升级一项专精。"},
 	"pack_1": {"name": "背负改良 I", "wood": 8, "gold": 5, "time": 20.0, "requires": "", "description": "每趟携带 2 单位资源。"},
 	"pack_2": {"name": "背负改良 II", "wood": 18, "gold": 12, "time": 35.0, "requires": "pack_1", "description": "每趟携带 3 单位资源。"},
 	"pack_3": {"name": "背负改良 III", "wood": 30, "gold": 20, "time": 45.0, "requires": "pack_2", "description": "每趟携带 4 单位资源。"},

@@ -88,6 +88,7 @@ func test_refits() -> void:
 	world.prepare_demo()
 	world.session.wood = 200
 	world.session.gold = 200
+	world.session.technologies.tower_engineering = true
 	var tower: Dictionary
 	var gate: Dictionary
 	for b in world.session.buildings:

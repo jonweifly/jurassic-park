@@ -194,7 +194,7 @@ func update_death(d: Node3D, dt: float) -> void:
 		world.sound.play_at("collapse", d.position, -4)
 		d.dying = true
 		d.route.clear()
-		world.session.kills += 1
+		world.session.record_kill(str(d.get_meta("species", "")))
 		world.session.gold += 3 # Existing provisional kill reward.
 		# Hunting reward feeds the optional survival loop without changing the
 		# existing gold economy.
@@ -219,8 +219,9 @@ func visible_target(d: Node3D) -> Dictionary:
 		var kind: String = d.get_meta("ai_target_kind")
 		var id: int = d.get_meta("ai_target_id")
 		var alive := false
-		if kind == "hero" and world.hero.health > 0:
-			position = world.hero.position
+		var survivor: Node3D = world.survivor_by_id(id)
+		if kind == "hero" and survivor and survivor.health > 0:
+			position = survivor.position
 			alive = true
 		elif kind == "building":
 			var b: Dictionary = world.session.building(id)
@@ -232,11 +233,12 @@ func visible_target(d: Node3D) -> Dictionary:
 		return {}
 	var preferred: Dictionary = tactics.preferred_target(d)
 	if not preferred.is_empty(): return preferred
-	if world.hero.health > 0:
-		var distance := d.position.distance_to(world.hero.position)
-		if distance <= best and world.hero.position.distance_to(home) <= senses.leash * 1.5 and has_line_of_sight(d.position, world.hero.position):
+	for survivor in world.survivors():
+		if survivor.health <= 0: continue
+		var distance := d.position.distance_to(survivor.position)
+		if distance <= best and survivor.position.distance_to(home) <= senses.leash * 1.5 and has_line_of_sight(d.position, survivor.position):
 			best = distance
-			result = {"kind": "hero", "id": -1, "position": world.hero.position}
+			result = {"kind": "hero", "id": world.survivor_id(survivor), "position": survivor.position}
 	for b in world.session.buildings:
 		if b.hp <= 0: continue
 		var position: Vector3 = world.board.point(b.cell)
@@ -382,8 +384,9 @@ func attack_if_close(d: Node3D) -> void:
 	var position := Vector3.ZERO
 	var building: Dictionary = {}
 	if kind == "hero":
-		if world.hero.health <= 0: return
-		position = world.hero.position
+		var survivor: Node3D = world.survivor_by_id(int(d.get_meta("ai_target_id",-1)))
+		if not survivor or survivor.health <= 0: return
+		position = survivor.position
 	elif kind == "building":
 		building = world.session.building(int(d.get_meta("ai_target_id", -1)))
 		if building.is_empty(): return
@@ -420,18 +423,19 @@ func resolve_strike(d: Node3D, dt: float) -> bool:
 		d.play_animation("attack", 0)
 	if strike.remaining > 0: return true
 	d.set_meta("ai_strike", {})
-	var position: Vector3 = world.hero.position
+	var survivor: Node3D = world.survivor_by_id(strike.id)
+	var position: Vector3 = survivor.position if survivor else Vector3.ZERO
 	var building: Dictionary = {}
 	if strike.kind == "building":
 		building = world.session.building(strike.id)
 		if building.is_empty(): return true
 		position = world.board.point(building.cell)
-	elif world.hero.health <= 0: return true
+	elif not survivor or survivor.health <= 0: return true
 	# Damage is committed at contact; a survivor who leaves reach can dodge the bite.
 	if d.position.distance_to(position) > 3.0 or not has_line_of_sight(d.position, position): return true
 	world.sound.play_at("hit", position)
 	var damage: float = d.attack_damage
-	if building.is_empty(): world.hero.health -= damage
+	if building.is_empty(): survivor.health -= damage
 	else:
 		if strike.get("heavy", false): damage *= 1.5
 		if building.kind in ["tower", "shelter", "gate"] and world.Regions.at(position) == "mountain": damage /= 1.18
@@ -442,7 +446,8 @@ func resolve_strike(d: Node3D, dt: float) -> bool:
 func safe_spawn(position: Vector3) -> bool:
 	if not world.board.is_open(world.board.cell_at(position)): return false
 	if world.vision.is_visible(world.board.cell_at(position)): return false
-	if position.distance_to(world.hero.position) < 24: return false
+	for survivor in world.survivors():
+		if position.distance_to(survivor.position) < 24: return false
 	for b in world.session.buildings:
 		if b.hp > 0 and position.distance_to(world.board.point(b.cell)) < 20: return false
 	return true

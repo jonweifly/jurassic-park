@@ -107,6 +107,9 @@ func audible(position: Vector3) -> bool:
 	return not world.vision or world.vision.is_visible(world.board.cell_at(position))
 
 func play_at(key: String, position: Vector3, gain_db: float = 0.0, priority: bool = false) -> void:
+	# Dinosaur calls are chosen locally from visible animals or attack cues;
+	# forwarding their layered samples as well would play a second roar.
+	if world.coop and not key.contains("_call_"): world.coop.effect("sound",[key,position,gain_db,priority])
 	if not audible(position): return
 	var offset: Vector3 = position-world.camera_focus
 	var distance := Vector2(offset.x,offset.z).length()
@@ -114,6 +117,7 @@ func play_at(key: String, position: Vector3, gain_db: float = 0.0, priority: boo
 	play_voice(key, "Effects", -5.0 + gain_db + linear_to_db(maxf(0.01, 1.0 - distance / 32.0)),priority,pan)
 
 func play_dinosaur(d: Node3D, attack: bool = false) -> void:
+	if world.coop: world.coop.effect("dinosaur",[d.get_meta("save_id",-1),attack])
 	dinosaur_audio.cue(d,attack)
 
 func play_voice(key: String, bus_name: String, gain_db: float, priority: bool = false, pan: float = 0.0) -> void:
@@ -138,6 +142,7 @@ func _process(dt: float) -> void:
 	for key in cooldowns: cooldowns[key] = maxf(0, cooldowns[key] - dt)
 	if not is_instance_valid(world) or not is_instance_valid(world.hero): return
 	var active: bool = not world.paused and world.session.phase in ["playing", "evacuate"]
+	if world.coop and world.coop.active: active = active and not world.coop.room_paused()
 	var ambience_gain := 1.0 if active or not world.started else 0.3
 	var rain: float = world.weather.rain if world.weather else 0.0
 	var wind: float = world.weather.wind if world.weather else 0.16
@@ -171,7 +176,13 @@ func _process(dt: float) -> void:
 	dinosaur_audio.update(dt)
 	foot_clock -= dt
 	work_clock -= dt
-	if world.hero.current_speed > 0.2 and not world.hero.route.is_empty() and foot_clock <= 0:
+	if world.coop and world.coop.active:
+		if world.coop.hosting and foot_clock<=0:
+			for survivor in world.survivors():
+				if survivor.current_speed>.2 and not survivor.route.is_empty():
+					play_at("step",survivor.position,-3)
+			foot_clock=.36
+	elif world.hero.current_speed > 0.2 and not world.hero.route.is_empty() and foot_clock <= 0:
 		play_at("step", world.hero.position, -3)
 		foot_clock = 0.36
 

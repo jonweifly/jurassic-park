@@ -54,6 +54,7 @@ func run() -> void:
 	expect(world.started and not world.paused, "Native start button launches focused standard game")
 	world.spawn_clocks.clear()
 	world.prepare_demo()
+	world.session.technologies.tower_engineering = true
 	world.camera_size = 29
 	world.camera_rig.target_pitch = deg_to_rad(48)
 	world.update_camera(0)
