@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="godot-macos">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/.tools/godot-macos.zip!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>

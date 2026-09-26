@@ -7,3 +7,4 @@ godot/captures/
 *.DS_Store
 __pycache__/
 *.pyc
+.idea/
