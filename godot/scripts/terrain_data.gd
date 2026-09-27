@@ -30,3 +30,9 @@ func height_at(x: float, z: float) -> float:
 	var v := fy - iy
 	if u + v <= 1: return a + (b - a) * u + (c - a) * v
 	return d + (c - d) * (1 - u) + (b - d) * (1 - v)
+
+func submerged_at(x: float, z: float) -> bool:
+	var cell_x := clampi(floori(x / 2.0 + 64.0), 0, 127)
+	var cell_z := clampi(floori(z / 2.0 + 64.0), 0, 127)
+	var level: float = water[cell_z * 129 + cell_x]
+	return level > -90.0 and level > height_at(x, z) + 0.08

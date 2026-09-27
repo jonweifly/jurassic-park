@@ -68,6 +68,7 @@ func bake() -> void:
 	for entry in data.placements:
 		var x: float = entry[1]
 		var z: float = entry[2]
+		if entry[0] != "rock" and data.submerged_at(x, z): continue
 		var p := Vector3(x, data.height_at(x, z), z)
 		var cell := Vector2i(floori(x / 2) + 64, floori(z / 2) + 64)
 		if cell.x < 0 or cell.y < 0 or cell.x >= 128 or cell.y >= 128: continue

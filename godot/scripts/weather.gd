@@ -73,11 +73,11 @@ func update() -> void:
 		update_roofs()
 
 func apply_lighting() -> void:
-	world.sun.light_energy *= lerpf(1.0,0.50,cloud)
-	world.environment.ambient_light_energy *= lerpf(1.0,0.86,cloud)
+	world.sun.light_energy *= lerpf(1.0,0.42,cloud) * lerpf(1.0,0.82,rain)
+	world.environment.ambient_light_energy *= lerpf(1.0,0.80,cloud)
 	world.environment.ambient_light_energy += flash
-	world.sun.light_color = world.sun.light_color.lerp(Color("b4c5cf"),cloud*.45)
-	world.environment.fog_density = lerpf(0.00065,0.0018,rain)
+	world.sun.light_color = world.sun.light_color.lerp(Color("a9bdc9"),cloud*.55+rain*.15)
+	world.environment.fog_density = lerpf(0.0007,0.0027,rain)
 
 func create_rain() -> void:
 	var height_image := Image.create(129,129,false,Image.FORMAT_RF)
@@ -94,19 +94,20 @@ func create_rain() -> void:
 	drops.name = "WeatherRain"
 	drops.emitting = false
 	drops.amount = 900
-	drops.lifetime = 1.35
-	drops.preprocess = 1.35
+	drops.lifetime = 1.1
+	drops.preprocess = 1.1
 	drops.local_coords = false
 	drops.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	drops.emission_box_extents = Vector3(22,2,22)
-	drops.spread = 3
+	drops.emission_box_extents = Vector3(22,3,22)
+	drops.spread = 4
 	drops.gravity = Vector3.ZERO
-	drops.initial_velocity_min = 18
-	drops.initial_velocity_max = 23
-	drops.scale_amount_min = 0.65
-	drops.scale_amount_max = 1.15
+	# Faster, longer streaks read as driving rain instead of a light drizzle.
+	drops.initial_velocity_min = 26
+	drops.initial_velocity_max = 36
+	drops.scale_amount_min = 0.55
+	drops.scale_amount_max = 1.55
 	var mesh := QuadMesh.new()
-	mesh.size = Vector2(0.018,0.24)
+	mesh.size = Vector2(0.026,0.34)
 	mesh.material = rain_material
 	drops.mesh = mesh
 	drops.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

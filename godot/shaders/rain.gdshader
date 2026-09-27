@@ -23,8 +23,12 @@ void fragment() {
  float floor_height = max(ground+0.06,roof);
  if (world_point.y < floor_height) { discard; }
  // Explicit mesh-space coordinates also work when particle UV animation is enabled.
- float edge = 1.0-smoothstep(0.20,0.50,abs(drop_uv.x-0.5));
- float ends = smoothstep(0.0,0.16,drop_uv.y)*(1.0-smoothstep(0.72,1.0,drop_uv.y));
- ALBEDO = vec3(0.53,0.65,0.70);
- ALPHA = (0.24+drop_seed*0.06)*rain_gain*edge*ends;
+ float edge = 1.0-smoothstep(0.30,0.50,abs(drop_uv.x-0.5));
+ float core = 1.0-smoothstep(0.08,0.22,abs(drop_uv.x-0.5));
+ float ends = smoothstep(0.0,0.10,drop_uv.y)*(1.0-smoothstep(0.78,1.0,drop_uv.y));
+ // Bright wet-glass core over a softer falling streak; near-white highlight sells speed.
+ ALBEDO = mix(vec3(0.56,0.68,0.74),vec3(0.86,0.93,0.97),core);
+ float body = (0.42+drop_seed*0.16)*edge;
+ float highlight = core*0.30*(0.6+0.4*drop_seed);
+ ALPHA = clamp((body+highlight)*rain_gain*ends,0.0,1.0);
 }

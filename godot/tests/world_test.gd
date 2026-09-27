@@ -46,6 +46,11 @@ func run() -> void:
 	var picked: Vector3 = world.ground_at(world.camera.unproject_position(world.hero.position))
 	expect(picked.distance_to(world.hero.position) < 0.15, "Mouse terrain picking must match elevated rendered ground")
 	expect(world.board.SIDE == 128 and world.trees.size() > 2500, "Reference map must load at original cell dimensions with tree placements")
+	var submerged_trees := 0
+	for cell in world.trees:
+		for tree_part in world.trees[cell].node.get_children():
+			if world.board.layout.submerged_at(tree_part.global_position.x, tree_part.global_position.z): submerged_trees += 1
+	expect(submerged_trees == 0, "Reference map does not register harvestable trees inside water")
 	expect(world.hero.position.y > 5, "Survivor must stand on the original elevated terrain")
 	var reachable: Dictionary = {}
 	var queue: Array[Vector2i] = [world.board.cell_at(world.hero.position)]

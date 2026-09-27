@@ -6,6 +6,7 @@ const GroundShader = preload("res://shaders/ground.gdshader")
 const FoliageShader = preload("res://shaders/foliage.gdshader")
 const FoliageFog = preload("res://shaders/foliage_fog.gdshader")
 const WaterShader = preload("res://shaders/water.gdshader")
+const WaterSurface = preload("res://scripts/water_surface.gd")
 const ForestRenderer = preload("res://scripts/forest_renderer.gd")
 const FernScene = preload("res://assets/models/fern.glb")
 const Visual = preload("res://scripts/pawn_visual.gd")
@@ -47,8 +48,23 @@ func _init(owner_world: Node) -> void:
 		ground.set_shader_parameter("buildable_map",ImageTexture.create_from_image(mask))
 		island.get_node("ReferenceGround").material_override = ground
 	if island.has_node("Water"):
+		island.get_node("Water").mesh = WaterSurface.build(world.board.layout)
 		water = ShaderMaterial.new()
 		water.shader = WaterShader
+		var coverage := Image.create(128,128,false,Image.FORMAT_R8)
+		for y in range(128):
+			for x in range(128):
+				var i := y*129+x
+				var level: float = world.board.layout.water[i]
+				var wet := level > -90.0 and minf(minf(float(world.board.layout.heights[i]),float(world.board.layout.heights[i+1])),minf(float(world.board.layout.heights[i+129]),float(world.board.layout.heights[i+130]))) < level
+				coverage.set_pixel(x,y,Color.WHITE if wet else Color.BLACK)
+		water.set_shader_parameter("water_coverage",ImageTexture.create_from_image(coverage))
+		# Depth comes from the terrain height map: gl_compatibility has no
+		# usable depth texture, and the pond beds never change at runtime.
+		var bed := Image.create(129,129,false,Image.FORMAT_RF)
+		for y in range(129):
+			for x in range(129): bed.set_pixel(x,y,Color(float(world.board.layout.heights[y*129+x]),0,0))
+		water.set_shader_parameter("ground_heights",ImageTexture.create_from_image(bed))
 		island.get_node("Water").material_override = water
 	variation = TreeVariation.new(world)
 	style_leaves(island)
@@ -368,8 +384,19 @@ func show_tent_occupant(node: Node3D, occupied: bool) -> void:
 		quad.size = Vector2(0.62, 0.62)
 		glow.mesh = quad
 		glow.position = Vector3(0, 1.55, 0)
+		var glow_gradient := Gradient.new()
+		glow_gradient.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+		glow_gradient.colors = PackedColorArray([Color(1, 0.92, 0.68, 0.85), Color(1, 0.85, 0.54, 0.35), Color(1, 0.85, 0.54, 0.0)])
+		var glow_texture := GradientTexture2D.new()
+		glow_texture.gradient = glow_gradient
+		glow_texture.width = 64
+		glow_texture.height = 64
+		glow_texture.fill = GradientTexture2D.FILL_RADIAL
+		glow_texture.fill_from = Vector2(0.5, 0.5)
+		glow_texture.fill_to = Vector2(1.0, 0.5)
 		var material := StandardMaterial3D.new()
 		material.albedo_color = Color("ffd98a")
+		material.albedo_texture = glow_texture
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED

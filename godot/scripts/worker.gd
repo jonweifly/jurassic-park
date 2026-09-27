@@ -23,6 +23,7 @@ func capacity() -> int:
 
 func assign(kind: String, target: Vector3, building_id: int = -1) -> void:
 	if world.adventure: world.adventure.cancel_job()
+	world.leave_shelter(world.hero)
 	clock = 0
 	recovery = 0
 	pose_clock = 0
@@ -73,6 +74,7 @@ func travel(kind: String, target: Vector3) -> bool:
 	return true
 
 func begin_return() -> void:
+	world.leave_shelter(world.hero)
 	var best := INF
 	var dropoff: Dictionary = {}
 	for b in world.session.buildings:

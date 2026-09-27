@@ -66,7 +66,7 @@ func route(from: Vector3, to: Vector3, adjacent: bool = false, radius: float = 0
 	var best_score := INF
 	# A restored actor may occupy a newly blocked clearance cell: allow departure only.
 	var start_solid := search.is_point_solid(start)
-	if radius > 1 and start_solid: search.set_point_solid(start, false)
+	if start_solid: search.set_point_solid(start, false)
 	for c in candidates:
 		var path := search.get_id_path(start, c)
 		if path.is_empty(): continue
@@ -74,7 +74,7 @@ func route(from: Vector3, to: Vector3, adjacent: bool = false, radius: float = 0
 		if score < best_score:
 			best_score = score
 			best = path
-	if radius > 1 and start_solid: search.set_point_solid(start, true)
+	if start_solid: search.set_point_solid(start, true)
 	for i in range(1, best.size()): result.append(point(best[i]))
 	# A pawn can be inside the destination cell but still en route to its center.
 	# Preserve that final segment when a moving pawn replans an adjacent-cell route.

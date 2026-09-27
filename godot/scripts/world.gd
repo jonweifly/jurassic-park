@@ -740,6 +740,7 @@ func command(p: Vector3) -> void:
 		if pointer_feedback: pointer_feedback.confirm(target)
 		return
 	adventure.cancel_job()
+	leave_shelter(hero)
 	selected_id = -1
 	worker.recovery = 0
 	destination.visible = false

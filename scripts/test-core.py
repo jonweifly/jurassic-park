@@ -25,6 +25,7 @@ cases.extend(['defense_tactics', 'defense_input'])
 cases.extend(['kill_stats', 'kill_stats_input'])
 cases.extend(['tower_upgrade', 'tower_upgrade_input'])
 cases.extend(['barrier_rotation', 'barrier_rotation_input', 'ground_surfaces'])
+cases.append('water_surface')
 cases.extend(['coop_rules', 'coop_input'])
 cases.append('tent_shelter')
 if args.full_session:

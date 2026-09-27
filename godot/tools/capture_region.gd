@@ -29,9 +29,14 @@ func run() -> void:
 	world.camera_size = 55
 	world.camera.size = 55
 	world.vision.update()
+	if "--unshrouded" in OS.get_cmdline_user_args():
+		world.vision.countdown = INF
+		world.vision.image.fill(Color.WHITE)
+		world.vision.texture.update(world.vision.image)
+		world.hud.hide()
 	world.update_camera(0)
 	world._physics_process(1.0/30)
-	world.hud.refresh(0)
+	if "--unshrouded" not in OS.get_cmdline_user_args(): world.hud.refresh(0)
 	world.capture_path = "res://captures/region-%s.png" % region
 	await process_frame
 	await process_frame
