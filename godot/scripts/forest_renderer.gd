@@ -8,18 +8,22 @@ var source_parts := 0
 var root: Node3D
 var lod_sources := {}
 
-func _init(owner_world: Node, enabled: bool = true) -> void:
+func _init(owner_world: Node, enabled: bool = true, cinematic: bool = false) -> void:
 	world = owner_world
 	if not enabled: return
 	root = Node3D.new()
 	root.name = "ForestBatches"
 	world.get_node("Island").add_child(root)
 	var groups := {}
-	for family in ["broadleaf","tree","snow_tree","canopy_tree","split_tree","palm_tree","wind_pine"]:
-		var source: Node3D = load("res://assets/models/%s_lod.glb" % family).instantiate()
+	var families := ["broadleaf","tree","snow_tree","canopy_tree","split_tree","palm_tree","wind_pine"]
+	if cinematic: families.append("cinematic_tree")
+	for family in families:
+		var asset_root := "res://assets/cinematic/gameplay/rainforest_tree" if family == "cinematic_tree" else "res://assets/models/%s" % family
+		var lod_path := "res://assets/cinematic/gameplay/rainforest_tree_lod.glb" if family == "cinematic_tree" else "res://assets/models/%s_lod.glb" % family
+		var source: Node3D = load(lod_path).instantiate()
 		var meshes := {}
 		for part in source.find_children("*","MeshInstance3D",true,false): meshes[str(part.name)] = part.mesh
-		lod_sources["res://assets/models/%s.glb" % family] = meshes
+		lod_sources[asset_root + ".glb"] = meshes
 		source.free()
 	for cell in world.trees:
 		var tree: Node3D = world.trees[cell].node

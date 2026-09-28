@@ -76,6 +76,9 @@ var effects: Array[Dictionary] = []
 var frame_count := 0
 var capture_path := ""
 var demo_mode := false
+## Opt-in visual pass. Gameplay data, navigation and the original assets remain
+## the default so captures and saves can be compared or rolled back directly.
+var cinematic_art_enabled := false
 var started := false
 var director: RefCounted
 var adventure: RefCounted
@@ -90,6 +93,7 @@ var coop: Node
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
+	cinematic_art_enabled = "--cinematic-art" in OS.get_cmdline_user_args()
 	if persistence_enabled: preferences.load_file()
 	rng.seed = 65065
 	for arg in OS.get_cmdline_user_args():
@@ -403,7 +407,7 @@ func update_build_preview() -> void:
 	if show_barrier:
 		if barrier_preview_kind != build_mode:
 			if is_instance_valid(barrier_preview): barrier_preview.free()
-			barrier_preview = load("res://scenes/models/%s.tscn" % build_mode).instantiate()
+			barrier_preview = load(model_scene_path(build_mode)).instantiate()
 			barrier_preview_kind = build_mode
 			add_child(barrier_preview)
 			for part in barrier_preview.find_children("*", "MeshInstance3D", true, false):
@@ -649,7 +653,7 @@ func place_building(cell: Vector2i, accepted_risk: bool = false, continuous: boo
 	if not keep_building: build_mode = ""
 
 func create_building_visual(b: Dictionary) -> void:
-	if not model_cache.has(b.kind): model_cache[b.kind] = load("res://scenes/models/%s.tscn" % ("lab" if b.kind == "laboratory" else b.kind))
+	if not model_cache.has(b.kind): model_cache[b.kind] = load(model_scene_path(b.kind))
 	var n: Node3D = model_cache[b.kind].instantiate()
 	n.position = board.point(b.cell)
 	n.rotation.y = float(b.get("rotation", 0.0)) if b.kind in ["shelter", "gate"] else 0.0
@@ -658,6 +662,12 @@ func create_building_visual(b: Dictionary) -> void:
 	scenery.prepare_building(n, b.kind)
 	scenery.update_building(n, b)
 	visuals[b.id] = n
+
+func model_scene_path(kind: String) -> String:
+	var family := "lab" if kind == "laboratory" else kind
+	if cinematic_art_enabled and family in ["generator", "lab", "gate", "shelter"]:
+		return "res://scenes/models/cinematic_%s.tscn" % family
+	return "res://scenes/models/%s.tscn" % family
 
 func building_at(cell: Vector2i) -> Dictionary:
 	for b in session.buildings:
@@ -907,6 +917,16 @@ func refit_selected(option: String) -> void:
 		var b := selected_building()
 		scenery.update_building(visuals[selected_id], b)
 		hud.toast("开始改造：" + Catalog.REFITS[option].name + "。施工完成前防御暂停。")
+	else:
+		hud.toast(error)
+
+func reinforce_selected() -> void:
+	if coop.route("reinforce", [selected_id]): return
+	if paused or selected_id < 0: return
+	var error := session.reinforce(selected_id)
+	if error.is_empty():
+		scenery.update_building(visuals[selected_id], selected_building())
+		hud.toast("开始加固箭塔：耐久上限 +120，施工完成前停火。")
 	else:
 		hud.toast(error)
 

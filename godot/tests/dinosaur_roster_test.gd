@@ -137,6 +137,15 @@ func test_attacks_and_save() -> void:
 	var first_hp: float = tower.hp
 	w.dino_ai.resolve_strike(boss, 1.2)
 	expect(tower.hp < first_hp and second.hp < 200, "Boss area strike damages multiple clustered defenses")
+	tower.hp = 200.0
+	second.hp = 200.0
+	var centered_strike: Dictionary = {"special": "stomp", "impact": target}
+	w.dino_ai.specials.resolve(boss, centered_strike)
+	var core_damage: float = 200.0 - tower.hp
+	var peripheral_damage: float = 200.0 - second.hp
+	expect(core_damage > peripheral_damage and peripheral_damage > 0.0, "Boss stomp remains lethal at its center but loses damage across nearby towers")
+	var tower_spacing := Vector2(w.board.point(second.cell).x - target.x, w.board.point(second.cell).z - target.z).length()
+	expect(absf(peripheral_damage / core_damage - lerpf(1.0, 0.35, tower_spacing / 4.2)) < 0.02, "Stomp damage follows distance within its warning circle")
 	expect(Catalog.received_damage("alpha_trex", 100, "tower") == 76 and Catalog.received_damage("alpha_trex", 100, "shelter") == 100, "Armor has a clear electric-defense counter")
 	# Legacy hard saves predate wave and health-budget fields.
 	var legacy := snapshot.duplicate(true)

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "security_gate",
+    "vertices": 3364,
+    "meshes": 3
+  },
+  {
+    "name": "diesel_generator",
+    "vertices": 2576,
+    "meshes": 1
+  },
+  {
+    "name": "service_cabin",
+    "vertices": 4008,
+    "meshes": 1
+  },
+  {
+    "name": "rainforest_canopy",
+    "vertices": 33480,
+    "meshes": 2
+  },
+  {
+    "name": "cinematic_rex",
+    "vertices": 29956,
+    "meshes": 110
+  },
+  {
+    "name": "rainforest_fern",
+    "vertices": 1900,
+    "meshes": 2
+  }
+]

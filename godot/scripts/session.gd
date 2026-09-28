@@ -318,8 +318,35 @@ func refit(id: int, option: String) -> String:
 	b.invested_wood = int(b.get("invested_wood", Catalog.BUILDINGS[b.kind].wood)) + spec.wood
 	b.invested_gold = int(b.get("invested_gold", Catalog.BUILDINGS[b.kind].gold)) + spec.gold
 	# Preserve existing damage; reinforcing a breached wall is not a free repair.
+	var previous_maximum := Catalog.max_health(b)
 	b.refit = option
-	b.hp += Catalog.max_health(b) - float(Catalog.BUILDINGS[b.kind].hp)
+	b.hp += Catalog.max_health(b) - previous_maximum
+	b.remaining = spec.time
+	b.upgrading = true
+	return ""
+
+func reinforce_error(id: int) -> String:
+	var b := building(id)
+	if phase != "playing": return "撤离阶段不能加固"
+	if b.is_empty() or b.kind != "tower": return "请选择箭塔"
+	if b.remaining > 0: return "请先完成施工"
+	if b.get("reinforced", false): return "箭塔已加固"
+	if supply() < demand(): return "加固需要正常供电"
+	var spec: Dictionary = Catalog.TOWER_REINFORCEMENT
+	if wood < spec.wood or gold < spec.gold: return "需要 %d 木材和 %d 黄金" % [spec.wood, spec.gold]
+	return ""
+
+func reinforce(id: int) -> String:
+	var error := reinforce_error(id)
+	if not error.is_empty(): return error
+	var b := building(id)
+	var spec: Dictionary = Catalog.TOWER_REINFORCEMENT
+	wood -= spec.wood
+	gold -= spec.gold
+	b.invested_wood = int(b.get("invested_wood", Catalog.BUILDINGS.tower.wood)) + spec.wood
+	b.invested_gold = int(b.get("invested_gold", Catalog.BUILDINGS.tower.gold)) + spec.gold
+	b.reinforced = true
+	b.hp += spec.hp
 	b.remaining = spec.time
 	b.upgrading = true
 	return ""

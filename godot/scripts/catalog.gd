@@ -21,9 +21,10 @@ const REFITS = {
 	"heavy": {"name": "重弩", "kinds": ["tower"], "wood": 18, "gold": 22, "time": 18.0, "description": "射程 17 米，36 伤害 / 2.4 秒；大型伤害 +35%，忽略 75% 箭甲，默认优先大型目标。"},
 	"brace": {"name": "加固", "kinds": ["shelter", "gate"], "wood": 14, "gold": 8, "time": 12.0, "description": "耐久上限 +180；保留原有伤势，改造期间停止电击。"},
 }
+const TOWER_REINFORCEMENT = {"wood": 12, "gold": 10, "time": 12.0, "hp": 120.0}
 
 static func max_health(b: Dictionary) -> float:
-	return float(BUILDINGS[b.kind].hp) + (180.0 if b.get("refit", "") == "brace" else 0.0)
+	return float(BUILDINGS[b.kind].hp) + (180.0 if b.get("refit", "") == "brace" else 0.0) + (TOWER_REINFORCEMENT.hp if b.kind == "tower" and b.get("reinforced", false) else 0.0)
 
 static func attack_range(b: Dictionary) -> float:
 	if b.kind != "tower": return 2.8

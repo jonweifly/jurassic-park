@@ -112,6 +112,6 @@ func refresh(b: Dictionary) -> void:
 	else:
 		status.text = "专精已选定 · 改造完成后自动恢复防御"
 		completed_icon.texture = portraits.get(refit)
-		completed_text.text = "%s塔%s\n%s" % [Catalog.REFITS[refit].name, " · 施工剩余 %.0f 秒" % b.remaining if b.remaining > 0 else " · 已就绪", Catalog.REFITS[refit].description]
+		completed_text.text = "%s塔%s%s\n%s" % [Catalog.REFITS[refit].name, " · 施工剩余 %.0f 秒" % b.remaining if b.remaining > 0 else " · 已就绪", " · 已加固" if b.get("reinforced", false) else "", Catalog.REFITS[refit].description]
 		if b.remaining <= 0: status.text = "保持供电 · 可在中部调整目标优先级和集火"
 	engineering_button.text = "科技已解锁" if s.technologies.has("tower_engineering") else "箭塔工程"

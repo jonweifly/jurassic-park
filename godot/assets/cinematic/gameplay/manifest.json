@@ -1,0 +1,42 @@
+[
+  {
+    "name": "generator",
+    "meshes": 1,
+    "triangles": 4960
+  },
+  {
+    "name": "lab",
+    "meshes": 1,
+    "triangles": 7712
+  },
+  {
+    "name": "gate",
+    "meshes": 2,
+    "triangles": 6360
+  },
+  {
+    "name": "rainforest_tree",
+    "meshes": 2,
+    "triangles": 14366
+  },
+  {
+    "name": "rainforest_tree_lod",
+    "meshes": 2,
+    "triangles": 4093
+  },
+  {
+    "name": "fern",
+    "meshes": 2,
+    "triangles": 1624
+  },
+  {
+    "name": "trex",
+    "meshes": 1,
+    "triangles": 59472
+  },
+  {
+    "name": "shelter",
+    "meshes": 1,
+    "triangles": 3672
+  }
+]

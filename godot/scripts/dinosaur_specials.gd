@@ -105,6 +105,9 @@ func resolve(d: Node3D, strike: Dictionary) -> void:
 		var point: Vector3 = world.board.point(b.cell)
 		if not within_impact(point, impact, radius) or not ai.has_line_of_sight(d.position, point): continue
 		var damage: float = d.attack_damage * multiplier
+		if strike.special == "stomp":
+			var distance := Vector2(point.x - impact.x, point.z - impact.z).length()
+			damage *= lerpf(1.0, 0.35, distance / radius)
 		if b.kind in ["tower", "shelter", "gate"]:
 			if world.Regions.at(point) == "mountain": damage /= 1.18
 			if world.session.technologies.has("defense"): damage *= 0.8

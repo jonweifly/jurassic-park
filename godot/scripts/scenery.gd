@@ -9,6 +9,7 @@ const WaterShader = preload("res://shaders/water.gdshader")
 const WaterSurface = preload("res://scripts/water_surface.gd")
 const ForestRenderer = preload("res://scripts/forest_renderer.gd")
 const FernScene = preload("res://assets/models/fern.glb")
+const CinematicFernScene = preload("res://assets/cinematic/gameplay/fern.glb")
 const Visual = preload("res://scripts/pawn_visual.gd")
 const ObstructionFade = preload("res://scripts/obstruction_fade.gd")
 const TreeVariation = preload("res://scripts/tree_variation.gd")
@@ -24,9 +25,11 @@ var foliage_cache := {}
 var clock := 0.0
 var leaf_fog: ShaderMaterial
 var forest: RefCounted
+var cinematic_enabled := false
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
+	cinematic_enabled = "--cinematic-art" in OS.get_cmdline_user_args() and "--original-environment" not in OS.get_cmdline_user_args()
 	obstructions = ObstructionFade.new(world)
 	leaf_fog = make_foliage_fog(0.055)
 	leaf_fog.set_shader_parameter("canopy_cutout",true)
@@ -66,9 +69,9 @@ func _init(owner_world: Node) -> void:
 			for x in range(129): bed.set_pixel(x,y,Color(float(world.board.layout.heights[y*129+x]),0,0))
 		water.set_shader_parameter("ground_heights",ImageTexture.create_from_image(bed))
 		island.get_node("Water").material_override = water
-	variation = TreeVariation.new(world)
+	variation = TreeVariation.new(world, cinematic_enabled)
 	style_leaves(island)
-	forest = ForestRenderer.new(world, "--unbatched-forest" not in OS.get_cmdline_user_args())
+	forest = ForestRenderer.new(world, "--unbatched-forest" not in OS.get_cmdline_user_args(), cinematic_enabled)
 	add_ground_cover(island)
 	for node in island.find_children("*", "Node3D", true, false):
 		if node.scene_file_path.contains("rock.tscn"): obstructions.register(node)
@@ -196,7 +199,7 @@ func add_ground_cover(island: Node) -> void:
 	add_ferns(root)
 
 func add_ferns(parent: Node3D) -> void:
-	var source: Node3D = FernScene.instantiate()
+	var source: Node3D = (CinematicFernScene if cinematic_enabled else FernScene).instantiate()
 	var random := RandomNumberGenerator.new()
 	random.seed = 650908
 	var chunks := {}
@@ -215,7 +218,7 @@ func add_ferns(parent: Node3D) -> void:
 	var fog := make_foliage_fog(0.045)
 	var fern_material := ShaderMaterial.new()
 	fern_material.shader = FoliageShader
-	fern_material.set_shader_parameter("vertex_color",true)
+	fern_material.set_shader_parameter("vertex_color",not cinematic_enabled)
 	fern_material.set_shader_parameter("strength",0.045)
 	wind_materials.append(fern_material)
 	for mesh in source.find_children("*","MeshInstance3D",true,false):
@@ -327,6 +330,9 @@ func prepare_building(node: Node3D, kind: String) -> void:
 	node.add_child(smoke)
 
 func polish_building_materials(node: Node3D, kind: String) -> void:
+	# Cinematic meshes have multiple steel, paint and concrete surfaces. Keep
+	# those source materials for the per-surface obstruction shader conversion.
+	if world.cinematic_art_enabled and kind in ["generator", "lab", "laboratory", "gate", "shelter"]: return
 	# Imported building materials vary by asset. Duplicate the surface material
 	# at runtime so every structure shares the same grounded, slightly worn look
 	# without changing the source GLB files.
@@ -439,6 +445,17 @@ func update_building(node: Node3D, data: Dictionary) -> void:
 				for y in [0.35, 1.25]: Visual.box(fittings, Vector3(0.30, 0.10, 0.30), Vector3(x, y, 0), Color("b4aa83"))
 			world.vision.shade(fittings)
 		node.get_node("Refit").visible = complete
+	if data.kind == "tower" and data.get("reinforced", false):
+		if not node.has_node("Fortification"):
+			var fortification := Node3D.new()
+			fortification.name = "Fortification"
+			node.add_child(fortification)
+			for x in [-0.78, 0.78]:
+				for z in [-0.78, 0.78]:
+					Visual.box(fortification, Vector3(0.26, 1.3, 0.26), Vector3(x, 0.65, z), Color("65756e"))
+					Visual.box(fortification, Vector3(0.34, 0.16, 0.34), Vector3(x, 1.2, z), Color("b5a77d"))
+			world.vision.shade(fortification)
+		node.get_node("Fortification").visible = complete
 	if data.kind == "fire":
 		node.get_node("FireLight").visible = complete
 		node.get_node("FireLight").light_energy = (0.85 if world.night else 0.28) + sin(clock*8)*0.025 + sin(clock*13)*0.018

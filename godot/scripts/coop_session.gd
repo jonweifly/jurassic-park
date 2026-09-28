@@ -336,7 +336,7 @@ func valid_intent(action: String, args: Array) -> bool:
 	match action:
 		"command", "focus": return args.size()==1 and args[0] is Vector3 and absf(args[0].x)<128 and absf(args[0].z)<128 and absf(args[0].y)<64
 		"place": return args.size()==4 and args[0] is String and args[0] in world.Catalog.BUILDINGS and args[1] is Vector2i and world.board.inside(args[1]) and args[2] is float and absf(args[2])<=TAU and args[3] is bool
-		"demolish", "repair", "research": return args.size()==1 and args[0] is int and args[0]>0
+		"demolish", "repair", "research", "reinforce": return args.size()==1 and args[0] is int and args[0]>0
 		"refit": return args.size()==2 and args[0] is int and args[1] is String and args[1] in world.Catalog.REFITS
 		"priority": return args.size()==2 and args[0] is int and args[1] is int and args[1] in range(3)
 		"tech": return args.size()==1 and args[0] is String and args[0] in world.Catalog.TECH
@@ -363,6 +363,9 @@ func dispatch(action: String, args: Array) -> void:
 		"refit":
 			world.selected_id=args[0]
 			world.refit_selected(args[1])
+		"reinforce":
+			world.selected_id=args[0]
+			world.reinforce_selected()
 		"priority": world.set_tower_priority(args[0],args[1])
 		"tech": world.begin_technology(args[0])
 		"heal": world.heal()

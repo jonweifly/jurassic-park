@@ -2,10 +2,13 @@ extends RefCounted
 ## Replace only visual children; source tree node, wood amount, cell and collision stay intact.
 const FAMILIES := ["canopy_tree","split_tree","palm_tree","wind_pine"]
 var counts := {}
-func _init(world: Node) -> void:
+var cinematic_enabled := false
+func _init(world: Node, use_cinematic: bool = false) -> void:
+	cinematic_enabled = use_cinematic and "--original-environment" not in OS.get_cmdline_user_args()
 	if "--original-environment" in OS.get_cmdline_user_args(): return
 	var scenes := {}
 	for family in FAMILIES: scenes[family] = load("res://assets/models/%s.glb" % family)
+	if cinematic_enabled: scenes["cinematic_tree"] = load("res://assets/cinematic/gameplay/rainforest_tree.glb")
 	for cell in world.trees:
 		var tree: Node3D = world.trees[cell].node
 		var region: String = world.Regions.at(tree.position)
@@ -15,6 +18,7 @@ func _init(world: Node) -> void:
 		if region == "mountain": family = "wind_pine" if value < 48 else ""
 		elif region == "swamp": family = "palm_tree" if value < 30 else ("split_tree" if value < 62 else "")
 		else: family = "canopy_tree" if value < 34 else ("split_tree" if value < 64 else ("palm_tree" if value < 77 else ""))
+		if cinematic_enabled and region != "mountain" and family != "palm_tree": family = "cinematic_tree"
 		if family.is_empty(): continue
 		var holders: Array[Node] = [tree] if tree.has_node("Model") else tree.get_children()
 		for holder in holders:

@@ -165,6 +165,7 @@ static func validate(data: Dictionary) -> String:
 			if not is_equal_approx(float(b.rotation) / (PI * 0.5), roundf(float(b.rotation) / (PI * 0.5))): return "存档建筑方向无效"
 		if b.has("refit") and (not b.refit is String or (not b.refit.is_empty() and not catalog.REFITS.has(b.refit))): return "存档建筑改造无效"
 		if b.get("refit", "") in catalog.REFITS and b.kind not in catalog.REFITS[b.refit].kinds: return "存档建筑改造与类型不符"
+		if b.has("reinforced") and (not b.reinforced is bool or b.kind != "tower"): return "存档箭塔加固无效"
 		if b.has("priority") and (b.kind != "tower" or b.priority not in ["nearest", "large", "ranged"]): return "存档防御优先级无效"
 		if b.hp > catalog.max_health(b): return "存档建筑耐久无效"
 		ids[b.id] = true
@@ -173,6 +174,7 @@ static func validate(data: Dictionary) -> String:
 			if b.has(key):
 				var maximum: int = catalog.BUILDINGS[b.kind][resource] + (5 if b.kind == "laboratory" else 0)
 				if b.has("refit") and catalog.REFITS.has(b.refit): maximum += catalog.REFITS[b.refit][resource]
+				if b.get("reinforced", false): maximum += catalog.TOWER_REINFORCEMENT[resource]
 				if not b[key] is int or b[key] < 0 or b[key] > maximum: return "存档建筑投入无效"
 	for tech in s.technologies:
 		if not catalog.TECH.has(tech): return "存档科技无效"

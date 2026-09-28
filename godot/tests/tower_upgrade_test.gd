@@ -89,6 +89,50 @@ func run() -> void:
 	tower = w.session.building(tower.id)
 	w.update_buildings(0)
 	expect(tower.refit == "heavy" and Catalog.attack_damage(tower)==36 and w.visuals[tower.id].get_meta("tower_variant")=="heavy", "Old upgraded tower survives load without retroactive tech lock")
+	var old_save := Save.snapshot(w)
+	expect(old_save.session.buildings.any(func(b): return b.kind == "tower" and not b.has("reinforced")) and Save.validate(old_save).is_empty(), "Existing saves need no reinforcement migration")
+	w.paused = false
+	w.selected_id = tower.id
+	w.hud.refresh(0)
+	expect(w.hud.reinforce_button.visible and not w.hud.reinforce_button.disabled, "Selected specialist tower exposes an available reinforcement command")
+	expect(w.coop.valid_intent("reinforce", [tower.id]) and not w.coop.valid_intent("reinforce", ["bad"]), "Co-op accepts only a valid reinforcement target id")
+	tower.hp = 120.0
+	stock = Vector2i(w.session.wood, w.session.gold)
+	expect(w.session.reinforce(tower.id).is_empty(), "Specialized tower can be reinforced independently")
+	expect(Vector2i(w.session.wood, w.session.gold) == stock - Vector2i(12, 10) and tower.hp == 240.0 and Catalog.max_health(tower) == 320.0, "Reinforcement charges once and preserves existing damage")
+	expect(tower.refit == "heavy" and Catalog.attack_damage(tower) == 36 and tower.remaining == 12.0, "Reinforcing pauses fire without replacing the attack specialization")
+	w.hud.refresh(0)
+	expect(not w.hud.reinforce_button.visible, "Reinforcement command hides during construction")
+	stock = Vector2i(w.session.wood, w.session.gold)
+	expect(not w.session.reinforce(tower.id).is_empty() and Vector2i(w.session.wood, w.session.gold) == stock, "Repeated reinforcement cannot spend resources")
+	var reinforced_save := Save.snapshot(w)
+	expect(Save.validate(reinforced_save).is_empty(), "Reinforcement under construction is save compatible")
+	var invalid := reinforced_save.duplicate(true)
+	for stored in invalid.session.buildings:
+		if stored.id == tower.id: stored.reinforced = "yes"
+	expect(not Save.validate(invalid).is_empty(), "Save rejects invalid reinforcement state")
+	Save.apply(w, reinforced_save)
+	tower = w.session.building(tower.id)
+	w.session.tick(12.0)
+	w.update_buildings(0)
+	expect(tower.refit == "heavy" and w.visuals[tower.id].get_meta("tower_variant") == "heavy" and w.visuals[tower.id].get_node("Fortification").visible, "Finished reinforced specialist restores its weapon and shows supports")
+	w.paused = false
+	w.selected_id = tower.id
+	tower.hp = 300.0
+	w.hud.refresh(0)
+	expect(w.hud.repair_button.visible, "Damaged reinforced tower can request repairs up to the new maximum")
+	tower.hp = 240.0
+	expect(is_equal_approx(w.session.demolition_quote(tower.id).wood, floori(float(tower.invested_wood) * 0.5 * 240.0 / 320.0)), "Demolition refund includes reinforcement investment and current condition")
+	tower.erase("refit")
+	tower.erase("reinforced")
+	tower.hp = 200.0
+	tower.remaining = 0.0
+	tower.invested_wood = 15
+	tower.invested_gold = 15
+	w.session.technologies.tower_engineering = true
+	expect(w.session.reinforce(tower.id).is_empty(), "Basic tower can reinforce before choosing specialization")
+	w.session.work(tower.id, 12.0)
+	expect(w.session.refit(tower.id, "rapid").is_empty() and Catalog.max_health(tower) == 320.0 and tower.hp == 320.0, "Later specialization retains reinforcement and full durability")
 	w.free()
 	print("TOWER UPGRADE: ",checks," checks, ",failures," failures")
 	quit(0 if failures==0 else 1)

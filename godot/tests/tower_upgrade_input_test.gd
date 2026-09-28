@@ -9,7 +9,7 @@ func screenshot(name: String) -> void:
 	expect(root.get_texture().get_image().save_png(folder.path_join(name+".png"))==OK,"Capture "+name)
 	var rect: Rect2 = world.hud.bottom.get_global_rect()
 	expect(root.get_visible_rect().encloses(rect) and rect.size.y<=210,"Compact HUD: "+name)
-	for c in world.hud.refit_buttons.values()+[world.hud.tower_commands.camp_button,world.hud.tower_commands.engineering_button]:
+	for c in world.hud.refit_buttons.values()+[world.hud.reinforce_button,world.hud.tower_commands.camp_button,world.hud.tower_commands.engineering_button]:
 		if c.is_visible_in_tree(): expect(rect.encloses(c.get_global_rect()),"Contextual control fits: "+name)
 
 func run() -> void:
@@ -82,6 +82,14 @@ func run() -> void:
 	expect(world.selected_id==tower.id,"Clicking elevated weapon selects the upgraded tower")
 	await screenshot("04-range-ready")
 	expect(world.hud.bottom.size.y<=original_height,"Upgrade details do not increase panel height")
+	expect(world.hud.reinforce_button.visible and not world.hud.reinforce_button.disabled,"Ready specialized tower exposes reinforcement")
+	click(world.hud.reinforce_button.get_global_rect().get_center())
+	await settle()
+	expect(tower.get("reinforced",false) and tower.remaining==12.0,"Clicking reinforcement starts paid construction")
+	world.session.tick(12)
+	world.update_buildings(0)
+	await screenshot("05-range-reinforced")
+	expect(world.visuals[tower.id].get_node("Fortification").visible and Catalog.max_health(tower)==320.0,"Reinforced specialist shows supports and has 320 durability")
 	click(world.hud.tower_commands.camp_button.get_global_rect().get_center())
 	await settle()
 	expect(world.selected_id==-1 and world.hud.tower_commands.grid.visible,"Rightmost camp command restores construction")
@@ -92,6 +100,7 @@ func run() -> void:
 	world.build_mode=""
 	# Reuse tower as unupgraded fixture to verify all cards at several aspect ratios.
 	tower.erase("refit")
+	tower.erase("reinforced")
 	tower.invested_wood=15
 	tower.invested_gold=15
 	world.preferences.values.fullscreen=false

@@ -74,6 +74,7 @@ var boarding_bar: ProgressBar
 const TowerCommands = preload("res://scripts/tower_commands.gd")
 var tower_commands: RefCounted
 var refit_buttons: Dictionary = {}
+var reinforce_button: Button
 var repair_button: Button
 var rotate_build_button: Button
 
@@ -280,6 +281,10 @@ func _ready() -> void:
 		refit_button.visible = false
 		refit_buttons[option] = refit_button
 		tactics.add_child(refit_button)
+	reinforce_button = button("加固箭塔")
+	reinforce_button.pressed.connect(world.reinforce_selected)
+	reinforce_button.hide()
+	tactics.add_child(reinforce_button)
 	research_button = button("升级实验室  R")
 	research_button.pressed.connect(world.research)
 	command_head.add_child(research_button)
@@ -460,7 +465,7 @@ func make_start() -> void:
 	col.add_child(browse)
 	start_hint = label("", 13, Color("a6b59e"))
 	col.add_child(start_hint)
-	add_help_settings(col)
+	add_help_settings(col, true)
 	load("res://scripts/coop_panel.gd").new(self,col)
 
 func panel(color: Color = Color(0.055, 0.10, 0.082, 0.96)) -> PanelContainer:
@@ -589,7 +594,7 @@ func refresh(dt: float) -> void:
 			var damage: float = Catalog.attack_damage(b) * s.defense_multiplier() * (1.5 if world.Regions.at(world.board.point(b.cell)) == "mountain" else 1.0)
 			var target: Node3D = world.defense.choose(b, world.board.point(b.cell))
 			var status: String = "断电" if s.supply() < s.demand() else ("等待目标" if target == null else "攻击：" + world.Dinosaurs.spec(target.get_meta("species")).name)
-			detail_label.text = "生命 %d / %d\n%.1f 伤害 / %.2f 秒 · %.1f 米\n%s" % [b.hp, maximum, damage, Catalog.attack_interval(b), Catalog.attack_range(b), status]
+			detail_label.text = "生命 %d / %d%s\n%.1f 伤害 / %.2f 秒 · %.1f 米\n%s" % [b.hp, maximum, " · 已加固" if b.get("reinforced", false) else "", damage, Catalog.attack_interval(b), Catalog.attack_range(b), status]
 			if b.get("refit", "") in Catalog.REFITS: selection_label.text = Catalog.REFITS[b.refit].name + "塔"
 	priority_button.visible = not b.is_empty() and b.kind == "tower"
 	priority_button.disabled = world.paused
@@ -622,6 +627,11 @@ func refresh(dt: float) -> void:
 		var error: String = s.refit_error(b.get("id", -1), option)
 		refit_buttons[option].disabled = world.paused or not error.is_empty()
 		refit_buttons[option].tooltip_text = "%s\n%d 木 / %d 金 / %.0f 秒；方向不可更换%s" % [Catalog.REFITS[option].description, Catalog.REFITS[option].wood, Catalog.REFITS[option].gold, Catalog.REFITS[option].time, "\n" + error if not error.is_empty() else ""]
+	reinforce_button.visible = not b.is_empty() and b.kind == "tower" and b.remaining <= 0 and not b.get("reinforced", false)
+	if reinforce_button.visible:
+		var reinforce_error: String = s.reinforce_error(b.id)
+		reinforce_button.disabled = world.paused or not reinforce_error.is_empty()
+		reinforce_button.tooltip_text = "耐久上限 +120，保留原有伤势；可与攻击专精叠加。\n12 木 / 10 金 / 12 秒；施工期间停火。" + ("\n" + reinforce_error if not reinforce_error.is_empty() else "")
 	tower_commands.refresh(b)
 	eat_button.visible = Features.peripheral_enabled
 	cook_button.visible = Features.peripheral_enabled
@@ -846,7 +856,12 @@ func close_load() -> void:
 	load_panel.hide()
 	world.paused = load_was_paused
 
-func add_help_settings(parent: Node) -> void:
+func open_art_sample() -> void:
+	if world.started or world.coop.active: return
+	var result := get_tree().change_scene_to_file("res://scenes/cinematic_sample.tscn")
+	if result != OK: toast("美术样板暂时无法打开：" + str(result))
+
+func add_help_settings(parent: Node, allow_art_preview: bool = false) -> void:
 	var row := HBoxContainer.new()
 	parent.add_child(row)
 	var guide_button := button("生存手册")
@@ -857,6 +872,13 @@ func add_help_settings(parent: Node) -> void:
 	settings_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	settings_button.pressed.connect(func(): preferences_panel.open())
 	row.add_child(settings_button)
+	if allow_art_preview:
+		var preview := button("01 美术样板")
+		preview.name = "CinematicSampleEntry"
+		preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		preview.tooltip_text = "独立场景：俯视检查新美术，也可切换近景。尚未接入人物操控与建造。"
+		preview.pressed.connect(open_art_sample)
+		row.add_child(preview)
 
 func refresh_key_hints() -> void:
 	var keys = world.preferences
