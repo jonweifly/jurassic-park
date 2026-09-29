@@ -1,5 +1,7 @@
 extends RefCounted
 const TowerVisuals = preload("res://scripts/tower_visuals.gd")
+const CampDetail = preload("res://scripts/camp_detail.gd")
+const TerrainRelief = preload("res://scripts/terrain_relief.gd")
 ## Render-only decoration. Never consumes gameplay RNG or changes navigation.
 const FlameShader = preload("res://shaders/flame.gdshader")
 const GroundShader = preload("res://shaders/ground.gdshader")
@@ -25,7 +27,9 @@ var foliage_cache := {}
 var clock := 0.0
 var leaf_fog: ShaderMaterial
 var forest: RefCounted
+var terrain_relief: RefCounted
 var cinematic_enabled := false
+var particles_paused := false
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
@@ -73,10 +77,16 @@ func _init(owner_world: Node) -> void:
 	style_leaves(island)
 	forest = ForestRenderer.new(world, "--unbatched-forest" not in OS.get_cmdline_user_args(), cinematic_enabled)
 	add_ground_cover(island)
+	terrain_relief = TerrainRelief.new(world, island.get_node("GroundCover"))
 	for node in island.find_children("*", "Node3D", true, false):
 		if node.scene_file_path.contains("rock.tscn"): obstructions.register(node)
 
 func update_view(dt: float = 0.0) -> void:
+	if particles_paused != world.presentation_paused():
+		particles_paused = world.presentation_paused()
+		for building in world.visuals.values():
+			for particle in building.find_children("*", "CPUParticles3D", true, false):
+				particle.speed_scale = 0.0 if particles_paused else 1.0
 	obstructions.update(dt)
 	if ground_palette: ground_palette.update()
 	if world.weather:
@@ -263,6 +273,7 @@ func prepare_building(node: Node3D, kind: String) -> void:
 			Visual.box(scaffold,Vector3(0.08,1.8,0.08),Vector3(x,0.9,z),Color("7c6444"))
 	for z in [-0.85,0.85]:
 		Visual.box(scaffold,Vector3(1.85,0.10,0.10),Vector3(0,1.5,z),Color("a1895c"))
+	CampDetail.prepare(self, node, kind)
 	obstructions.register(node)
 	if kind != "fire": return
 	var flame_mat := ShaderMaterial.new()
@@ -465,3 +476,4 @@ func update_building(node: Node3D, data: Dictionary) -> void:
 			var flame: Node3D = model.get_node(name)
 			flame.visible = complete
 			flame.scale = Vector3(1+sin(clock*7)*0.09,1+sin(clock*11)*0.15,1+cos(clock*9)*0.08)
+	CampDetail.update(self, node, data)

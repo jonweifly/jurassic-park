@@ -206,13 +206,13 @@ func test_tactics_and_pacing() -> void:
 	world.director.update()
 	d.set_meta("ai_state", "return")
 	world.director.update()
-	expect(world.spawn_clocks[0].next == 120, "Combat ending near a wave grants twenty-five seconds to rebuild")
+	expect(world.spawn_clocks[0].next == 140, "Combat ending near a wave grants forty-five seconds to rebuild or make a short field trip")
 	world.session.elapsed = 110
 	d.set_meta("ai_state", "alert")
 	world.director.update()
 	d.set_meta("ai_state", "return")
 	world.director.update()
-	expect(world.spawn_clocks[0].next == 120, "Repeated disengagement cannot postpone the next wave forever")
+	expect(world.spawn_clocks[0].next == 140, "Repeated disengagement cannot postpone the next wave forever")
 	world.free()
 
 func run() -> void:

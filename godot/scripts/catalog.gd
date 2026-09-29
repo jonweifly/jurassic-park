@@ -11,8 +11,9 @@ const BUILDINGS = {
 	"generator": {"source_id": "h004", "name": "发电站", "wood": 10, "gold": 10, "power": 0, "supply": 5, "hp": 100.0, "time": 10.0, "requires": ["tent"], "description": "提供 5 点电力，解锁防御设施。需要帐篷。"},
 	"shelter": {"source_id": "h006", "name": "电栅栏", "wood": 12, "gold": 12, "power": 1, "supply": 0, "hp": 280.0, "time": 10.0, "requires": ["generator"], "description": "电击并减速 1.2 秒：小型 35%、大型 15%、首领 8%；不叠加。需供电。"},
 	"tower": {"source_id": "h005", "name": "弓箭塔", "wood": 15, "gold": 15, "power": 1, "supply": 0, "hp": 200.0, "time": 18.0, "requires": ["generator"], "description": "自动攻击附近恐龙。射程 15.625 米，需要发电站。"},
-	"lab": {"source_id": "h00D", "name": "基础建筑", "wood": 5, "gold": 5, "power": 1, "supply": 0, "hp": 50.0, "time": 5.0, "requires": ["generator"], "description": "建成后选中，使用升级功能变为实验室。"},
+	"lab": {"source_id": "h00D", "name": "基础建筑", "wood": 5, "gold": 5, "power": 1, "supply": 0, "hp": 50.0, "time": 5.0, "requires": ["generator"], "description": "建成后选中，选择升级为实验室或装备工坊。"},
 	"laboratory": {"source_id": "h008", "name": "实验室", "wood": 5, "gold": 5, "power": 2, "supply": 0, "hp": 100.0, "time": 10.0, "requires": ["generator"], "description": "营地实验室。"},
+	"workshop": {"name":"装备工坊", "wood":10, "gold":8, "power":2, "supply":0, "hp":160.0, "time":15.0, "requires":["generator"], "description":"制作野外补给与个人装备；完成后到现场领取。"},
 }
 const ORDER = ["tent", "fire", "generator", "shelter", "tower", "lab", "fossil", "gate"]
 const REFITS = {
@@ -46,8 +47,9 @@ const EXTRACTION_RADIUS = 3.0
 const DAY_SECONDS = 150.0 # Still provisional, not Warcraft's verified day length.
 
 # Original single-player progression, not verified Warcraft 6.5 rules.
-const TECH_ORDER = ["tower_engineering", "pack_1", "pack_2", "pack_3", "tools", "defense", "medicine", "radio"]
+const TECH_ORDER = ["tower_engineering", "pack_1", "pack_2", "pack_3", "tools", "defense", "medicine", "radio", "field_equipment"]
 const TECH = {
+	"field_equipment": {"name":"野外装备工程", "wood":18, "gold":15, "time":30.0, "requires":"", "description":"结合带回营地的图纸，在工坊改良鞋子、护甲和步枪；基础装备无需研究。"},
 	"tower_engineering": {"name": "箭塔工程", "wood": 20, "gold": 15, "time": 25.0, "requires": "", "description": "解锁远射塔、速射塔与重弩塔。研究后选中箭塔，支付费用升级一项专精。"},
 	"pack_1": {"name": "背负改良 I", "wood": 8, "gold": 5, "time": 20.0, "requires": "", "description": "每趟携带 2 单位资源。"},
 	"pack_2": {"name": "背负改良 II", "wood": 18, "gold": 12, "time": 35.0, "requires": "pack_1", "description": "每趟携带 3 单位资源。"},

@@ -1,10 +1,10 @@
 extends RefCounted
 ## Local presentation/input preferences; separate from single-run saves and simulation.
-const DEFAULTS = {"quality": 2, "fullscreen": true, "vsync": true, "fps": 0, "pan_speed": 1.0, "rotation_speed": 1.0, "zoom_speed": 1.0, "invert_y": false, "route_dots": true}
+const DEFAULTS = {"quality": 2, "fullscreen": true, "vsync": true, "fps": 0, "pan_speed": 1.0, "rotation_speed": 1.0, "zoom_speed": 1.0, "invert_y": false, "route_dots": true, "perspective": true, "impact_motion": true}
 const ACTIONS = {
 	"pan_up": ["镜头向前", KEY_W], "pan_down": ["镜头向后", KEY_S], "pan_left": ["镜头向左", KEY_A], "pan_right": ["镜头向右", KEY_D],
 	"rotate_left": ["镜头左转", KEY_Q], "rotate_right": ["镜头右转", KEY_E], "center": ["回到并跟随角色", KEY_SPACE], "follow": ["切换跟随", KEY_F], "reset_camera": ["重置镜头", KEY_HOME],
-	"upgrade": ["升级实验室", KEY_R], "tech": ["科技面板", KEY_T], "heal": ["返回帐篷治疗", KEY_H], "kit": ["使用急救包", KEY_J], "stop": ["停止命令", KEY_X], "journal": ["探索日志", KEY_L],
+	"upgrade": ["升级实验室", KEY_R], "tech": ["科技面板", KEY_T], "heal": ["返回帐篷治疗", KEY_H], "kit": ["使用急救包", KEY_J], "stop": ["停止命令", KEY_X], "journal": ["装备与探索", KEY_L],
 	"save": ["手动存档", KEY_F5], "load": ["选择存档", KEY_F9], "guide": ["生存手册", KEY_F1], "settings": ["设置", KEY_F10],
 	"build_0": ["建造帐篷", KEY_1], "build_1": ["建造营火", KEY_2], "build_2": ["建造发电站", KEY_3], "build_3": ["建造电栅栏", KEY_4],
 	"build_4": ["建造弓箭塔", KEY_5], "build_5": ["建造基础建筑", KEY_6], "build_6": ["建造化石挖掘场", KEY_7], "build_7": ["建造电门", KEY_8],

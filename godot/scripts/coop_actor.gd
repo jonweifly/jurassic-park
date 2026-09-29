@@ -35,4 +35,5 @@ func tick(dt: float) -> void:
 		world.hero.position.y = world.board.layout.height_at(world.hero.position.x,world.hero.position.z)
 		if world.hero.health <= 0: return
 		world.update_order(dt)
-		world.worker.update(dt))
+		world.worker.update(dt)
+		world.outfitting.tick_actor(dt))

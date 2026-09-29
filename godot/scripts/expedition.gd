@@ -49,8 +49,9 @@ func restore() -> void:
 	clear_visuals()
 	initialize()
 
-func choose_cell(at: Vector2) -> Vector2i:
+func choose_cell(at: Vector2, route_origin: Variant = null) -> Vector2i:
 	var center: Vector2i = world.board.cell_at(Vector3(at.x, 0, at.y))
+	var origin: Vector3 = world.hero.position if route_origin == null else route_origin
 	var avoid: Dictionary = {}
 	for p in world.hero.route: avoid[world.board.cell_at(p)] = true
 	for d in world.dinosaurs:
@@ -69,7 +70,7 @@ func choose_cell(at: Vector2) -> Vector2i:
 				for dx in range(-1, 2):
 					for dy in range(-1, 2):
 						if not world.board.is_open(cell + Vector2i(dx, dy)): ring_open = false
-				if not ring_open or world.board.route(world.hero.position, p).is_empty(): continue
+				if not ring_open or world.board.route(origin, p).is_empty(): continue
 				return cell
 	return Vector2i(-1, -1)
 

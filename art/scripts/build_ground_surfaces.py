@@ -27,7 +27,7 @@ def noise(cells):
 
 def build(kind):
     macro = noise(4)*.5+noise(11)*.3+noise(37)*.2
-    grains = noise(128)*.7+rng.random((N, N))*.3
+    grains = noise(90)*.8+rng.random((N, N))*.2
     soil = np.array([103, 86, 63])
     height = .29 + macro*.22 + grains*.10
     rgb = soil[None, None, :]*(.64+macro[..., None]*.67+grains[..., None]*.20)
@@ -54,10 +54,10 @@ def build(kind):
                 bump.polygon(shifted, fill=int(h))
 
     # Different stone sizes, irregular outlines and facets give soil real structure.
-    count = 1250 if kind == 'rock' else 480
+    count = 1250 if kind == 'rock' else (740 if kind == 'soil' else 330)
     for _ in range(count):
         center = rng.uniform(0, N, 2)
-        radius = rng.uniform(3, 17 if kind == 'rock' else 7)
+        radius = rng.uniform(4, 19 if kind == 'rock' else (15 if kind == 'soil' else 11))
         angles = np.arange(7)*np.pi*2/7
         pts = center + np.stack([np.cos(angles), np.sin(angles)], axis=1)*rng.uniform(.6, 1.2, (7, 1))*radius
         stone = np.array([110, 104, 87])*rng.uniform(.67, 1.2)
@@ -67,20 +67,21 @@ def build(kind):
 
     if kind == 'turf':
         # Clusters of bent blades; broad bare patches keep the soil readable.
-        for _ in range(31000):
+        for _ in range(14500):
             x, y = rng.uniform(0, N, 2)
             density = float(growth[int(y), int(x)])
             if rng.random() > density*.94: continue
             angle = rng.uniform(0, np.pi*2)
             axis = np.array([np.cos(angle), np.sin(angle)])
             side = np.array([-axis[1], axis[0]])
-            length = rng.uniform(5, 22)
+            length = rng.uniform(10, 34)
             base = np.array([x, y])
             tip = base+axis*length+side*rng.uniform(-4, 4)
             mid = base+axis*length*.48
-            tint = np.array([86, 104, 48]) * rng.uniform(.56, 1.28)
+            tint = np.array([82, 101, 49]) * rng.uniform(.65, 1.32)
             if rng.random() < .12: tint = np.array([117, 102, 65])*rng.uniform(.75, 1.1)
-            pts = [base-side*.6, mid-side*1.2, tip, mid+side*1.0, base+side*.6]
+            pts = [base-side*.9, mid-side*1.9, tip, mid+side*1.5, base+side*.9]
+            poly(np.array(pts)+side*1.4+axis*.7, tint*.48, 105)
             poly(pts, tint, rng.integers(140, 175))
     if kind in ('litter', 'soil', 'turf'):
         for _ in range(950 if kind == 'litter' else 75):

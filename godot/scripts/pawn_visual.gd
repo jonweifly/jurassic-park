@@ -5,7 +5,9 @@ extends Node
 @export var work_equipment := false
 @export_node_path("Skeleton3D") var contact_rig_path := NodePath("")
 const SurvivorContact = preload("res://scripts/survivor_contact.gd")
+const SurvivorMotion = preload("res://scripts/survivor_motion.gd")
 var contact: RefCounted
+var motion: RefCounted
 @export_node_path("Node3D") var hand_socket_path := NodePath("../Model/ArmR")
 @export_node_path("Node3D") var cargo_socket_path := NodePath("../Model")
 @export_node_path("Node3D") var rifle_path := NodePath("../Model/ArmR/Rifle")
@@ -40,6 +42,7 @@ func _ready() -> void:
 		if rig:
 			contact = SurvivorContact.new(self, rig)
 			if not contact.ready(): contact = null
+			else: motion = SurvivorMotion.new(contact)
 
 static func box(parent: Node3D, size: Vector3, at: Vector3, color: Color) -> MeshInstance3D:
 	var piece := MeshInstance3D.new()
@@ -115,7 +118,9 @@ func show_equipment(action: String, carrying: bool, cargo_kind: String) -> void:
 
 func face(direction: Vector3, dt: float, sharpness: float = 14.0) -> void:
 	if Vector2(direction.x,direction.z).is_zero_approx(): return
+	var before := model.rotation.y
 	model.rotation.y = lerp_angle(model.rotation.y,atan2(direction.x,direction.z),1.0-exp(-sharpness*dt))
+	if motion and dt > 0.0: motion.turn_velocity = angle_difference(before, model.rotation.y) / dt
 
 func play(action: String, dt: float) -> void:
 	if contact: contact.clear()
@@ -129,6 +134,13 @@ func play(action: String, dt: float) -> void:
 func seek_work(action: String, phase: float, dt: float) -> void:
 	play(action,dt)
 	player.seek(phase,true)
+	if motion: motion.work(action, phase)
+
+func locomotion(speed: float, dt: float) -> void:
+	if not motion: return
+	var clip: StringName = clips.get(state, state)
+	var cycle := player.current_animation_position / maxf(0.01, player.get_animation(clip).length) if player.has_animation(clip) else 0.0
+	motion.locomotion(state, cycle, speed, dt)
 
 func ground(layout: RefCounted) -> void:
 	if contact: contact.ground(layout)
@@ -143,3 +155,36 @@ func locomotion_reference_speed(action: String) -> float:
 	var clip: StringName = clips.get(action,action)
 	if player.has_animation(clip): return locomotion_stride / maxf(0.01,player.get_animation(clip).length)
 	return 2.5
+
+var outfit_signature := ""
+var outfit_parts: Array[Node3D] = []
+
+func set_outfit(inventory: Dictionary) -> void:
+	if not contact: return
+	var signature := "%d:%d:%d" % [inventory.boots, inventory.vest, inventory.rifle]
+	if outfit_signature == signature: return
+	outfit_signature = signature
+	for part in outfit_parts: part.free()
+	outfit_parts.clear()
+	if inventory.vest > 0:
+		var vest := outfit_attachment("spine")
+		box(vest, Vector3(.46,.39,.13), Vector3(0,.10,.17), Color("42594b") if inventory.vest == 1 else Color("475763"))
+		for x in [-.14,.14]: box(vest,Vector3(.12,.15,.06),Vector3(x,.05,.255),Color("8b8b68"))
+	if inventory.boots > 0:
+		for side in ["L", "R"]:
+			var boot := outfit_attachment("foot" + side)
+			box(boot, Vector3(.15,.055,.28), Vector3(0,-.065,.045),Color("343d32"))
+	if inventory.rifle > 0 and rifle:
+		var scope := Node3D.new()
+		rifle.add_child(scope)
+		outfit_parts.append(scope)
+		box(scope,Vector3(.065,.075,.26),Vector3(0,.105,.24),Color("4a5b5c"))
+		box(scope,Vector3(.07,.035,.06),Vector3(0,.07,.19),Color("a49b70"))
+		if inventory.rifle > 1: box(scope,Vector3(.08,.07,.16),Vector3(0,0,.78),Color("778887"))
+
+func outfit_attachment(bone: String) -> BoneAttachment3D:
+	var attachment := BoneAttachment3D.new()
+	attachment.bone_name = bone
+	contact.skeleton.add_child(attachment)
+	outfit_parts.append(attachment)
+	return attachment

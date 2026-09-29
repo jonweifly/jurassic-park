@@ -49,7 +49,8 @@ func run() -> void:
 	check(current_scene.scene_file_path == "res://scenes/main.tscn","Return button must reopen the main menu")
 	if current_scene.scene_file_path == "res://scenes/main.tscn":
 		check(not current_scene.started,"Returning must not silently start a game")
-		check(current_scene.camera.projection == Camera3D.PROJECTION_ORTHOGONAL,"Gameplay projection must remain orthographic")
+		var expected: int = Camera3D.PROJECTION_PERSPECTIVE if current_scene.preferences.values.perspective else Camera3D.PROJECTION_ORTHOGONAL
+		check(current_scene.camera.projection == expected,"Gameplay must restore the player's tactical projection preference")
 		check(not auto_accept_quit,"Gameplay's save-on-exit handling must be restored")
 	print("CINEMATIC ENTRY: ",checks," checks, ",failures," failures")
 	quit(1 if failures else 0)

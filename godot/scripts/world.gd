@@ -22,6 +22,7 @@ const ExtractionFeedback = preload("res://scripts/extraction_feedback.gd")
 const BuildAccess = preload("res://scripts/build_access.gd")
 const DefenseFeedback = preload("res://scripts/defense_feedback.gd")
 const DefenseCombat = preload("res://scripts/defense_combat.gd")
+const EncounterPresentation = preload("res://scripts/encounter_presentation.gd")
 const SurvivorScene = preload("res://scenes/models/survivor.tscn")
 const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
 const TreeScene = preload("res://scenes/models/tree.tscn")
@@ -32,6 +33,7 @@ const FossilScene = preload("res://scenes/models/fossil.tscn")
 var preferences = Preferences.new()
 var session = Session.new()
 var board = Board.new()
+var crowd = preload("res://scripts/crowd.gd").new()
 var worker: RefCounted
 var build_access: RefCounted
 var vision: RefCounted
@@ -82,6 +84,7 @@ var cinematic_art_enabled := false
 var started := false
 var director: RefCounted
 var adventure: RefCounted
+var outfitting: RefCounted
 var autosave_clock := 0.0
 var persistence_enabled := not ("--script" in OS.get_cmdline_args())
 var save_status := "尚未存档"
@@ -90,6 +93,7 @@ var outage_warned := false
 var defense_notice_after := 0.0
 var shelter_warned: Dictionary = {}
 var coop: Node
+var encounter: Control
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
@@ -130,6 +134,7 @@ func _ready() -> void:
 	scenery = Scenery.new(self)
 	dino_ai = DinosaurAI.new(self)
 	adventure = Expedition.new(self)
+	outfitting = preload("res://scripts/outfitting.gd").new(self)
 	ghost = mesh_box(Vector3(1.96, 0.06, 1.96), Color(0.45, 0.8, 0.58, 0.55))
 	ghost.visible = false
 	destination = ring(0.42, Color("d8c885"))
@@ -158,6 +163,9 @@ func _ready() -> void:
 	var defense_feedback := DefenseFeedback.new()
 	defense_feedback.world = self
 	hud.root.add_child(defense_feedback)
+	encounter = EncounterPresentation.new()
+	encounter.world = self
+	hud.root.add_child(encounter)
 	pointer_feedback = PointerFeedback.new()
 	pointer_feedback.world = self
 	hud.root.add_child(pointer_feedback)
@@ -175,7 +183,9 @@ func _ready() -> void:
 	update_camera(0)
 	vision.update()
 	hud.refresh(0)
-	if not capture_path.is_empty() and "--audio-panel" in OS.get_cmdline_user_args(): hud.sound_panel.show()
+	if not capture_path.is_empty() and "--audio-panel" in OS.get_cmdline_user_args():
+		hud.preferences_panel.open()
+		hud.preferences_panel.tabs.current_tab = 3
 
 func make_environment() -> void:
 	environment = Environment.new()
@@ -200,17 +210,18 @@ func make_environment() -> void:
 	env.environment = environment
 	add_child(env)
 	sun = DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-53, -32, 0)
+	sun.rotation_degrees = Vector3(-43, -32, 0)
 	sun.light_color = Color("fff0d6")
 	sun.light_energy = 0.72
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 115
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	sun.shadow_bias = 0.25
-	sun.shadow_normal_bias = 1.0
+	sun.shadow_normal_bias = 0.65
 	add_child(sun)
 	camera = Camera3D.new()
-	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+	camera.fov = 30.0
 	camera.size = camera_size
 	camera.far = 500
 	add_child(camera)
@@ -435,6 +446,7 @@ func _physics_process(dt: float) -> void:
 		if Features.peripheral_enabled: hero.health = maxf(0.0, hero.health - session.survival_damage)
 		session.survival_damage = 0.0
 	scenery.clock += dt
+	crowd.rebuild(survivors() + dinosaurs)
 	hero.navigation = board
 	hero.advance(dt)
 	hero.position.y = board.layout.height_at(hero.position.x, hero.position.z)
@@ -442,6 +454,8 @@ func _physics_process(dt: float) -> void:
 	if hero.health > 0:
 		update_order(dt)
 		worker.update(dt)
+	outfitting.tick_actor(dt)
+	outfitting.update(dt)
 	if coop.active: coop.tick_partner(dt)
 	# Exploration, hunger, fatigue and cooking remain readable in old saves but
 	# are dormant while the core dinosaur/building loop is being polished.
@@ -486,6 +500,9 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if coop.ui and coop.ui.panel.visible: return
 	if hud.confirmation.visible or hud.preferences_panel.panel.visible: return
+	if hud.outfit_panel.panel.visible:
+		if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_ESCAPE or preferences.matches(event, "journal")): hud.outfit_panel.close()
+		return
 	if hud.kill_stats.panel.visible:
 		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE: hud.kill_stats.close()
 		return
@@ -521,6 +538,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif not build_mode.is_empty(): build_mode = ""
 			else: toggle_pause()
 			return
+		if not Features.peripheral_enabled and preferences.matches(event, "journal") and started:
+			hud.outfit_panel.open()
+			return
 		if Features.peripheral_enabled and preferences.matches(event, "journal") and started:
 			hud.expedition_panel.open()
 			return
@@ -533,7 +553,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if preferences.matches(event, "upgrade"): research()
 		if preferences.matches(event, "tech"): hud.open_tech()
 		if preferences.matches(event, "heal"): heal()
-		if Features.peripheral_enabled and preferences.matches(event, "kit"): use_medkit()
+		if preferences.matches(event, "kit"): use_medkit()
 		if preferences.matches(event, "stop"): stop_order()
 	if not event is InputEventMouseButton or not event.pressed: return
 	if paused or session.phase in ["won", "lost"]: return
@@ -718,6 +738,8 @@ func context_at(p: Vector3) -> Dictionary:
 	for d in dinosaurs:
 		if d.health > 0 and d.visible and d.position.distance_to(p) < 1.8:
 			return {"kind": "attack", "position": d.position, "id": d.get_instance_id()}
+	var field_site: String = outfitting.at_point(p)
+	if not field_site.is_empty(): return {"kind":"field_site", "position":board.point(outfitting.data().sites[field_site].cell), "site":field_site}
 	var site: String = adventure.at_point(p) if Features.peripheral_enabled else ""
 	if not site.is_empty(): return {"kind": "inspect", "position": board.point(adventure.data().sites[site].cell), "site": site}
 	var b := building_at(cell)
@@ -742,6 +764,9 @@ func command(p: Vector3) -> void:
 	if kind == "blocked":
 		if pointer_feedback: pointer_feedback.confirm(target, false)
 		return
+	if kind == "field_site":
+		outfit_action("explore", -1, target.site)
+		return
 	if kind == "inspect":
 		hud.expedition_panel.open(target.site)
 		return
@@ -750,6 +775,7 @@ func command(p: Vector3) -> void:
 		if pointer_feedback: pointer_feedback.confirm(target)
 		return
 	adventure.cancel_job()
+	outfitting.cancel()
 	leave_shelter(hero)
 	selected_id = -1
 	worker.recovery = 0
@@ -775,7 +801,7 @@ func command(p: Vector3) -> void:
 	if pointer_feedback: pointer_feedback.confirm(target, order != "idle")
 
 func order_description() -> String:
-	return {"idle": "等待命令", "move": "正在移动", "wood": "正在采集木材", "gold": "正在挖掘化石", "attack": "正在攻击恐龙", "build": "正在施工（右键工地可继续）", "repair": "正在修理", "return": "正在返送资源", "waiting_dropoff": "等待可用帐篷", "heal": "返回帐篷治疗（每秒 1 金，%s / %s）" % [preferences.key_name("heal"), preferences.key_name("stop")], "expedition": "前往设施调查（%s 可中断）" % preferences.key_name("stop")}.get(order, "等待命令")
+	return {"field": outfitting.brief(), "idle": "等待命令", "move": "正在移动", "wood": "正在采集木材", "gold": "正在挖掘化石", "attack": "正在攻击恐龙", "build": "正在施工（右键工地可继续）", "repair": "正在修理", "return": "正在返送资源", "waiting_dropoff": "等待可用帐篷", "heal": "返回帐篷治疗（每秒 1 金，%s / %s）" % [preferences.key_name("heal"), preferences.key_name("stop")], "expedition": "前往设施调查（%s 可中断）" % preferences.key_name("stop")}.get(order, "等待命令")
 
 func update_order(dt: float) -> void:
 	var route_changed := false
@@ -806,7 +832,7 @@ func update_order(dt: float) -> void:
 		else:
 			hero.route.clear()
 			if hero.attack_cooldown <= 0:
-				target.health -= session.survivor_damage()
+				target.health -= session.survivor_damage() * outfitting.damage_multiplier(hero)
 				dino_ai.provoke(target, "hero", survivor_id(hero), hero.position)
 				dino_ai.emit_noise(hero.position, 22.0, "hero", survivor_id(hero))
 				hero.attack_cooldown = 0.7
@@ -814,7 +840,7 @@ func update_order(dt: float) -> void:
 				hero.visual.face(target.position - hero.position, 1)
 				hero.play_animation("attack", 0)
 				sound.play_at("shot", hero.position)
-				tracer(hero.position + Vector3.UP * 1.5, target.position + Vector3.UP, Color("e6cd8e"))
+				tracer(hero.position + Vector3.UP * 1.5, target.position + Vector3.UP, Color("e6cd8e") if outfitting.actor().rifle == 0 else Color("fff0bc"))
 
 func update_buildings(dt: float) -> void:
 	refresh_shelters()
@@ -852,17 +878,21 @@ func update_buildings(dt: float) -> void:
 				if b.kind=="tower": coop.effect("tower",[b.id])
 				tracer(shot_origin, nearest.position + Vector3.UP * 1.2, Color("f5d087"))
 
-func spawn_dinosaur(at: Vector3 = Vector3(10000, 0, 0), species: String = "raptor") -> Node3D:
+func spawn_dinosaur(at: Vector3 = Vector3(10000, 0, 0), species: String = "raptor", avoid_units: bool = false) -> Node3D:
 	var p := at
+	# Explicit placements retain exact save/replication coordinates. Live spawners
+	# reject occupied footprints instead of creating a new stack to correct later.
+	if p.x > 1000 or avoid_units: crowd.rebuild(survivors() + dinosaurs)
 	if p.x > 1000:
 		var found := false
 		for attempt in range(50):
 			p = board.point(Vector2i(rng.randi_range(2, Board.SIDE - 3), rng.randi_range(2, Board.SIDE - 3)))
-			if dino_ai.safe_spawn(p) and board.body_open(p, Board.species_radius(species)):
+			if dino_ai.safe_spawn(p) and board.body_open(p, Board.species_radius(species)) and crowd.space_open(p, Board.species_radius(species)):
 				found = true
 				break
 		if not found: return null
 	if not board.is_open(board.cell_at(p)): return null
+	if avoid_units and not crowd.space_open(p, Board.species_radius(species)): return null
 	var spec: Dictionary = Dinosaurs.spec(species)
 	var model_key: String = "dinosaur_" + spec.model
 	if not model_cache.has(model_key): model_cache[model_key] = load("res://scenes/models/%s.tscn" % spec.model)
@@ -884,16 +914,22 @@ func spawn_dinosaur(at: Vector3 = Vector3(10000, 0, 0), species: String = "rapto
 	d.navigation = board
 	add_child(d)
 	dinosaurs.append(d)
+	crowd.register(d)
 	dino_ai.register(d, species)
 	d.visible = vision.is_visible(board.cell_at(d.position))
 	return d
 
 func update_dinosaurs(dt: float) -> void:
+	# Also supports direct simulation/test calls, and incorporates newly spawned units.
+	crowd.rebuild(survivors() + dinosaurs)
+	crowd.separate(dt)
 	dino_ai.update(dt)
 
 func damage_building(b: Dictionary, damage: float) -> void:
 	var previous: float = b.hp
 	b.hp = maxf(0.0, b.hp - damage)
+	if previous > b.hp: outfitting.building_hit(b)
+	if encounter and previous > b.hp: encounter.building_hit(b, previous - b.hp)
 	var now: float = session.game_time()
 	# Deliberately ahead of the defence-notice throttle below: a 10s global cooldown
 	# could swallow exactly the warning that tells someone their shelter is failing.
@@ -974,16 +1010,19 @@ func work_impact(at: Vector3, color: Color) -> void:
 		var chip := mesh_box(Vector3(0.06,0.045,0.09),color,contact)
 		effects.append({"node":chip,"remaining":0.45,"velocity":Vector3(cos(angle)*0.7,0.6+i*0.12,sin(angle)*0.7)})
 
-func research() -> void:
-	if coop.route("research",[selected_id]): return
+func research(destination_kind: String = "laboratory") -> void:
+	if coop.route("upgrade_base",[selected_id, destination_kind]): return
 	if paused: return
-	var result: String = session.research(selected_id)
+	var result: String = session.research(selected_id, destination_kind)
 	if result.is_empty():
 		visuals[selected_id].queue_free()
 		var b := selected_building()
 		if Regions.at(board.point(b.cell)) == "swamp": b.remaining *= 0.3
 		create_building_visual(b)
-	hud.toast("开始升级实验室。" if result.is_empty() else result)
+	hud.toast("开始升级%s。" % Catalog.BUILDINGS[destination_kind].name if result.is_empty() else result)
+
+func presentation_paused() -> bool:
+	return paused or (coop != null and coop.active and coop.room_paused())
 
 func toggle_pause() -> void:
 	if not started: return
@@ -1003,6 +1042,7 @@ func start_session(duration: float, mode: String = "classic", content_seed: int 
 	paused = false
 	camera_rig.center(true)
 	adventure.initialize(content_seed)
+	outfitting.initialize()
 	sound.play_ui("ready")
 
 func prepare_demo() -> void:
@@ -1060,6 +1100,7 @@ func stop_order() -> void:
 	if coop.route("stop"): return
 	if pointer_feedback: pointer_feedback.pulse_left = 0
 	if adventure: adventure.cancel_job()
+	if outfitting: outfitting.cancel()
 	leave_shelter(hero)
 	order = "idle"
 	hero.route.clear()
@@ -1243,18 +1284,29 @@ func clear_focus() -> void:
 func update_lighting() -> void:
 	var daylight := (cos(((session.elapsed + session.evacuation_elapsed) / Catalog.DAY_SECONDS) * TAU - 0.5) + 1.0) / 2.0
 	night = daylight < 0.3
-	sun.light_energy = lerpf(0.16, 0.76, daylight)
+	sun.light_energy = lerpf(0.20, 0.94, daylight)
 	sun.light_color = Color("849bc1").lerp(Color("f4e9d5"), daylight)
-	environment.ambient_light_energy = lerpf(0.28, 0.44, daylight)
+	environment.ambient_light_energy = lerpf(0.27, 0.34, daylight)
 	environment.ambient_light_color = Color("7790af").lerp(Color("aabac6"), daylight)
 	environment.fog_light_color = Color("253d50").lerp(Color("819794"), daylight)
 	if weather:
 		weather.update()
 		weather.apply_lighting()
 
+func outfit_action(action: String, id: int = -1, item: String = "") -> void:
+	if coop.route("outfit", [action, id, item]): return
+	if paused or not started or hero.health <= 0 or session.phase not in ["playing", "evacuate"]: return
+	var result := ""
+	match action:
+		"craft": result = outfitting.craft(id, item)
+		"collect": result = outfitting.collect(id)
+		"explore": result = outfitting.explore(item)
+		"return": result = outfitting.return_home()
+		"kit": result = outfitting.use_kit()
+	if not result.is_empty(): hud.toast(result)
+
 func use_medkit() -> void:
-	if not Features.peripheral_enabled:
-		hud.toast("急救包系统暂缓，请使用营地帐篷治疗。")
-		return
-	var error: String = adventure.use_kit()
-	hud.toast("已使用急救包，恢复 50 生命。" if error.is_empty() else error)
+	if Features.peripheral_enabled:
+		var error: String = adventure.use_kit()
+		hud.toast("已使用急救包，恢复 50 生命。" if error.is_empty() else error)
+	else: outfit_action("kit")

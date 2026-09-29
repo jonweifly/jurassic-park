@@ -7,7 +7,7 @@ var bones := {}
 func _init(owner_visual: Node, rig: Skeleton3D) -> void:
 	visual = owner_visual
 	skeleton = rig
-	for name in ["spine", "thighL", "shinL", "footL", "thighR", "shinR", "footR", "upper_armR", "forearmR", "handR"]:
+	for name in ["root", "spine", "neck", "head", "thighL", "shinL", "footL", "thighR", "shinR", "footR", "upper_armL", "forearmL", "upper_armR", "forearmR", "handR"]:
 		bones[name] = skeleton.find_bone(name)
 
 func ready() -> bool:
@@ -25,27 +25,41 @@ func override_pose(name: String, value: Transform3D) -> void:
 
 func rotate_towards(basis: Basis, from: Vector3, to: Vector3) -> Basis:
 	if from.length_squared() < 0.000001 or to.length_squared() < 0.000001: return basis
-	return Basis(Quaternion(from.normalized(), to.normalized())) * basis
+	var from_axis := from.normalized()
+	var to_axis := to.normalized()
+	var cross_axis := from_axis.cross(to_axis)
+	var sine := cross_axis.length()
+	# Quaternion(from, to) rounds very small arcs to identity. Those arcs matter
+	# when retaining a foot joint after a subtle pelvis shift every render tick.
+	if sine > 0.000001:
+		return Basis(Quaternion(cross_axis / sine, atan2(sine, clampf(from_axis.dot(to_axis), -1.0, 1.0)))) * basis
+	return Basis(Quaternion(from_axis, to_axis)) * basis
 
 func solve(upper: String, lower: String, end: String, target: Vector3, end_basis: Basis) -> void:
 	var a := pose(upper)
 	var b := pose(lower)
 	var c := pose(end)
-	var l1 := a.origin.distance_to(b.origin)
-	var l2 := b.origin.distance_to(c.origin)
+	# Imported IK keys can contain millimetres of translation in the foot joint.
+	# Solving from those animated distances would retain that stretch each frame.
+	var upper_link := skeleton.get_bone_rest(bones[lower]).origin
+	var lower_link := skeleton.get_bone_rest(bones[end]).origin
+	var l1 := upper_link.length()
+	var l2 := lower_link.length()
 	var axis := (target - a.origin).normalized()
 	var distance := clampf(a.origin.distance_to(target), absf(l1 - l2) + 0.002, l1 + l2 - 0.002)
 	var bend := b.origin - a.origin
+	# A straight imported leg has no reliable bend plane. Pelvis motion can
+	# flip the tiny authored offset backward; human knees need a forward pole.
+	if upper.begins_with("thigh"): bend = pose("root").basis.z
 	bend -= axis * bend.dot(axis)
 	if bend.length() < 0.0001: bend = Vector3.FORWARD - axis * Vector3.FORWARD.dot(axis)
 	bend = bend.normalized()
 	var along := (l1*l1 + distance*distance - l2*l2) / (2.0*distance)
 	var knee := a.origin + axis * along + bend * sqrt(maxf(0, l1*l1 - along*along))
 	var ankle := a.origin + axis * distance
-	a.basis = rotate_towards(a.basis, b.origin - a.origin, knee - a.origin)
-	var old_lower := b.origin
+	a.basis = rotate_towards(a.basis, a.basis * upper_link, knee - a.origin)
 	b.origin = knee
-	b.basis = rotate_towards(b.basis, c.origin - old_lower, ankle - knee)
+	b.basis = rotate_towards(b.basis, b.basis * lower_link, ankle - knee)
 	c.origin = ankle
 	c.basis = end_basis
 	override_pose(upper, a)

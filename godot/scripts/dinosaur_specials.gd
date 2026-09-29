@@ -85,7 +85,9 @@ func advance(d: Node3D, strike: Dictionary, dt: float) -> void:
 	if strike.special != "pounce" or strike.remaining > 0.2: return
 	var next: Vector3 = d.position.move_toward(strike.impact, dt * 15.0 * world.DefenseCombat.slow_factor(d))
 	if d.segment_open(d.position, next):
+		if d.crowd: next = d.crowd.move(d,next,false)
 		d.position = next
+		if d.crowd: d.crowd.relocate(d)
 		d.position.y = world.board.layout.height_at(next.x, next.z)
 
 func resolve(d: Node3D, strike: Dictionary) -> void:
@@ -93,13 +95,15 @@ func resolve(d: Node3D, strike: Dictionary) -> void:
 	var radius: float = {"acid": 1.8, "stomp": 4.2, "pounce": 2.0}[strike.special]
 	var multiplier := 1.35 if strike.special == "stomp" else 1.0
 	if strike.special == "pounce" and d.position.distance_to(impact) > 3.0: return
+	if world.encounter: world.encounter.impact(impact, strike.special == "stomp")
+	if world.coop: world.coop.effect("impact", [impact, strike.special == "stomp"])
 	# No target tracking after wind-up, no damage through trees/walls and no friendly hits.
 	# Area damage bypasses resolve_strike(), so shelter needs its own guard here or acid
 	# and stomps would still kill someone inside a tent.
 	for survivor in world.survivors():
 		if survivor.is_sheltered(): continue
 		if survivor.health > 0 and within_impact(survivor.position, impact, radius) and ai.has_line_of_sight(d.position, survivor.position):
-			survivor.health -= d.attack_damage * multiplier
+			survivor.health -= world.outfitting.incoming_damage(survivor, d.attack_damage * multiplier, strike.special != "acid")
 	for b in world.session.buildings:
 		if b.hp <= 0: continue
 		var point: Vector3 = world.board.point(b.cell)

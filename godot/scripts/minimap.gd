@@ -26,6 +26,12 @@ func _draw() -> void:
 		draw_rect(Rect2(p - Vector2.ONE, Vector2(3, 3)), Color("416443"))
 	for b in world.session.buildings:
 		if b.hp > 0: draw_rect(Rect2(project(world.board.point(b.cell)) - Vector2(2, 2), Vector2(4, 4)), Color("d6bf79"))
+	for b in world.session.buildings:
+		if world.outfitting.recent_hits.has(b.id): draw_circle(project(world.board.point(b.cell)), 5.0 + sin(Time.get_ticks_msec() * .01), Color("ff8060"), false, 1.5)
+	for id in world.outfitting.data().sites:
+		var site: Dictionary = world.outfitting.data().sites[id]
+		var at: Vector2 = project(world.board.point(site.cell))
+		draw_rect(Rect2(at - Vector2(2,2), Vector2(4,4)), Color("d7bb76") if site.status == "known" else Color("718f78"), false, 1.2)
 	for d in world.dinosaurs:
 		if is_instance_valid(d) and d.health > 0 and world.vision.is_visible(world.board.cell_at(d.position)): draw_circle(project(d.position), 2.0, Color("dc8069"))
 	for id in world.session.adventure.get("sites", {}):

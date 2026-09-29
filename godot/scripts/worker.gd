@@ -23,6 +23,7 @@ func capacity() -> int:
 
 func assign(kind: String, target: Vector3, building_id: int = -1) -> void:
 	if world.adventure: world.adventure.cancel_job()
+	if world.outfitting: world.outfitting.cancel()
 	world.leave_shelter(world.hero)
 	clock = 0
 	recovery = 0

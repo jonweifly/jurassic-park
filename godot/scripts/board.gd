@@ -9,6 +9,54 @@ var terrain: Dictionary = {}
 var structures: Dictionary = {}
 var revision: int = 0
 var clearance_grids := {}
+var reachability := {}
+
+# AStar exhausts the entire connected region for each impossible destination.
+# Cache component membership per body radius and board revision, then retain
+# the existing AStar scoring for reachable candidates. Four-way components are
+# sufficient: diagonal movement never cuts blocked corners on these grids.
+func reachable_candidates(search: AStarGrid2D, radius: float, start: Vector2i, candidates: Array[Vector2i]) -> Array[Vector2i]:
+	if candidates.is_empty(): return candidates
+	var key := snappedf(radius, 0.01) if radius > 1.0 else 0.0
+	if not reachability.has(key) or reachability[key].revision != revision:
+		var labels := PackedInt32Array()
+		labels.resize(SIDE * SIDE)
+		reachability[key] = {"revision":revision, "labels":labels, "next":1}
+	var entry: Dictionary = reachability[key]
+	var labels: PackedInt32Array = entry.labels
+	var origins: Array[Vector2i] = [start]
+	if search.is_point_solid(start):
+		# Restored actors may depart a blocked start, but it must not permanently
+		# join the otherwise separate regions on either side of that cell.
+		origins.clear()
+		for offset in [Vector2i.LEFT,Vector2i.RIGHT,Vector2i.UP,Vector2i.DOWN]:
+			var cell: Vector2i = start + offset
+			if inside(cell) and not search.is_point_solid(cell): origins.append(cell)
+	var components := []
+	for origin in origins:
+		var index := origin.y * SIDE + origin.x
+		if labels[index] == 0:
+			var component: int = entry.next
+			entry.next += 1
+			var pending := PackedVector2Array([Vector2(origin)])
+			var cursor := 0
+			labels[index] = component
+			while cursor < pending.size():
+				var cell := Vector2i(pending[cursor])
+				cursor += 1
+				for offset in [Vector2i.LEFT,Vector2i.RIGHT,Vector2i.UP,Vector2i.DOWN]:
+					var neighbour: Vector2i = cell + offset
+					if not inside(neighbour): continue
+					var next_index := neighbour.y * SIDE + neighbour.x
+					if labels[next_index] != 0 or search.is_point_solid(neighbour): continue
+					labels[next_index] = component
+					pending.append(Vector2(neighbour))
+		components.append(labels[index])
+	entry.labels = labels
+	var result: Array[Vector2i] = []
+	for cell in candidates:
+		if cell == start or labels[cell.y * SIDE + cell.x] in components: result.append(cell)
+	return result
 
 func _init() -> void:
 	grid.region = Rect2i(0, 0, SIDE, SIDE)
@@ -64,6 +112,7 @@ func route(from: Vector3, to: Vector3, adjacent: bool = false, radius: float = 0
 				if is_open(c) and not search.is_point_solid(c): candidates.append(c)
 	var best: Array[Vector2i] = []
 	var best_score := INF
+	candidates = reachable_candidates(search, radius, start, candidates)
 	# A restored actor may occupy a newly blocked clearance cell: allow departure only.
 	var start_solid := search.is_point_solid(start)
 	if start_solid: search.set_point_solid(start, false)

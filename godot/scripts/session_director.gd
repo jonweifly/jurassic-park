@@ -114,7 +114,7 @@ func update() -> void:
 				var combat := camp_in_combat()
 				if clock.get("contact", false) and not combat and not clock.get("recovery_used", false):
 					# At most one short extension per wave; existing animals keep acting.
-					clock.next = maxf(clock.next, minf(s.elapsed + 25.0, clock.next + 25.0))
+					clock.next = maxf(clock.next, minf(s.elapsed + 45.0, clock.next + 45.0))
 					clock.recovery_used = true
 				clock.contact = combat
 				if not clock.get("warned", false) and clock.next - s.elapsed <= 12.0:
@@ -151,4 +151,14 @@ func objective() -> String:
 	if s.duration - s.elapsed <= 180: return "救援准备：治疗并检查北侧路线"
 	if not s.has_completed("laboratory"): return "⑥ 建基础建筑，选中后升级实验室"
 	if s.technologies.is_empty(): return "⑦ 研究防御或工具，准备下一轮来袭"
-	return "守住营地，修复受损建筑并准备撤离"
+	if not s.has_completed("workshop"): return "⑧ 另建基础建筑升级工坊，准备野外装备"
+	return "守住营地，准备装备并探索岛上设施"
+
+func field_window() -> String:
+	if world.session.phase != "playing": return "救援已到 · 装备仍可使用，请及时撤离"
+	if not world.outfitting.actor().cargo.is_empty(): return world.outfitting.brief()
+	if world.session.mode != "standard": return "外出前检查防线 · 岛上巡游恐龙始终存在"
+	if world.spawn_clocks.is_empty(): return "外出前检查防线与补给"
+	var remaining := maxf(0, world.spawn_clocks[0].next - world.session.elapsed)
+	if camp_in_combat(): return "附近正在交战 · 先处理威胁再出发"
+	return "下次增援约 %.0f 秒 · 现有恐龙仍会巡游" % remaining

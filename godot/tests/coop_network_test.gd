@@ -119,6 +119,29 @@ func run_host() -> void:
 	expect(world.session.building(tower_id).get("refit")=="rapid","Guest refit updates authoritative tower")
 	world.session.tick(12)
 	world.update_buildings(0)
+	var power_cell := plot("generator")
+	var generator: Dictionary = world.session.build("generator", power_cell)
+	generator.remaining = 0.0
+	world.board.block_building(power_cell, generator.id)
+	world.create_building_visual(generator)
+	var gear_cell := plot("lab")
+	var workshop: Dictionary = world.session.build("lab", gear_cell)
+	workshop.remaining = 0.0
+	world.board.block_building(gear_cell, workshop.id)
+	world.create_building_visual(workshop)
+	world.build_mode = ""
+	world.coop.world_clock = 0
+	signal_phase("workshop-foundation", {"id":workshop.id})
+	await until(func(): return workshop.kind == "workshop", "Guest workshop upgrade reaches host")
+	world.session.tick(15)
+	world.update_buildings(0)
+	world.coop.world_clock = 0
+	await until(func(): return world.outfitting.data().jobs.has(str(workshop.id)), "Guest craft request starts host production")
+	expect(world.outfitting.data().jobs[str(workshop.id)].owner == "2", "Network craft retains personal owner")
+	world.outfitting.update(18)
+	world.coop.world_clock = 0
+	await wait_phase("gear-collected")
+	expect(world.outfitting.data().actors["2"].boots == 1 and world.outfitting.data().actors["1"].boots == 0, "Network pickup equips guest only")
 	# A crowded packet must span several datagrams and still reassemble as one frame.
 	world.set_physics_process(false)
 	for i in range(24):
@@ -166,7 +189,7 @@ func run_client() -> void:
 	await until(func(): return world.hero.position.distance_to(start)>1,"Authoritative movement is replicated")
 	signal_phase("moved")
 	await until(func(): return world.order=="idle","Guest movement completes")
-	expect(world.coop.received_motion_frames>=5,"High-frequency motion frames reassemble independently of world updates")
+	await until(func(): return world.coop.received_motion_frames>=5,"High-frequency motion frames reassemble independently of world updates",5)
 	var tree_target := Vector3.ZERO
 	var best := INF
 	for cell in world.trees:
@@ -218,6 +241,18 @@ func run_client() -> void:
 	world.refit_selected("rapid")
 	await until(func(): return world.session.building(tower_id).get("refit")=="rapid","Client tower upgrade is accepted")
 	signal_phase("refit-started")
+	var gear_info := await wait_phase("workshop-foundation")
+	var workshop_id := int(gear_info.get("id", -1))
+	await until(func(): return not world.session.building(workshop_id).is_empty(), "New foundation reaches client")
+	world.selected_id = workshop_id
+	world.research("workshop")
+	await until(func(): return world.session.building(workshop_id).get("kind") == "workshop" and world.session.building(workshop_id).get("remaining", 1) <= 0, "Workshop branch and completion synchronize")
+	world.outfit_action("craft", workshop_id, "boots")
+	await until(func(): return world.outfitting.data().jobs.get(str(workshop_id), {}).get("remaining", 1) <= 0, "Ready equipment is replicated to client")
+	world.outfit_action("collect", workshop_id)
+	await until(func(): return world.outfitting.actor().boots == 1, "Guest travels and receives equipment over ENet")
+	expect(is_equal_approx(world.hero.speed, world.session.survivor_speed() * 1.1) and world.outfitting.data().actors["1"].boots == 0, "Client applies its own boot speed without equipping host")
+	signal_phase("gear-collected")
 	await wait_phase("crowded")
 	var motion_frames: int = world.coop.received_motion_frames
 	await until(func(): return world.dinosaurs.size()==24 and world.coop.received_motion_frames>=motion_frames+5,"Crowded dinosaur snapshots reassemble across datagrams")

@@ -1,0 +1,6 @@
+[gd_scene load_steps=3 format=3]
+[ext_resource type="PackedScene" path="res://assets/models/lab.glb" id="model"]
+[ext_resource type="Script" path="res://scripts/workshop_visual.gd" id="script"]
+[node name="Workshop" type="Node3D"]
+script = ExtResource("script")
+[node name="Model" parent="." instance=ExtResource("model")]

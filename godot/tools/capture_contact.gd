@@ -1,6 +1,7 @@
 extends SceneTree
 const Save = preload("res://scripts/save_store.gd")
 const Preferences = preload("res://scripts/preferences.gd")
+const Catalog = preload("res://scripts/catalog.gd")
 var world: Node
 var folder := "res://captures/contact"
 
@@ -19,6 +20,7 @@ func aperture(value: float) -> void:
 	for mat in world.scenery.obstructions.materials.values(): mat.set_shader_parameter("cutout_enabled",value)
 
 func close_camera(focus: Vector3, offset: Vector3, size: float) -> void:
+	world.camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	world.camera.position = focus + offset
 	world.camera.look_at(focus)
 	world.camera.size = size
@@ -75,7 +77,9 @@ func run() -> void:
 	tent.position = base + Vector3(0,0,1.7)
 	world.vision.shade(tent)
 	world.scenery.prepare_building(tent,"tent")
-	world.scenery.update_building(tent,{"kind":"tent","remaining":5.0})
+	var tent_data := {"kind":"tent","remaining":5.0}
+	tent_data.hp = Catalog.max_health(tent_data)
+	world.scenery.update_building(tent,tent_data)
 	world.hero.work_pose("build",tent.position,0.65,1)
 	close_camera(base+Vector3(0,1,0.8),Vector3(6,3,-3),7)
 	await shot("build-contact")
@@ -86,7 +90,9 @@ func run() -> void:
 	tower.position = base + Vector3(1.8,0,1.8)
 	world.vision.shade(tower)
 	world.scenery.prepare_building(tower,"tower")
-	world.scenery.update_building(tower,{"kind":"tower","remaining":0})
+	var tower_data := {"kind":"tower","remaining":0}
+	tower_data.hp = Catalog.max_health(tower_data)
+	world.scenery.update_building(tower,tower_data)
 	close_camera(base+Vector3.UP,Vector3(8,7,8),9)
 	aperture(0)
 	await shot("building-occlusion-before")

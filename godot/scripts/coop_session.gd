@@ -1,6 +1,6 @@
 extends Node
 ## Two-player ENet room. Only this node exposes RPCs; clients send bounded intents.
-const PROTOCOL := "jp-coop-1"
+const PROTOCOL := "jp-coop-2"
 const DEFAULT_PORT := 24565
 const Actor = preload("res://scripts/coop_actor.gd")
 const Replication = preload("res://scripts/coop_replication.gd")
@@ -74,7 +74,15 @@ func host(mode: String = "standard", selected_port: int = DEFAULT_PORT, password
 				Save.restore_fields(world.worker,saved.partner.worker,Save.WORKER_FIELDS)
 				world.order="idle"
 				world.hero.route.clear()
-				Save.restore_visual(world.hero,saved.partner.visual))
+				Save.restore_visual(world.hero,saved.partner.visual)
+				world.outfitting.apply_equipment(world.hero)
+				# Replan field orders on the restored board, keeping personal cargo intact.
+				var task: Dictionary = world.outfitting.actor().duplicate(true)
+				world.outfitting.cancel()
+				if task.task == "collect": world.outfitting.collect(task.target)
+				elif task.task == "explore": world.outfitting.explore(task.site)
+				elif task.task == "return": world.outfitting.return_home()
+				)
 		world.paused=false
 	else: world.start_session(1500,mode)
 	status="房间已创建 · 等待朋友加入"
@@ -337,6 +345,8 @@ func valid_intent(action: String, args: Array) -> bool:
 		"command", "focus": return args.size()==1 and args[0] is Vector3 and absf(args[0].x)<128 and absf(args[0].z)<128 and absf(args[0].y)<64
 		"place": return args.size()==4 and args[0] is String and args[0] in world.Catalog.BUILDINGS and args[1] is Vector2i and world.board.inside(args[1]) and args[2] is float and absf(args[2])<=TAU and args[3] is bool
 		"demolish", "repair", "research", "reinforce": return args.size()==1 and args[0] is int and args[0]>0
+		"upgrade_base": return args.size()==2 and args[0] is int and args[0]>0 and args[1] in ["laboratory", "workshop"]
+		"outfit": return args.size()==3 and args[0] in ["craft", "collect", "explore", "return", "kit"] and args[1] is int and args[2] is String and (args[0]!="craft" or args[2] in world.outfitting.Catalog.ITEMS) and (args[0]!="explore" or args[2] in world.outfitting.Catalog.SITES)
 		"refit": return args.size()==2 and args[0] is int and args[1] is String and args[1] in world.Catalog.REFITS
 		"priority": return args.size()==2 and args[0] is int and args[1] is int and args[1] in range(3)
 		"tech": return args.size()==1 and args[0] is String and args[0] in world.Catalog.TECH
@@ -357,6 +367,10 @@ func dispatch(action: String, args: Array) -> void:
 		"repair":
 			world.selected_id=args[0]
 			world.repair_selected()
+		"outfit": world.outfit_action(args[0], args[1], args[2])
+		"upgrade_base":
+			world.selected_id=args[0]
+			world.research(args[1])
 		"research":
 			world.selected_id=args[0]
 			world.research()
@@ -390,6 +404,8 @@ func effect(kind: String, args: Array) -> void:
 func _effect(kind: String, args: Array) -> void:
 	if not active or hosting or not connected: return
 	match kind:
+		"impact":
+			if world.encounter: world.encounter.impact(args[0], args[1])
 		"tracer": world.tracer(args[0],args[1],args[2])
 		"sound": world.sound.play_at(args[0],args[1],args[2],args[3])
 		"dinosaur":
@@ -450,7 +466,8 @@ static func read_save() -> Dictionary:
 	if not file: return {"error":"没有合作存档。"}
 	if file.get_length()>4194304: return {"error":"合作存档无效。"}
 	var data: Variant = bytes_to_var(file.get_buffer(file.get_length()))
-	if not data is Dictionary or data.get("protocol")!=PROTOCOL or not data.get("world") is Dictionary or not Save.safe_data(data): return {"error":"合作存档版本或数据无效。"}
+	# Live peers require the current protocol; older local saves can still migrate.
+	if not data is Dictionary or data.get("protocol") not in ["jp-coop-1", PROTOCOL] or not data.get("world") is Dictionary or not Save.safe_data(data): return {"error":"合作存档版本或数据无效。"}
 	if not Save.validate(data.world).is_empty(): return {"error":"合作存档校验失败。"}
 	if data.has("partner"):
 		var pawn = load("res://scripts/pawn.gd").new()

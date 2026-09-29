@@ -125,6 +125,26 @@ func run() -> void:
 	world.command(previous+Vector3(4,0,0))
 	expect(world.order=="idle","Host cannot move while guest has paused the room")
 	world.coop.guest_paused=false
+	# Exercise new equipment intents through the same scoped dispatcher as RPC.
+	world.prepare_demo()
+	world.session.wood=1000
+	world.session.gold=1000
+	var foundation: Dictionary
+	for b in world.session.buildings:
+		if b.kind == "lab": foundation = b
+	world.coop.partner.run(func(): world.coop.dispatch("upgrade_base", [foundation.id, "workshop"]))
+	world.session.tick(15)
+	world.coop.partner.run(func(): world.coop.dispatch("outfit", ["craft", foundation.id, "boots"]))
+	expect(world.outfitting.data().jobs[str(foundation.id)].owner == "2", "Guest craft belongs to guest through real intent dispatcher")
+	world.outfitting.update(18)
+	expect(not world.outfitting.collect(foundation.id).is_empty(), "Host cannot collect guest equipment")
+	world.coop.partner.run(func(): world.coop.dispatch("outfit", ["collect", foundation.id, ""]))
+	for frame in range(3000):
+		world.coop.partner.tick(.05)
+		if world.coop.partner.state.order != "field": break
+	expect(world.outfitting.actor(guest).boots == 1 and world.outfitting.actor(host).boots == 0, "Guest travels to collect gear without changing host equipment")
+	world.coop.partner.run(func(): world.coop.dispatch("outfit", ["explore", -1, "supplies"]))
+	expect(world.coop.partner.state.order == "field" and world.order == "idle", "Guest exploration keeps host order independent")
 	world.coop.partner.state.worker.cargo=3
 	world.coop.partner.state.worker.cargo_kind="gold"
 	expect(world.coop.save_game().is_empty(),"Coop game saves separately from single-player")
@@ -134,6 +154,19 @@ func run() -> void:
 	make_world()
 	expect(world.coop.host("standard",port,"",true).is_empty(),"New room restores saved coop world")
 	expect(world.coop.pawns.size()==2 and world.coop.partner.state.worker.cargo==3 and world.coop.partner.state.worker.cargo_kind=="gold","Restore preserves both survivors and does not duplicate cargo")
+	expect(world.coop.partner.state.order == "field" and world.outfitting.data().actors["2"].task == "explore", "Coop reload replans guest exploration instead of leaving stale task")
+	for frame in range(3000):
+		world.coop.partner.tick(.05)
+		if world.coop.partner.state.order != "field": break
+	expect(world.outfitting.data().actors["2"].cargo == ["supplies"] and world.outfitting.actor().cargo.is_empty(), "Resumed guest search grants cargo to guest only")
+	var reward_before := Vector2i(world.session.wood,world.session.gold)
+	world.coop.partner.run(func(): world.coop.dispatch("outfit", ["return", -1, ""]))
+	for frame in range(3000):
+		world.coop.partner.tick(.05)
+		if world.coop.partner.state.order != "field": break
+	expect(Vector2i(world.session.wood,world.session.gold) == reward_before + Vector2i(8,6) and world.outfitting.data().actors["2"].cargo.is_empty(), "Guest returns exploration reward exactly once to shared camp stock")
+	world.coop.partner.tick(1)
+	expect(Vector2i(world.session.wood,world.session.gold) == reward_before + Vector2i(8,6), "Repeated partner ticks cannot duplicate exploration reward")
 	var before := Vector2i(world.session.wood,world.session.gold)
 	for request in [["place",["invalid",Vector2i.ZERO,0.0,true]],["place",["gate",Vector2i(-1,0),0.0,true]],["place",["gate",Vector2i(65,62),NAN,true]],["priority",[1,99]],["demolish",["all"]],["tech",["unknown"]],["set_gold",[99999]]]:
 		expect(not world.coop.valid_intent(request[0],request[1]),"Reject malformed or unauthorized intent "+request[0])

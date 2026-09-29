@@ -42,6 +42,76 @@ func _init(owner_world: Node, enabled: bool = true, cinematic: bool = false) -> 
 			groups[key].parts.append(part)
 			groups[key].cells.append(cell)
 	for group in groups.values(): create_batch(group)
+	if "--original-environment" not in OS.get_cmdline_user_args(): add_root_batches()
+
+func add_root_batches() -> void:
+	var groups := {}
+	for cell in world.trees:
+		var tree: Node3D = world.trees[cell].node
+		if world.Regions.at(tree.position) == "ice": continue
+		for model in tree.find_children("Model","Node3D",true,false):
+			var at: Transform3D = model.global_transform
+			# Use only upright trunks on gently sloping soil: roots must meet the
+			# collision terrain, and never hang over a cliff face.
+			var p := at.origin
+			if world.board.layout:
+				var low := INF
+				var high := -INF
+				for offset in [Vector2(-.65,0),Vector2(.65,0),Vector2(0,-.65),Vector2(0,.65)]:
+					var h: float = world.board.layout.height_at(p.x+offset.x,p.z+offset.y)
+					low = minf(low,h)
+					high = maxf(high,h)
+				if high-low > .18 or absf(p.y-world.board.layout.height_at(p.x,p.z)) > .25: continue
+				at.origin.y = world.board.layout.height_at(p.x,p.z)-.04
+			var chunk := Vector2i(floori(p.x/CHUNK_SIZE),floori(p.z/CHUNK_SIZE))
+			if not groups.has(chunk): groups[chunk] = []
+			groups[chunk].append({"cell":cell,"transform":at})
+	var mesh := root_mesh()
+	var low_mesh := root_mesh(3)
+	for chunk in groups:
+		var node := MultiMeshInstance3D.new()
+		node.name = "RootFlares_%d" % batches.size()
+		node.position = Vector3((chunk.x+.5)*CHUNK_SIZE,0,(chunk.y+.5)*CHUNK_SIZE)
+		node.material_overlay = world.vision.overlay
+		root.add_child(node)
+		var multi := MultiMesh.new()
+		multi.transform_format = MultiMesh.TRANSFORM_3D
+		multi.mesh = mesh
+		multi.instance_count = groups[chunk].size()
+		multi.visible_instance_count = multi.instance_count
+		node.multimesh = multi
+		var entries: Array[Dictionary] = []
+		for i in range(multi.instance_count):
+			var entry: Dictionary = groups[chunk][i]
+			multi.set_instance_transform(i,node.global_transform.affine_inverse()*entry.transform)
+			var slot := {"batch":batches.size(),"index":i,"cell":entry.cell}
+			entries.append(slot)
+			if not cells.has(entry.cell): cells[entry.cell] = []
+			cells[entry.cell].append(slot)
+		# Root slots share the tree's normal swap-removal path when harvested.
+		batches.append({"node":node,"multi":multi,"entries":entries,"high":mesh,"low":low_mesh,"detail":true})
+
+static func root_mesh(root_count: int = 5) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(root_count):
+		var angle := i*TAU/float(root_count)
+		var direction := Vector3(cos(angle),0,sin(angle))
+		var side := Vector3(-sin(angle),0,cos(angle))*.11
+		var base := direction*.14+Vector3(0,-.11,0)
+		var tip := direction*(.57+float(i%2)*.13)+Vector3(0,-.08,0)
+		var peak := direction*.15+Vector3(0,.44-float(i%2)*.06,0)
+		for vertex in [base-side,tip,peak,base+side,peak,tip,base-side,peak,base+side]:
+			surface.set_color(Color("3f3528").lerp(Color("766044"),clampf((vertex.y+.08)/.5,0,1)))
+			surface.add_vertex(vertex)
+	surface.generate_normals()
+	var mesh := surface.commit()
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.roughness = 1.0
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh.surface_set_material(0,material)
+	return mesh
 
 func create_batch(group: Dictionary) -> void:
 	var original: MeshInstance3D = group.parts[0]

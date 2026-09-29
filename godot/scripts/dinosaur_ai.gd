@@ -43,7 +43,7 @@ func spawn_patrol(species: String, destination_override: Variant = null) -> Node
 		if not safe_spawn(p) or not world.board.body_open(p, world.Board.species_radius(species)): continue
 		var route := patrol_route(p, destination, world.Board.species_radius(species))
 		if route.is_empty() or route.size() > 70: continue
-		var d: Node3D = world.spawn_dinosaur(p, species)
+		var d: Node3D = world.spawn_dinosaur(p, species, true)
 		if not is_instance_valid(d): continue
 		d.set_meta("ai_state", "patrol")
 		d.set_meta("ai_patrol_destination", destination)
@@ -443,9 +443,11 @@ func resolve_strike(d: Node3D, dt: float) -> bool:
 	elif not survivor or survivor.health <= 0 or survivor.is_sheltered(): return true
 	# Damage is committed at contact; a survivor who leaves reach can dodge the bite.
 	if d.position.distance_to(position) > 3.0 or not has_line_of_sight(d.position, position): return true
+	if world.encounter: world.encounter.impact(position, strike.get("heavy", false))
+	if world.coop: world.coop.effect("impact", [position, strike.get("heavy", false)])
 	world.sound.play_at("hit", position)
 	var damage: float = d.attack_damage
-	if building.is_empty(): survivor.health -= damage
+	if building.is_empty(): survivor.health -= world.outfitting.incoming_damage(survivor, damage)
 	else:
 		if strike.get("heavy", false): damage *= 1.5
 		if building.kind in ["tower", "shelter", "gate"] and world.Regions.at(position) == "mountain": damage /= 1.18

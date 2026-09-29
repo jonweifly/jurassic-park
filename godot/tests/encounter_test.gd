@@ -26,6 +26,9 @@ func run_scenario(seed_value: int, with_camp: bool, region: String) -> bool:
 	world.set_physics_process(false)
 	world.sound.set_process(false)
 	world.start_session(3600)
+	# This fixture measures timed patrol waves. Field-site guards have their own
+	# proximity trigger and can legitimately attack a remote camp before 60s.
+	for site in world.outfitting.data().sites.values(): site.guarded = true
 	world.rng.seed = seed_value
 	world.hero.health = 100000
 	var tent: Dictionary = {}

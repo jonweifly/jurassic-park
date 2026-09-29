@@ -3,12 +3,21 @@ var world: Node
 var focus := Vector3.ZERO
 var yaw := PI / 4
 var target_yaw := PI / 4
-var pitch := deg_to_rad(52)
-var target_pitch := deg_to_rad(52)
+var pitch := deg_to_rad(48)
+var target_pitch := deg_to_rad(48)
 var following := false
 var dragging := false
 var initialized := false
 var boom_height := 0.0
+var impact_strength := 0.0
+var impact_clock := 0.0
+
+func impact(at: Vector3, strength: float) -> void:
+	if world.presentation_paused() or not world.preferences.values.get("impact_motion", true): return
+	if not world.vision.is_visible(world.board.cell_at(at)): return
+	var attenuation := clampf(1.0 - at.distance_to(focus) / 28.0, 0.0, 1.0)
+	impact_strength = maxf(impact_strength, minf(strength, 0.16) * attenuation)
+	impact_clock = 0.0
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
@@ -19,7 +28,7 @@ func center(follow: bool = false) -> void:
 
 func reset() -> void:
 	target_yaw = PI / 4
-	target_pitch = deg_to_rad(52)
+	target_pitch = deg_to_rad(48)
 	world.camera_size = 36
 	center(true)
 
@@ -45,9 +54,7 @@ func handle(event: InputEvent) -> bool:
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			var multiplier := pow(0.90 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.10, world.preferences.values.zoom_speed)
-			var previous_size: float = world.camera_size
 			world.camera_size = clampf(world.camera_size * multiplier, 18, 68)
-			if previous_size > 24 and world.camera_size <= 24: center(true)
 			return true
 	if event is InputEventKey and event.pressed and not event.echo:
 		if world.preferences.matches(event, "center"): center(true); return true
@@ -79,19 +86,33 @@ func update(dt: float) -> void:
 		yaw = lerp_angle(yaw, target_yaw, blend)
 		pitch = lerpf(pitch, target_pitch, blend)
 	world.camera.size = lerpf(world.camera.size, world.camera_size, blend if dt > 0 else 1.0)
-	var offset := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)) * 68
+	var perspective: bool = world.preferences.values.get("perspective", true)
+	world.camera.projection = Camera3D.PROJECTION_PERSPECTIVE if perspective else Camera3D.PROJECTION_ORTHOGONAL
+	# A narrow lens gives useful depth while retaining the familiar RTS footprint.
+	# camera.size still represents the visible span at the focus, including old saves.
+	var distance: float = world.camera.size / (2.0 * tan(deg_to_rad(world.camera.fov) * 0.5)) if perspective else 68.0
+	var offset := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)) * distance
 	var desired_position := focus + offset
 	# Raise the boom above intervening hills at low pitch.
-	var required_height := desired_position.y
+	var required_lift := 0.0
 	for i in range(1, 9):
 		var t := float(i) / 8
 		var p: Vector3 = focus.lerp(desired_position, t)
 		var floor_y: float = world.board.layout.height_at(p.x, p.z) + 3
-		if p.y < floor_y: required_height = maxf(required_height, desired_position.y + (floor_y - p.y) / t)
+		if p.y < floor_y: required_lift = maxf(required_lift, (floor_y - p.y) / t)
 	if not initialized or dt == 0:
-		boom_height = required_height
+		boom_height = required_lift
 	else:
-		boom_height = lerpf(boom_height, required_height, 1.0 - exp(-10.0 * dt))
-	desired_position.y = boom_height
+		# Zoom already smooths its distance. Filtering absolute Y again makes it
+		# lag X/Z and rocks the lens; smooth only additional terrain clearance.
+		boom_height = lerpf(boom_height, required_lift, 1.0 - exp(-10.0 * dt))
+	desired_position.y += boom_height
 	world.camera.position = desired_position
 	world.camera.look_at(focus)
+	if not world.preferences.values.get("impact_motion", true): impact_strength = 0.0
+	if not world.presentation_paused() and dt > 0:
+		impact_clock += dt
+		impact_strength *= exp(-12.0 * dt)
+		# Short translation only: never retarget, change zoom or interrupt commands.
+		world.camera.position += world.camera.global_basis.x * sin(impact_clock * 61.0) * impact_strength
+		world.camera.position += world.camera.global_basis.y * sin(impact_clock * 47.0) * impact_strength * 0.6

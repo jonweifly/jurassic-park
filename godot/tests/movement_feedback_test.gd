@@ -75,7 +75,7 @@ func run() -> void:
 	wheel.pressed = true
 	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
 	world.camera_rig.handle(wheel)
-	expect(world.camera_rig.following, "Entering close zoom restores following")
+	expect(not world.camera_rig.following, "Zoom preserves a deliberately free camera without recentering")
 	world.camera_rig.center(false)
 	world.camera_rig.target_pitch = deg_to_rad(52)
 	world.camera_rig.dragging = true

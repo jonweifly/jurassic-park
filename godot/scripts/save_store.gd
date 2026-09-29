@@ -51,7 +51,7 @@ static func snapshot(w: Node) -> Dictionary:
 		if d.get_instance_id() == w.hero.target_id: target_uid = d.get_meta("save_id")
 	return {
 		"version": VERSION, "map": MAP_ID, "saved_at": int(Time.get_unix_time_from_system() * 1000000),
-		"session": fields(w.session, SESSION_FIELDS + ["kills_by_species"]), "survival": fields(w.session, SURVIVAL_FIELDS), "worker": fields(w.worker, WORKER_FIELDS),
+		"session": fields(w.session, SESSION_FIELDS + ["kills_by_species", "outfitting"]), "survival": fields(w.session, SURVIVAL_FIELDS), "worker": fields(w.worker, WORKER_FIELDS),
 		"hero": fields(w.hero, PAWN_FIELDS), "hero_visual": visual_state(w.hero), "animals": animals, "trees": stocks,
 		"explored": w.vision.explored.duplicate(), "rng_seed": w.rng.seed, "rng_state": w.rng.state,
 		"spawn_clocks": w.spawn_clocks.duplicate(true), "order": w.order, "order_target": w.order_target,
@@ -149,8 +149,9 @@ static func validate(data: Dictionary) -> String:
 			remaining -= amount
 	if s.phase not in ["playing", "evacuate"] or s.mode not in ["classic", "standard", "hard"] or s.wood < 0 or s.gold < 0 or s.duration <= 0 or s.elapsed < 0 or s.harvest_level not in range(4): return "存档单局状态无效"
 	if data.hero.health <= 0 or data.hero.max_health <= 0 or data.animals.size() > 128: return "存档角色状态无效"
+	if not preload("res://scripts/outfitting_catalog.gd").validate(s.get("outfitting", {}), s.buildings): return "装备与野外行动存档无效"
 	if not ExpeditionCatalog.validate(s.adventure): return "探索存档状态无效"
-	if data.order not in ["expedition", "idle", "move", "wood", "gold", "build", "repair", "return", "waiting_dropoff", "attack", "heal"]: return "存档命令无效"
+	if data.order not in ["field", "expedition", "idle", "move", "wood", "gold", "build", "repair", "return", "waiting_dropoff", "attack", "heal"]: return "存档命令无效"
 	var catalog = load("res://scripts/catalog.gd")
 	var ids: Dictionary = {}
 	for b in s.buildings:
@@ -172,7 +173,7 @@ static func validate(data: Dictionary) -> String:
 		for resource in ["wood", "gold"]:
 			var key: String = "invested_" + resource
 			if b.has(key):
-				var maximum: int = catalog.BUILDINGS[b.kind][resource] + (5 if b.kind == "laboratory" else 0)
+				var maximum: int = catalog.BUILDINGS[b.kind][resource] + (5 if b.kind in ["laboratory", "workshop"] else 0)
 				if b.has("refit") and catalog.REFITS.has(b.refit): maximum += catalog.REFITS[b.refit][resource]
 				if b.get("reinforced", false): maximum += catalog.TOWER_REINFORCEMENT[resource]
 				if not b[key] is int or b[key] < 0 or b[key] > maximum: return "存档建筑投入无效"
@@ -294,6 +295,7 @@ static func write(w: Node, automatic: bool = false) -> String:
 static func apply(w: Node, data: Dictionary) -> void:
 	# Only call on a freshly instantiated island, after validate().
 	restore_fields(w.session, data.session, SESSION_FIELDS)
+	w.session.outfitting = data.session.get("outfitting", {}).duplicate(true)
 	w.session.kills_by_species = data.session.get("kills_by_species", {}).duplicate(true)
 	var survival: Dictionary = data.get("survival", {})
 	for key in SURVIVAL_FIELDS:
@@ -325,6 +327,8 @@ static func apply(w: Node, data: Dictionary) -> void:
 		if d.get_meta("save_id") == data.target_uid: w.hero.target_id = d.get_instance_id()
 	w.session.next_dinosaur_id = data.session.next_dinosaur_id
 	w.adventure.restore()
+	w.outfitting.initialize()
+	w.outfitting.apply_equipment(w.hero)
 	for d in w.dinosaurs:
 		d.last_board_revision = w.board.revision
 		var strike: Dictionary = d.get_meta("ai_strike", {})

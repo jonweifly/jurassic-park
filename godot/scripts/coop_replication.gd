@@ -24,7 +24,7 @@ func world_packet(full: bool = false) -> Dictionary:
 	tree_stocks = trees
 	var fields: Array = Save.SESSION_FIELDS.duplicate()
 	fields.erase("adventure")
-	return {"full":full,"session":Save.fields(world.session,fields+["kills_by_species"]),"trees":changes,
+	return {"full":full,"session":Save.fields(world.session,fields+["kills_by_species", "outfitting"]),"trees":changes,
 		"explored":world.vision.explored.keys(),"focus":world.defense.focus_uid,"players":actor_packet()}
 
 func pawn_packet(pawn: Node3D) -> Dictionary:
@@ -49,6 +49,7 @@ func actor_packet() -> Dictionary:
 		var packet := pawn_packet(d)
 		packet.species = d.get_meta("species")
 		packet.strike = d.get_meta("ai_strike",{}).duplicate(true)
+		packet.target_kind = d.get_meta("ai_target_kind", "")
 		dinosaurs[d.get_meta("save_id")] = packet
 	return {"seq":sequence,"players":players,"dinosaurs":dinosaurs,"guns":guns,"time":world.session.elapsed,
 		"evacuation":world.session.evacuation_elapsed,"paused":net.room_paused(),"phase":world.session.phase,"boarding":world.session.boarding_progress}
@@ -72,6 +73,9 @@ func apply_world(data: Dictionary) -> void:
 		if key not in ["elapsed","evacuation_elapsed","phase","boarding_progress"]: world.session.set(key,data.session[key])
 	for b in world.session.buildings:
 		if b.hp <= 0: continue
+		if current.has(b.id) and float(current[b.id].hp) > float(b.hp) and world.encounter:
+			world.outfitting.building_hit(b)
+			world.encounter.building_hit(b, float(current[b.id].hp) - float(b.hp))
 		var blocked: bool = not b.get("open",false)
 		if blocked and world.board.structures.get(b.cell,-1) != b.id: world.board.block_building(b.cell,b.id)
 		elif not blocked and world.board.structures.has(b.cell): world.board.remove_building(b.cell)
@@ -87,6 +91,8 @@ func apply_world(data: Dictionary) -> void:
 	apply_actors(data.players)
 	world.vision.update()
 	world.weather.update_roofs()
+	world.outfitting.sync_visuals()
+	for pawn in net.pawns.values(): world.outfitting.apply_equipment(pawn)
 
 func apply_pawn(pawn: Node3D, packet: Dictionary) -> void:
 	if not pawn.has_meta("net_target") or pawn.position.distance_to(packet.position)>6: pawn.position=packet.position
@@ -146,6 +152,7 @@ func apply_actors(data: Dictionary) -> void:
 		var previous: Dictionary = d.get_meta("ai_strike",{})
 		apply_pawn(d,packet)
 		d.set_meta("ai_strike",packet.strike)
+		d.set_meta("ai_target_kind", packet.get("target_kind", ""))
 		if not packet.strike.is_empty() and (previous.is_empty() or packet.strike.remaining>previous.get("remaining",0.0)):
 			if packet.strike.has("special"): world.dino_ai.specials.telegraph(d,packet.strike)
 			elif packet.strike.get("heavy",false): world.dino_ai.tactics.telegraph(d,packet.strike.remaining)

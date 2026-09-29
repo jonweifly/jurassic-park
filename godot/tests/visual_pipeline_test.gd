@@ -86,7 +86,11 @@ func run() -> void:
 	world.set_physics_process(false)
 	world.sound.set_process(false)
 	var forest: RefCounted = world.scenery.forest
-	expect(forest.source_parts > 10000 and forest.batches.size() < forest.source_parts / 4, "Original forest must use substantially fewer spatial render batches")
+	var root_batches: int = forest.batches.filter(func(batch):return str(batch.node.name).begins_with("RootFlares_")).size()
+	var root_parts := 0
+	for batch in forest.batches:
+		if str(batch.node.name).begins_with("RootFlares_"): root_parts += batch.entries.size()
+	print("FOREST BATCHES: ",forest.source_parts," source parts, ",forest.batches.size()," batches, ",root_batches," root batches, ",root_parts," root parts")
 	expect(forest.cells.size() == world.trees.size(), "Each harvestable cell must own render slots")
 	if forest.cells.size() != world.trees.size():
 		world.queue_free()
@@ -95,9 +99,15 @@ func run() -> void:
 		return
 	var snapshots := []
 	var originals_hidden := true
+	var imported_parts := 0
 	for cell in world.trees:
-		for part in world.trees[cell].node.find_children("*","MeshInstance3D",true,false): originals_hidden = originals_hidden and not part.visible
+		for part in world.trees[cell].node.find_children("*","MeshInstance3D",true,false):
+			originals_hidden = originals_hidden and not part.visible
+			if part.mesh: imported_parts += 1
 		for slot in forest.cells[cell]: snapshots.append({"slot":slot,"transform":forest.batches[slot.batch].multi.get_instance_transform(slot.index)})
+	# Tree families have different authored part counts. Verify the actual scene
+	# count while retaining the same draw-batch budget, including generated roots.
+	expect(forest.source_parts == imported_parts and imported_parts > 0 and forest.batches.size() < forest.source_parts / 4, "Forest batches stay below one quarter of the actual imported mesh count")
 	expect(originals_hidden, "Editable source trees must not render twice")
 	var initial_count: int = forest.live_parts()
 	var removed := {}

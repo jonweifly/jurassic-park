@@ -147,6 +147,7 @@ func _process(dt: float) -> void:
 	var rain: float = world.weather.rain if world.weather else 0.0
 	var wind: float = world.weather.wind if world.weather else 0.16
 	var duck := 0.60 if voices.any(func(v): return v.playing and v.get_meta("priority",false)) else 1.0
+	if world.encounter: duck *= 1.0 - world.encounter.tension * 0.25
 	set_loop("day", ambience_gain*(1-rain*.75)*duck if not world.night else 0.0, dt)
 	set_loop("night", ambience_gain*(1-rain*.65)*duck if world.night else 0.0, dt)
 	set_loop("wind_breeze",ambience_gain*(0.3+wind*.3)*duck,dt)

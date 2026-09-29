@@ -5,12 +5,25 @@ var world: Node
 var texture: ImageTexture
 var image: Image
 var forest_image: Image
+var landform_image: Image
 var last_trees := -1
 var last_buildings := ""
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
 	texture = ImageTexture.create_from_image(Image.create(SIZE, SIZE, false, Image.FORMAT_RGBA8))
+	landform_image = Image.create(SIZE,SIZE,false,Image.FORMAT_RGBA8)
+	landform_image.fill(Color(0,0,.5,1))
+	# Blue stores local terrain concavity. This follows the collision surface,
+	# giving banks and shallow hollows a readable base without displacing it.
+	if world.board.layout:
+		for y in range(SIZE):
+			for x in range(SIZE):
+				var px := float(x)-127.5
+				var pz := float(y)-127.5
+				var height: float = world.board.layout.height_at(px,pz)
+				var around: float = (world.board.layout.height_at(px-2,pz)+world.board.layout.height_at(px+2,pz)+world.board.layout.height_at(px,pz-2)+world.board.layout.height_at(px,pz+2))*.25
+				landform_image.set_pixel(x,y,Color(0,0,clampf(.5+(around-height)*.3,0,1),1))
 	update()
 
 func stamp(image: Image, at: Vector3, radius: float, channel: int, amount: float) -> void:
@@ -28,8 +41,7 @@ func update() -> void:
 		if b.hp > 0: key += "%d," % b.id
 	if last_trees == world.trees.size() and last_buildings == key: return
 	if last_trees != world.trees.size():
-		forest_image = Image.create(SIZE,SIZE,false,Image.FORMAT_RGBA8)
-		forest_image.fill(Color(0,0,0,1))
+		forest_image = landform_image.duplicate() as Image
 		for cell in world.trees: stamp(forest_image,world.board.point(cell),3.8,1,.9)
 		last_trees = world.trees.size()
 	image = forest_image.duplicate() as Image

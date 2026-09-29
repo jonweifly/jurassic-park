@@ -38,6 +38,7 @@ var next_dinosaur_id := 1
 var healing_spent := 0
 var boarding_progress := 0.0
 var adventure: Dictionary = {}
+var outfitting: Dictionary = {}
 var profession := "explorer"
 
 const PROFESSIONS := {
@@ -254,7 +255,7 @@ func demolition_quote(id: int) -> Dictionary:
 	if b.is_empty() or phase not in ["playing", "evacuate"]: return {}
 	var spec: Dictionary = Catalog.BUILDINGS[b.kind]
 	# Legacy upgraded labs paid for both the foundation and the upgrade.
-	var legacy_upgrade := 5 if b.kind == "laboratory" and b.get("upgrading", false) else 0
+	var legacy_upgrade := 5 if b.kind in ["laboratory", "workshop"] and b.get("upgrading", false) else 0
 	var paid_wood: int = b.get("invested_wood", int(spec.wood) + legacy_upgrade)
 	var paid_gold: int = b.get("invested_gold", int(spec.gold) + legacy_upgrade)
 	var ratio := 0.5 * clampf(float(b.hp) / Catalog.max_health(b), 0.0, 1.0)
@@ -276,7 +277,8 @@ func work(id: int, dt: float) -> bool:
 	b.remaining = maxf(0.0, b.remaining - dt)
 	return b.remaining <= 0
 
-func research(selected_id: int = -1) -> String:
+func research(selected_id: int = -1, destination: String = "laboratory") -> String:
+	if destination not in ["laboratory", "workshop"]: return "未知升级方向"
 	if phase != "playing": return "本局已结束"
 	var target: Dictionary = {}
 	for b in buildings:
@@ -284,14 +286,15 @@ func research(selected_id: int = -1) -> String:
 	if target.is_empty(): return "请先选中已完成的基础建筑"
 	if not has_completed("generator"): return "需要发电站"
 	if supply() < demand() + 1: return "升级还需要 1 点电力"
-	if wood < 5 or gold < 5: return "升级需要 5 木材和 5 黄金"
-	wood -= 5
-	gold -= 5
-	target.invested_wood = int(target.get("invested_wood", Catalog.BUILDINGS.lab.wood)) + 5
-	target.invested_gold = int(target.get("invested_gold", Catalog.BUILDINGS.lab.gold)) + 5
-	target.kind = "laboratory"
-	target.hp = 100.0
-	target.remaining = 10.0
+	var cost: Dictionary = Catalog.BUILDINGS[destination]
+	if wood < cost.wood or gold < cost.gold: return "升级需要 %d 木材和 %d 黄金" % [cost.wood, cost.gold]
+	wood -= cost.wood
+	gold -= cost.gold
+	target.invested_wood = int(target.get("invested_wood", Catalog.BUILDINGS.lab.wood)) + cost.wood
+	target.invested_gold = int(target.get("invested_gold", Catalog.BUILDINGS.lab.gold)) + cost.gold
+	target.kind = destination
+	target.hp = cost.hp
+	target.remaining = cost.time
 	target.upgrading = true
 	return ""
 

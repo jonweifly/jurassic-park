@@ -45,7 +45,7 @@ var start_panel: PanelContainer
 var notification_time := 0.0
 var font: SystemFont
 var sound_panel: PanelContainer
-var sound_toggle: Button
+var settings_button: Button
 var quest_box: PanelContainer
 var camera_panel: PanelContainer
 var follow_button: Button
@@ -74,6 +74,12 @@ var boarding_bar: ProgressBar
 const TowerCommands = preload("res://scripts/tower_commands.gd")
 var tower_commands: RefCounted
 var refit_buttons: Dictionary = {}
+var outfit_panel: RefCounted
+var outfit_button: Button
+var kit_button: Button
+var workshop_button: Button
+var camp_view_button: Button
+var field_notice: Label
 var reinforce_button: Button
 var repair_button: Button
 var rotate_build_button: Button
@@ -101,9 +107,9 @@ func _ready() -> void:
 	status_line.add_child(clock_label)
 	var action_row := HBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 4)
-	sound_toggle = button("声音")
-	sound_toggle.tooltip_text = "音量与静音"
-	sound_toggle.pressed.connect(func(): sound_panel.visible = not sound_panel.visible)
+	settings_button = button("设置  F10")
+	settings_button.tooltip_text = "画面、镜头、声音和键位"
+	settings_button.pressed.connect(func(): preferences_panel.open())
 	tech_button = button("科技  T")
 	tech_button.pressed.connect(open_tech)
 	action_row.add_child(tech_button)
@@ -119,7 +125,7 @@ func _ready() -> void:
 	cook_button.tooltip_text = "在已建成的营火消耗生肉制作熟肉。"
 	cook_button.pressed.connect(world.cook_food)
 	action_row.add_child(cook_button)
-	action_row.add_child(sound_toggle)
+	action_row.add_child(settings_button)
 	var pause := button("暂停  Esc")
 	pause.pressed.connect(world.toggle_pause)
 	action_row.add_child(pause)
@@ -127,7 +133,7 @@ func _ready() -> void:
 	kill_stats_button.tooltip_text = "查看本局各类恐龙的击杀数量；打开时暂停。"
 	kill_stats_button.pressed.connect(func(): kill_stats.open())
 	action_row.add_child(kill_stats_button)
-	for action_button in [tech_button, heal_button, eat_button, cook_button, sound_toggle]:
+	for action_button in [tech_button, heal_button, eat_button, cook_button, settings_button]:
 		action_button.custom_minimum_size.x = 52
 	pause.custom_minimum_size.x = 72
 	quest_box = panel(Color(0.05, 0.10, 0.08, 0.86))
@@ -155,6 +161,14 @@ func _ready() -> void:
 	journal_button = button("探索 / 任务  L")
 	journal_button.pressed.connect(func(): expedition_panel.open())
 	quest_column.add_child(journal_button)
+	camp_view_button = button("查看营地")
+	camp_view_button.pressed.connect(world.outfitting.view_camp)
+	camp_view_button.tooltip_text = "只切换镜头；空格回到人物，不中断当前命令。"
+	quest_column.add_child(camp_view_button)
+	field_notice = label("", 12, Color("d6be88"))
+	field_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	field_notice.custom_minimum_size.x = 250
+	quest_column.add_child(field_notice)
 	boarding_bar = ProgressBar.new()
 	boarding_bar.custom_minimum_size.y = 8
 	boarding_bar.max_value = Catalog.BOARDING_SECONDS
@@ -179,6 +193,9 @@ func _ready() -> void:
 	bottom = panel(Color(0.045, 0.085, 0.068, 0.97))
 	root.add_child(bottom)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	# Wrapped status/building text may raise the minimum height on narrow windows.
+	# Keep the lower edge anchored while letting the panel grow toward the playfield.
+	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	bottom.offset_left = 8
 	bottom.offset_right = -8
 	# The compact three-column layout needs a small allowance for wrapped
@@ -189,7 +206,7 @@ func _ready() -> void:
 	bottom.offset_bottom = -6
 	(bottom.get_theme_stylebox("panel") as StyleBoxFlat).set_content_margin_all(8)
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 16)
+	columns.add_theme_constant_override("separation", 12)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bottom.add_child(columns)
 	var left := HBoxContainer.new()
@@ -206,6 +223,7 @@ func _ready() -> void:
 	var info := VBoxContainer.new()
 	info.custom_minimum_size.x = 140
 	left.add_child(info)
+	info.add_child(label("选中单位", 11, Color("82998e")))
 	selection_label = label("幸存者", 19, Color("dbc690"))
 	info.add_child(selection_label)
 	health = ProgressBar.new()
@@ -214,6 +232,11 @@ func _ready() -> void:
 	var hp_style := StyleBoxFlat.new()
 	hp_style.bg_color = Color("8fa877")
 	health.add_theme_stylebox_override("fill", hp_style)
+	hp_style.set_corner_radius_all(2)
+	var hp_track := StyleBoxFlat.new()
+	hp_track.bg_color = Color("0c1716")
+	hp_track.set_corner_radius_all(2)
+	health.add_theme_stylebox_override("background", hp_track)
 	info.add_child(health)
 	detail_label = label("", 12, Color("b4c1aa"))
 	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -221,8 +244,10 @@ func _ready() -> void:
 	info.add_child(detail_label)
 	controls_hint = label("", 11, Color("879d85"))
 	info.add_child(controls_hint)
+	columns.add_child(section_divider())
 	var middle := VBoxContainer.new()
-	middle.custom_minimum_size.x = 500
+	middle.custom_minimum_size.x = 470
+	middle.add_theme_constant_override("separation", 7)
 	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	middle.size_flags_stretch_ratio = 1.15
 	# Status details belong to the bottom panel; keeping their width fixed also
@@ -231,9 +256,11 @@ func _ready() -> void:
 	middle.add_child(status_line)
 	status_label.custom_minimum_size.x = 340
 	middle.add_child(status_label)
+	middle.add_child(label("营地行动", 11, Color("91aa9c")))
 	middle.add_child(action_row)
-	var tactics := HBoxContainer.new()
-	tactics.add_theme_constant_override("separation", 4)
+	var tactics := HFlowContainer.new()
+	tactics.add_theme_constant_override("h_separation", 4)
+	tactics.add_theme_constant_override("v_separation", 4)
 	middle.add_child(tactics)
 	priority_button = OptionButton.new()
 	for text in world.DefenseCombat.LABELS: priority_button.add_item(text)
@@ -255,7 +282,14 @@ func _ready() -> void:
 		world.clear_focus()
 		world.defense.marking = false)
 	tactics.add_child(clear_focus_button)
+	outfit_button = button("装备 / 探索  L")
+	outfit_button.pressed.connect(func(): outfit_panel.open())
+	tactics.add_child(outfit_button)
+	kit_button = button("急救包  J")
+	kit_button.pressed.connect(world.use_medkit)
+	tactics.add_child(kit_button)
 	columns.add_child(middle)
+	columns.add_child(section_divider())
 	var commands := VBoxContainer.new()
 	commands.custom_minimum_size.x = 430
 	commands.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -264,7 +298,7 @@ func _ready() -> void:
 	columns.add_child(commands)
 	var command_head := HBoxContainer.new()
 	commands.add_child(command_head)
-	var title := label("营 地 建 造", 14, Color("cdb983"))
+	var title := label("营地建造", 15, Color("d8c398"))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	command_head.add_child(title)
 	demolish_button = button("拆除")
@@ -288,6 +322,10 @@ func _ready() -> void:
 	research_button = button("升级实验室  R")
 	research_button.pressed.connect(world.research)
 	command_head.add_child(research_button)
+	workshop_button = button("升级工坊")
+	workshop_button.tooltip_text = "基础建筑升级为装备工坊 · 10 木 / 8 金 / 15 秒 · 额外 1 点电力"
+	workshop_button.pressed.connect(world.research.bind("workshop"))
+	command_head.add_child(workshop_button)
 	rotate_build_button = button("旋转")
 	rotate_build_button.pressed.connect(world.rotate_building_preview)
 	rotate_build_button.hide()
@@ -305,6 +343,10 @@ func _ready() -> void:
 		b.custom_minimum_size = Vector2(76, 46)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.tooltip_text = spec.description
+		var tile: StyleBoxFlat = b.get_theme_stylebox("normal").duplicate()
+		tile.border_color = Color("506659")
+		tile.border_width_left = 3
+		b.add_theme_stylebox_override("normal", tile)
 		b.pressed.connect(world.select_build.bind(kind))
 		build_buttons[kind] = b
 		grid.add_child(b)
@@ -320,6 +362,7 @@ func _ready() -> void:
 	preferences_panel = PreferencesPanel.new(self)
 	guide_panel = GuidePanel.new(self)
 	kill_stats = KillStatsPanel.new(self)
+	outfit_panel = preload("res://scripts/outfitting_panel.gd").new(self)
 	refresh_key_hints()
 	refresh_save_info()
 
@@ -390,10 +433,7 @@ func make_sound_panel() -> void:
 	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preview.pressed.connect(world.sound.play_ui.bind("ready"))
 	actions.add_child(preview)
-	var close := button("关闭")
-	close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	close.pressed.connect(sound_panel.hide)
-	actions.add_child(close)
+	col.add_child(label("音量调整立即生效并保存。", 13, Color("91aa9c")))
 	sound_panel.hide()
 
 func make_start() -> void:
@@ -472,11 +512,26 @@ func panel(color: Color = Color(0.055, 0.10, 0.082, 0.96)) -> PanelContainer:
 	var p := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
-	style.border_color = Color("566447")
+	style.border_color = Color("526357")
 	style.set_border_width_all(1)
+	style.border_width_top = 2
+	style.set_corner_radius_all(5)
+	style.shadow_color = Color(0, 0, 0, .28)
+	style.shadow_size = 5
+	style.shadow_offset = Vector2(0, 2)
 	style.set_content_margin_all(13)
 	p.add_theme_stylebox_override("panel", style)
 	return p
+
+func section_divider() -> VSeparator:
+	var divider := VSeparator.new()
+	var style := StyleBoxLine.new()
+	style.color = Color("3c5148")
+	style.thickness = 1
+	style.vertical = true
+	divider.add_theme_stylebox_override("separator", style)
+	divider.add_theme_constant_override("separation", 1)
+	return divider
 
 func label(text: String, point_size: int = 16, color: Color = Color("e7e4cc")) -> Label:
 	var l := Label.new()
@@ -496,11 +551,14 @@ func button(text: String) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color("243c2f") if state == "normal" else Color("43533b")
-		if state == "disabled": style.bg_color = Color("17271f")
-		style.border_color = Color("67724e") if state == "hover" else Color("3f523d")
+		style.bg_color = Color("23392f") if state == "normal" else Color("354d3e")
+		if state == "pressed": style.bg_color = Color("172b24")
+		if state == "disabled": style.bg_color = Color("14241e")
+		style.border_color = Color("b5a477") if state == "hover" else Color("475e4e")
 		style.set_border_width_all(1)
-		style.set_content_margin_all(8)
+		style.border_width_top = 2 if state != "pressed" else 1
+		style.set_corner_radius_all(3)
+		style.set_content_margin_all(7)
 		b.add_theme_stylebox_override(state, style)
 	return b
 
@@ -551,6 +609,18 @@ func make_pause() -> void:
 
 func refresh(dt: float) -> void:
 	preferences_panel.update()
+	if outfit_panel.panel.visible: outfit_panel.refresh()
+	outfit_button.disabled = not world.started
+	outfit_button.text = "装备 / 探索 " + world.preferences.key_name("journal")
+	var gear: Dictionary = world.outfitting.actor()
+	kit_button.text = "急救包 %d  %s" % [gear.kits, world.preferences.key_name("kit")]
+	kit_button.disabled = world.paused or not world.started or gear.kits <= 0 or gear.cooldown > 0 or world.hero.health >= world.hero.max_health
+	kit_button.tooltip_text = "恢复 50 生命；冷却 %.0f 秒" % ceilf(gear.cooldown)
+	camp_view_button.visible = world.started
+	camp_view_button.text = "营地受袭！点击查看" if not world.outfitting.recent_hits.is_empty() else "查看营地"
+	camp_view_button.modulate = Color("f1ac8b") if not world.outfitting.recent_hits.is_empty() else Color.WHITE
+	field_notice.visible = world.started
+	field_notice.text = world.director.field_window()
 	if kill_stats.panel.visible: kill_stats.refresh()
 	kill_stats_button.disabled = not world.started
 	if expedition_panel.panel.visible: expedition_panel.refresh()
@@ -559,7 +629,7 @@ func refresh(dt: float) -> void:
 		follow_button.set_pressed_no_signal(world.camera_rig.following)
 		follow_button.text = "跟随中" if world.camera_rig.following else "自由视角"
 	var s = world.session
-	sound_toggle.text = "已静音" if world.sound.muted or world.sound.levels.Master <= 0 else "声音"
+	settings_button.text = "设置  " + world.preferences.key_name("settings")
 	resource_label.text = "木材 %d   黄金 %d   电力 %d/%d" % [s.wood, s.gold, s.demand(), s.supply()]
 	clock_label.text = "%s·%s  %02d:%02d" % ["夜" if world.night else "昼", world.weather.NAMES[world.weather.kind], int(s.elapsed) / 60, int(s.elapsed) % 60]
 	var left := maxi(0, int(s.duration - s.elapsed))
@@ -607,6 +677,8 @@ func refresh(dt: float) -> void:
 		var reason: String = s.can_afford(kind)
 		build_buttons[kind].tooltip_text = Catalog.BUILDINGS[kind].description + ("\n" + reason if not reason.is_empty() else "")
 		build_buttons[kind].modulate = Color("e6cb89") if world.build_mode == kind else Color.WHITE
+	workshop_button.visible = not b.is_empty() and b.kind == "lab" and world.build_mode.is_empty()
+	workshop_button.disabled = world.paused or b.get("remaining", 1) > 0
 	research_button.disabled = b.is_empty() or b.kind != "lab" or b.remaining > 0
 	research_button.visible = b.is_empty() or b.kind == "lab"
 	rotate_build_button.visible = world.build_mode in ["shelter", "gate"]
@@ -655,9 +727,9 @@ func refresh(dt: float) -> void:
 	if tech_panel.visible: refresh_tech()
 	minimap.queue_redraw()
 	start_panel.visible = not world.started and not load_panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible
-	pause_panel.visible = world.started and not kill_stats.panel.visible and not confirmation.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible and (world.paused or s.phase in ["won", "lost"])
-	if camera_panel: camera_panel.visible = not kill_stats.panel.visible and not sound_panel.visible and not start_panel.visible and not pause_panel.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible
-	modal_shade.visible = kill_stats.panel.visible or confirmation.visible or start_panel.visible or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible
+	pause_panel.visible = world.started and not outfit_panel.panel.visible and not kill_stats.panel.visible and not confirmation.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible and (world.paused or s.phase in ["won", "lost"])
+	if camera_panel: camera_panel.visible = not outfit_panel.panel.visible and not kill_stats.panel.visible and not start_panel.visible and not pause_panel.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible
+	modal_shade.visible = outfit_panel.panel.visible or kill_stats.panel.visible or confirmation.visible or start_panel.visible or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible
 	resume_button.visible = not s.phase in ["won", "lost"]
 	pause_title.text = "成功撤离侏罗纪公园" if s.phase == "won" else (("幸存者已阵亡" if world.hero.health <= 0 else "未能及时撤离") if s.phase == "lost" else "营地已暂停")
 	if world.coop.ui: world.coop.ui.refresh()
@@ -671,8 +743,8 @@ func covers(screen: Vector2) -> bool:
 	if world.coop.ui:
 		var ui = world.coop.ui
 		if ui.panel.visible or (ui.room_button.visible and ui.room_button.get_global_rect().has_point(screen)) or (ui.revive_button.visible and ui.revive_button.get_global_rect().has_point(screen)): return true
-	if kill_stats.panel.visible: return true
-	return quest_box.get_global_rect().has_point(screen) or bottom.get_global_rect().has_point(screen) or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible or confirmation.visible or start_panel.visible or (sound_panel.visible and sound_panel.get_global_rect().has_point(screen)) or (camera_panel and camera_panel.visible and camera_panel.get_global_rect().has_point(screen))
+	if outfit_panel.panel.visible or kill_stats.panel.visible: return true
+	return quest_box.get_global_rect().has_point(screen) or bottom.get_global_rect().has_point(screen) or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible or confirmation.visible or start_panel.visible or (camera_panel and camera_panel.visible and camera_panel.get_global_rect().has_point(screen))
 
 func make_tech() -> void:
 	modal_shade = ColorRect.new()

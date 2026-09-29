@@ -20,6 +20,7 @@ var attack_interval := 1.0
 var health_label: Label3D
 var selection: MeshInstance3D
 var navigation: RefCounted
+var crowd: RefCounted
 var body_radius := 0.30
 var current_speed := 0.0
 var movement_blocked := false # Transient collision outcome, never persisted.
@@ -117,9 +118,17 @@ func advance(dt: float) -> void:
 				route.clear()
 				current_speed = 0
 				break
+			var desired := next
+			if crowd: next = crowd.move(self,next)
 			position = next
+			if crowd: crowd.relocate(self)
 			if navigation and navigation.layout: position.y = navigation.layout.height_at(position.x, position.z)
 			budget -= step
+			if Vector2(next.x-desired.x,next.z-desired.z).length_squared() > 0.000001:
+				# Temporary traffic retains the command and route, without global replans.
+				# Bypass an occupied intermediate waypoint only with a clear static segment.
+				if route.size() > 1 and crowd.occupied(self,route[0]) and segment_open(position,route[1]): route.remove_at(0)
+				break
 			if step >= distance: route.remove_at(0)
 		if position.distance_squared_to(before) > 0.00001:
 			var heading := position - before
@@ -131,6 +140,7 @@ func advance(dt: float) -> void:
 	if moving or work_timeout <= 0 or swing > 0:
 		var state := "attack" if swing > 0 else (("carry" if moving else "carry_idle") if carrying else ("walk" if moving else "idle"))
 		play_animation(state, dt * clampf(moved / maxf(0.001, dt * visual.locomotion_reference_speed(state)), 0.25, 3.5) if moving else dt)
+		visual.locomotion(moved / maxf(dt, 0.001), dt)
 		visual.show_equipment(state,carrying,cargo_kind)
 		if navigation: visual.ground(navigation.layout)
 	health_label.text = "%d / %d" % [maxi(0, int(health)), int(max_health)] if health < max_health else ""

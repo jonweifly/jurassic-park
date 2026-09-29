@@ -28,6 +28,12 @@ cases.extend(['barrier_rotation', 'barrier_rotation_input', 'ground_surfaces'])
 cases.append('water_surface')
 cases.extend(['coop_rules', 'coop_input'])
 cases.append('tent_shelter')
+cases.extend(['survivor_motion', 'camp_detail', 'immersion'])
+cases.append('motion_camera_regression')
+cases.extend(['outfitting', 'outfitting_input'])
+cases.append('navigation_budget')
+cases.append('crowd_collision')
+cases.append('crowd_world')
 if args.full_session:
     cases.extend(['full_session', 'varied_session'])
 if args.audio:
@@ -41,7 +47,7 @@ if args.only:
 results = []
 for case in cases:
     cmd = ['sh', str(root / 'scripts/godot.sh')]
-    if case not in ['audio', 'environment_audio', 'pointer_input', 'preferences_input', 'variety_input', 'demolition_input', 'camp_flow_input', 'display_input', 'core_focus_input', 'defense_input', 'kill_stats_input', 'tower_upgrade_input', 'barrier_rotation_input', 'coop_input']:
+    if case not in ['audio', 'environment_audio', 'pointer_input', 'preferences_input', 'variety_input', 'demolition_input', 'camp_flow_input', 'display_input', 'core_focus_input', 'defense_input', 'kill_stats_input', 'tower_upgrade_input', 'barrier_rotation_input', 'coop_input', 'outfitting_input']:
         cmd.append('--headless')
     cmd += ['--script', f'res://tests/{case}_test.gd']
     try:

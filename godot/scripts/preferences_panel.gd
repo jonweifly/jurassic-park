@@ -36,7 +36,7 @@ func _init(owner_hud: Node) -> void:
 	column.add_theme_constant_override("separation", 12)
 	panel.add_child(column)
 	column.add_child(hud.label("游戏设置", 26, Color("d8c38d")))
-	column.add_child(hud.label("画面和键位独立保存；关闭后返回原界面。声音可在右上角调整。", 14))
+	column.add_child(hud.label("画面、镜头、声音与操作习惯，集中在这里调整。", 14, Color("a6b59e")))
 	tabs = TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(tabs)
@@ -52,6 +52,8 @@ func _init(owner_hud: Node) -> void:
 	for entry in [["pan_speed", "镜头平移速度"], ["rotation_speed", "镜头旋转灵敏度"], ["zoom_speed", "滚轮缩放速度"]]: slider(camera, entry[0], entry[1])
 	check(camera, "invert_y", "反转中键拖动的上下俯仰")
 	check(camera, "route_dots", "显示角色行走路线点")
+	check(camera, "perspective", "立体战术视角（关闭后使用原俯视效果）")
+	check(camera, "impact_motion", "大型恐龙重击时轻微镜头震动")
 	camera.add_child(hud.label("默认跟随角色；手动平移可查看地图，归位键恢复持续跟随。", 14, Color("a6b59e")))
 	var keys := page("键位")
 	keys.add_child(hud.label("点击键位后按新键。重复键位会提示冲突；Esc 取消录入。", 14))
@@ -65,7 +67,6 @@ func _init(owner_hud: Node) -> void:
 	grid.add_theme_constant_override("v_separation", 7)
 	scroll.add_child(grid)
 	for action in Preferences.ACTIONS:
-		if action in ["journal", "kit"] and not preload("res://scripts/feature_policy.gd").peripheral_enabled: continue
 		var title: Label = hud.label(Preferences.ACTIONS[action][0], 14)
 		title.custom_minimum_size.x = 190
 		grid.add_child(title)
@@ -74,6 +75,11 @@ func _init(owner_hud: Node) -> void:
 		b.pressed.connect(listen.bind(action))
 		key_buttons[action] = b
 		grid.add_child(b)
+	var audio := page("声音")
+	hud.sound_panel.reparent(audio)
+	hud.sound_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	hud.sound_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hud.sound_panel.show()
 	message = hud.label("", 14, Color("dfc693"))
 	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	message.custom_minimum_size.y = 38
@@ -159,7 +165,7 @@ func open() -> void:
 	was_paused = world.paused
 	world.paused = true
 	world.camera_rig.dragging = false
-	hud.sound_panel.hide()
+	hud.sound_panel.show()
 	baseline = world.preferences.values.duplicate()
 	baseline_keys = world.preferences.bindings.duplicate()
 	draft = baseline.duplicate()

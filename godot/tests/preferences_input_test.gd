@@ -38,6 +38,7 @@ func run() -> void:
 	Save.directory = fixture
 	world = load("res://scenes/main.tscn").instantiate()
 	root.add_child(world)
+	world.sound.settings_path = fixture.path_join("audio.cfg")
 	world.preferences.values.fullscreen = false
 	world.set_process(false)
 	world.set_physics_process(false)
@@ -46,11 +47,30 @@ func run() -> void:
 	await physics_frame
 	world.paused = false
 	world.hud.refresh(0)
-	press(KEY_F10)
+	click(world.hud.settings_button)
 	world.hud.refresh(0)
 	await process_frame
 	var panel = world.hud.preferences_panel
-	expect(panel.panel.visible and world.paused, "Native F10 opens settings and pauses")
+	expect(panel.panel.visible and world.paused, "Native HUD settings button opens the unified settings and pauses")
+	panel.tabs.current_tab = 3
+	await process_frame
+	expect(world.hud.sound_panel.is_visible_in_tree() and panel.panel.get_global_rect().encloses(world.hud.sound_panel.get_global_rect()), "Audio controls live inside the unified settings panel")
+	var mute: CheckBox = world.hud.sound_panel.find_children("*", "CheckBox", true, false)[0]
+	var prior_mute: bool = world.sound.muted
+	click(mute)
+	expect(world.sound.muted != prior_mute, "Unified audio mute responds to a real click")
+	click(mute)
+	expect(world.sound.muted == prior_mute, "Audio fixture restores the player's original mute choice")
+	panel.tabs.current_tab = 1
+	await process_frame
+	for key in ["perspective", "impact_motion"]:
+		var control: Control = panel.controls[key]
+		expect(root.get_visible_rect().encloses(control.get_global_rect()) and panel.tabs.get_global_rect().encloses(control.get_global_rect()), "New camera setting fits inside the real settings window")
+		var initial: bool = panel.draft[key]
+		click(control)
+		await process_frame
+		expect(panel.draft[key] != initial, "Native checkbox click changes the camera preference draft")
+		click(control)
 	panel.tabs.current_tab = 2
 	await process_frame
 	# Guide is below the scroll fold; expose its actual Button then click it.

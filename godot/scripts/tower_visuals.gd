@@ -23,13 +23,34 @@ static func update(scenery: RefCounted, node: Node3D, data: Dictionary) -> void:
 		scenery.polish_building_materials(model, "tower")
 		scenery.world.vision.shade(model)
 		scenery.obstructions.register(model)
+	ensure_recoil(node)
 	var recoil: Node3D = node.get_node_or_null("Model/Gun/Recoil")
 	if recoil:
 		var elapsed: float = scenery.clock - node.get_meta("tower_shot_time", -100.0)
 		var distance := 0.18 if variant == "heavy" else 0.085
-		recoil.position.z = -distance * pow(maxf(0.0, 1.0 - elapsed / 0.22), 2.0)
+		var kick := pow(maxf(0.0, 1.0 - elapsed / 0.22), 2.0)
+		recoil.position.z = -distance * kick
+		recoil.rotation.x = (0.045 if variant == "heavy" else 0.025) * kick
+
+static func ensure_recoil(node: Node3D) -> void:
+	# The original tower predates the specialist models' articulated weapon roots.
+	# Give it the same firing feedback without changing its gun pivot or saved state.
+	var gun: Node3D = node.get_node("Model/Gun")
+	if gun.has_node("Recoil"): return
+	var recoil := Node3D.new()
+	recoil.name = "Recoil"
+	var parts := gun.get_children()
+	gun.add_child(recoil)
+	for part in parts:
+		gun.remove_child(part)
+		recoil.add_child(part)
+	var muzzle := Marker3D.new()
+	muzzle.name = "Muzzle"
+	muzzle.position = Vector3(0, .24, .87)
+	recoil.add_child(muzzle)
 
 static func fire(node: Node3D, clock: float) -> Vector3:
+	ensure_recoil(node)
 	var gun: Node3D = node.get_node("Model/Gun")
 	var name := "Muzzle"
 	if node.get_meta("tower_variant", "") == "rapid":
