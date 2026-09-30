@@ -53,6 +53,23 @@ func run() -> void:
 		world._physics_process(0.1)
 		world.update_camera(0.1)
 	expect(world.camera.position.distance_to(before) > 1, "Camera follows after the click without further events")
+	# Tool actions use left click while right click remains movement-only.
+	var tree_cell := Vector2i.ZERO
+	for cell in world.trees:
+		var candidate_point: Vector3 = world.board.point(cell)
+		var candidate_screen: Vector2 = world.camera.unproject_position(candidate_point)
+		if world.vision.explored.has(cell) and not world.hud.covers(candidate_screen) and not world.board.route(world.hero.position, candidate_point, true).is_empty():
+			tree_cell = cell
+			break
+	var tree_point: Vector3 = world.board.point(tree_cell)
+	var tree_screen: Vector2 = world.camera.unproject_position(tree_point)
+	click(tree_screen, MOUSE_BUTTON_LEFT)
+	await process_frame
+	expect(world.order == "wood", "Left click starts the tree tool action")
+	world.stop_order()
+	click(tree_screen, MOUSE_BUTTON_RIGHT)
+	await process_frame
+	expect(world.order == "move", "Right click on a tree only moves the survivor")
 	# A remaining core modal consumes the click and pauses the simulation.
 	world.hud.refresh(0)
 	expect(not world.hud.journal_button.visible, "Archived journal is absent from the focused HUD")

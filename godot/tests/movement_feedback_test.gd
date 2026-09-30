@@ -95,8 +95,27 @@ func run() -> void:
 			world.vision.explored[cell] = true
 			break
 	expect(tree != Vector3.ZERO and hover(tree) == "wood", "Known reachable tree displays the axe")
+	world.interaction_targets.refresh(true, false)
+	var hover_ring: Dictionary = world.interaction_targets.layers["hover"]
+	expect(hover_ring.root.get_child_count() == 1 and hover_ring.ring.is_visible_in_tree(), "Tree hover renders only its ground ring, without model copies")
+	expect(hover_ring.material.albedo_color == world.interaction_targets.HOVER_COLOR, "Unselected hover uses a faint ring")
 	world.command(tree)
 	expect(world.order == "wood" and world.pointer_feedback.pulse_kind == "wood", "Axe preview and actual gathering command agree")
+	world.interaction_targets.refresh(false)
+	var working_tree: Dictionary = world.interaction_targets.layers["order"]
+	expect(working_tree.ring.is_visible_in_tree() and working_tree.root.get_child_count() == 1 and working_tree.material.albedo_color == world.interaction_targets.SELECTED_COLOR, "Clicked tree keeps only a gold ground ring after hover ends")
+	var initial_radius: float = working_tree.drawn_radius
+	world.interaction_targets.refresh(false, false, 0.12)
+	expect(working_tree.drawn_radius < initial_radius and working_tree.drawn_radius > working_tree.radius, "Click ring contracts towards its final size")
+	world.interaction_targets.refresh(false, false, 0.5)
+	var settled_mesh: Mesh = working_tree.ring.mesh
+	world.interaction_targets.refresh(false, false, 2.0)
+	expect(is_equal_approx(working_tree.drawn_radius, working_tree.radius) and working_tree.ring.mesh == settled_mesh, "Working ring settles once without pulsing or rebuilding")
+	world.interaction_targets.refresh(true)
+	expect(hover_ring.ring.is_visible_in_tree() and not working_tree.root.visible and hover_ring.material.albedo_color == world.interaction_targets.SELECTED_COLOR, "Hover over work keeps one gold ring")
+	world.interaction_targets.refresh(false)
+	expect(working_tree.ring.mesh == settled_mesh, "Leaving hover does not restart click animation")
+
 	world.stop_order()
 	expect(world.pointer_feedback.pulse_left == 0 and world.hero.route.is_empty(), "Stop clears the previous target pulse and route")
 	world.vision.explored.erase(world.board.cell_at(tree))

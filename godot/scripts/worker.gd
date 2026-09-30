@@ -14,12 +14,17 @@ var recovery := 0.0
 var pose_clock := 0.0
 var broke_notified := false
 
+const WORK_DISTANCES := {"wood": 1.43, "gold": 1.7, "build": 3.0, "repair": 3.0, "return": 3.0, "heal": 3.0}
+
 func _init(owner_world: Node) -> void:
 	world = owner_world
 
 func capacity() -> int:
 	# A04M Har2 / Har3: levels 1–4 carry 1 / 2 / 3 / 4.
 	return mini(4, maxi(1, world.session.harvest_level + 1 + world.session.carry_capacity_bonus()))
+
+func work_distance(kind: String) -> float:
+	return float(WORK_DISTANCES.get(kind, 2.0))
 
 func assign(kind: String, target: Vector3, building_id: int = -1) -> void:
 	if world.adventure: world.adventure.cancel_job()
@@ -31,11 +36,66 @@ func assign(kind: String, target: Vector3, building_id: int = -1) -> void:
 	target_id = building_id
 	resource_kind = kind if kind in ["wood", "gold"] else ""
 	resource_target = target
-	if cargo > 0 and kind in ["wood", "gold"]:
+	if cargo > 0 and kind in ["wood", "gold"] and not (kind == "wood" and world.outfitting.saw_active()):
 		begin_return()
 	else: travel(kind, target)
 
+# Movement follows terrain in XZ. Use the same contact rule for planning and work,
+# with an inset arrival point so rounding can never cause an endless replan.
+func wood_contact(from: Vector3, target: Vector3) -> bool:
+	return Vector2(from.x - target.x, from.z - target.z).length() <= work_distance("wood") and absf(from.y - target.y) <= 0.55 and world.board.body_open(from, world.hero.body_radius)
+
+func wood_route(target: Vector3) -> PackedVector3Array:
+	var origin: Vector3 = world.hero.position
+	if wood_contact(origin, target): return PackedVector3Array()
+	var best := PackedVector3Array()
+	var shortest := INF
+	var cell: Vector2i = world.board.cell_at(target)
+	# Prefer the side facing the camera so the survivor remains readable while
+	# working. Fall back to the shortest reachable side when terrain blocks it.
+	var camera_direction := Vector2(world.camera.position.x - target.x, world.camera.position.z - target.z)
+	if camera_direction.length_squared() < 0.001: camera_direction = Vector2(1, 1)
+	camera_direction = camera_direction.normalized()
+	var sides := [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
+	sides.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var a_score := Vector2(a.x, a.y).dot(camera_direction)
+		var b_score := Vector2(b.x, b.y).dot(camera_direction)
+		return a_score > b_score
+	)
+	# A blocked tree cell is square: diagonal approaches cannot reach the trunk
+	# without clipping its collision. Choose an accessible cardinal working side.
+	for side in sides:
+		if not world.board.is_open(cell + side): continue
+		var center: Vector3 = world.board.point(cell + side)
+		var approach := target + Vector3(side.x, 0, side.y) * 1.36
+		if world.board.layout: approach.y = world.board.layout.height_at(approach.x, approach.z)
+		if not wood_contact(approach, target): continue
+		var route := PackedVector3Array()
+		if world.hero.segment_open(origin, approach):
+			route.append(approach)
+		else:
+			route = world.board.route(origin, center, false, world.hero.body_radius)
+			var end: Vector3 = route[-1] if not route.is_empty() else origin
+			if end.distance_to(center) > 0.05 or not world.hero.segment_open(end, approach): continue
+			route.append(approach)
+		var previous := origin
+		var valid := true
+		for point in route:
+			if not world.hero.segment_open(previous, point):
+				valid = false
+				break
+			previous = point
+		if not valid: continue
+		var length := route_length(route)
+		var camera_bias := Vector2(side.x, side.y).dot(camera_direction)
+		var score := length - camera_bias * 2.0
+		if score < shortest:
+			shortest = score
+			best = route
+	return best
+
 func work_route(kind: String, target: Vector3) -> PackedVector3Array:
+	if kind == "wood": return wood_route(target)
 	var route: PackedVector3Array = world.board.route(world.hero.position, target, kind != "move")
 	# A grid route starts at the next cell's centre. From an off-centre position,
 	# that first diagonal can clip a building corner: first straighten inside this cell.
@@ -47,7 +107,7 @@ func work_route(kind: String, target: Vector3) -> PackedVector3Array:
 	var end: Vector3 = route[-1] if not route.is_empty() else world.hero.position
 	var direction := target - end
 	direction.y = 0
-	var distance := 1.34 if kind == "wood" else (1.5 if kind == "gold" else 1.7)
+	var distance := work_distance(kind)
 	if direction.length() > distance:
 		var approach := end + direction.normalized() * (direction.length() - distance)
 		if world.board.body_segment_open(end, approach, world.hero.body_radius):
@@ -68,7 +128,8 @@ func travel(kind: String, target: Vector3) -> bool:
 	world.order_target = target
 	world.hero.route = work_route(kind, target)
 	world.hero_route_revision = world.board.revision
-	if world.hero.route.is_empty() and world.hero.position.distance_to(target) > 3.0:
+	var at_work: bool = wood_contact(world.hero.position, target) if kind == "wood" else world.hero.position.distance_to(target) <= 3.0
+	if world.hero.route.is_empty() and not at_work:
 		world.order = "idle"
 		world.hud.toast("工作位置无法到达，请清理道路后重新下令。")
 		return false
@@ -82,7 +143,7 @@ func begin_return() -> void:
 		if b.kind != "tent" or b.hp <= 0 or b.remaining > 0: continue
 		var p: Vector3 = world.board.point(b.cell)
 		var route: PackedVector3Array = work_route("return", p)
-		if route.is_empty() and world.hero.position.distance_to(p) > 3.0: continue
+		if route.is_empty() and world.hero.position.distance_to(p) > work_distance("return"): continue
 		var length := route_length(route)
 		if length < best:
 			best = length
@@ -105,8 +166,8 @@ func resume_harvest() -> void:
 		for cell in cells:
 			var p: Vector3 = world.board.point(cell)
 			if p.distance_to(resource_target) > 16: break
-			var route: PackedVector3Array = world.board.route(world.hero.position, p, true)
-			if not route.is_empty() or world.hero.position.distance_to(p) <= 3:
+			var route := wood_route(p)
+			if not route.is_empty() or wood_contact(world.hero.position, p):
 				resource_target = p
 				found = true
 				break
@@ -156,12 +217,14 @@ func update(dt: float) -> void:
 		return
 	if world.order == "return":
 		var tent: Dictionary = world.session.building(target_id)
-		if tent.is_empty() or tent.remaining > 0 or (world.hero.route.is_empty() and world.hero.position.distance_to(world.order_target) > 3):
+		if tent.is_empty() or tent.remaining > 0 or (world.hero.route.is_empty() and world.hero.position.distance_to(world.order_target) > work_distance("return")):
 			begin_return()
 			return
 	if world.order not in ["wood", "gold", "build", "repair", "return", "heal"]: return
 	if not world.hero.route.is_empty(): return
-	if world.hero.position.distance_to(world.order_target) > 3:
+	var at_work: bool = wood_contact(world.hero.position, world.order_target) if world.order == "wood" else world.hero.position.distance_to(world.order_target) <= 3.0
+	if not at_work:
+		clock = 0
 		travel(world.order, world.order_target)
 		return
 	if world.order == "heal":
@@ -233,6 +296,17 @@ func update(dt: float) -> void:
 			if b.hp >= max_hp:
 				world.order = "idle"
 				world.hud.toast("修理完成。")
+		return
+	if world.order == "wood" and world.outfitting.saw_active():
+		clock += dt
+		world.hero.work_pose("chop", world.order_target, minf(clock,1.1), dt)
+		if clock >= 1.1:
+			world.clear_tree(world.board.cell_at(world.order_target))
+			world.dino_ai.emit_noise(world.hero.position, 14.0, "hero", world.survivor_id(world.hero))
+			world.sound.play_at("chop", world.hero.visual.work_tip())
+			world.work_impact(world.order_target, Color("ad8756"))
+			world.stop_order()
+			world.hud.toast("道路已清开。左键下一棵树继续开路。")
 		return
 	clock += dt * world.session.work_multiplier()
 	world.hero.work_pose("chop" if world.order == "wood" else "mine", world.order_target, minf(clock, 1.1), dt)

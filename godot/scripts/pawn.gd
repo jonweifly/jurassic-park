@@ -23,6 +23,8 @@ var navigation: RefCounted
 var crowd: RefCounted
 var body_radius := 0.30
 var current_speed := 0.0
+var progress_anchor := Vector3.INF
+var progress_clock := 0.0
 var movement_blocked := false # Transient collision outcome, never persisted.
 var travelled := 0.0
 var carrying := false
@@ -98,9 +100,12 @@ func advance(dt: float) -> void:
 		return
 	var before := position
 	if not route.is_empty() and speed > 0:
+		var target_speed := speed
+		if navigation and navigation.layout and navigation.layout.has_method("movement_factor_at"):
+			target_speed *= navigation.layout.movement_factor_at(position.x,position.z)
 		var acceleration := speed * 7.0
 		var old_speed := current_speed
-		current_speed = move_toward(current_speed, speed, acceleration * dt)
+		current_speed = move_toward(current_speed, target_speed, acceleration * dt)
 		var acceleration_time := absf(current_speed - old_speed) / acceleration
 		var budget := (old_speed + current_speed) * 0.5 * acceleration_time + current_speed * (dt - acceleration_time)
 		while budget > 0.00001 and not route.is_empty():
@@ -134,7 +139,23 @@ func advance(dt: float) -> void:
 			var heading := position - before
 			visual.face(heading,dt)
 	else: current_speed = 0
+	if not route.is_empty():
+		progress_clock += dt
+		if progress_anchor == Vector3.INF or position.distance_to(progress_anchor) > 0.8:
+			progress_anchor = position
+			progress_clock = 0
+		elif progress_clock > 2.0:
+			set_meta("crowd_side", -float(get_meta("crowd_side", 1.0)))
+			progress_clock = 0
+			if is_dinosaur:
+				route.clear()
+				path_cooldown = 0
+	else:
+		progress_anchor = position
+		progress_clock = 0
 	var moved := Vector2(position.x - before.x, position.z - before.z).length()
+	if navigation and navigation.layout and navigation.layout.has_method("wading_at"):
+		selection.position.y = maxf(.09,navigation.layout.water_level_at(position.x,position.z)-position.y+.09) if navigation.layout.wading_at(position.x,position.z) else .09
 	travelled += moved
 	var moving := moved > 0.0001
 	if moving or work_timeout <= 0 or swing > 0:

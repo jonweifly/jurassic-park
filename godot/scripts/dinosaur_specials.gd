@@ -17,7 +17,7 @@ func begin(d: Node3D, target: Vector3, kind: String, id: int) -> bool:
 	var impact := d.position if special == "stomp" else target
 	d.route.clear()
 	d.attack_cooldown = d.attack_interval
-	d.visual.face(target - d.position, 1)
+	d.visual.face(target - d.position, 1.0 / 60.0)
 	d.swing = 1.0
 	d.play_animation("attack", 0)
 	var strike := {"remaining": duration, "duration": duration, "kind": kind, "id": id, "special": special, "impact": impact, "animated": true}

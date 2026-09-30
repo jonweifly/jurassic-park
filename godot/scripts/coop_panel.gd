@@ -5,6 +5,7 @@ var panel: PanelContainer
 var address: LineEdit
 var port: SpinBox
 var password: LineEdit
+var duration: OptionButton
 var mode: OptionButton
 var message: Label
 var host_button: Button
@@ -56,6 +57,9 @@ func _init(owner_hud: CanvasLayer, start_column: VBoxContainer) -> void:
 	mode.add_item("标准合作")
 	mode.add_item("困难合作")
 	port_row.add_child(mode)
+	duration=OptionButton.new()
+	for minutes in [25,45,60,80]: duration.add_item("%d 分钟" % minutes,minutes)
+	port_row.add_child(duration)
 	password=LineEdit.new()
 	password.placeholder_text="房间口令（可选，双方填写一致）"
 	password.secret=true
@@ -120,7 +124,7 @@ func open() -> void:
 	refresh()
 
 func host(resume: bool) -> void:
-	var result: String = net.host("hard" if mode.selected==1 else "standard",int(port.value),password.text,resume)
+	var result: String = net.host("hard" if mode.selected==1 else "standard",int(port.value),password.text,resume,float(duration.get_selected_id())*60.0)
 	if result.is_empty(): panel.hide()
 	else: net.status=result
 	refresh()
@@ -138,6 +142,7 @@ func refresh() -> void:
 	address.editable=not busy
 	password.editable=not busy
 	mode.disabled=busy
+	duration.disabled=busy
 	port.editable=not busy
 	message.text=net.status
 	if net.active and net.hosting:

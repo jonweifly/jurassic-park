@@ -24,6 +24,8 @@ var motion: RefCounted
 @export var ore_cargo_scene: PackedScene
 var model: Node3D
 var player: AnimationPlayer
+var chainsaw: Node3D
+var saw_equipped := false
 var axe: Node3D
 var pickaxe: Node3D
 var hammer: Node3D
@@ -57,6 +59,36 @@ static func box(parent: Node3D, size: Vector3, at: Vector3, color: Color) -> Mes
 	parent.add_child(piece)
 	return piece
 
+static func axe_blade(parent: Node3D, outline: PackedVector2Array, color: Color) -> void:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var front := PackedVector3Array()
+	var back := PackedVector3Array()
+	for point in outline:
+		# The poll is thick; the cutting edge tapers to a fine steel wedge.
+		var thickness := lerpf(0.052, 0.007, clampf(point.x / 0.34, 0, 1))
+		front.append(Vector3(point.x, thickness, point.y))
+		back.append(Vector3(point.x, -thickness, point.y))
+	var indices := Geometry2D.triangulate_polygon(outline)
+	for index in indices: surface.add_vertex(front[index])
+	indices.reverse()
+	for index in indices: surface.add_vertex(back[index])
+	for index in range(outline.size()):
+		var next := (index + 1) % outline.size()
+		for vertex in [front[index], back[index], back[next], front[index], back[next], front[next]]:
+			surface.add_vertex(vertex)
+	surface.generate_normals()
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.metallic = 0.35
+	material.roughness = 0.55
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	surface.set_material(material)
+	var blade := MeshInstance3D.new()
+	blade.name = "AxeBlade"
+	blade.mesh = surface.commit()
+	parent.add_child(blade)
+
 func attach(scene: PackedScene, socket: Node3D, title: String, origin: Vector3) -> Node3D:
 	var prop: Node3D = scene.instantiate() if scene else Node3D.new()
 	prop.name = title
@@ -68,10 +100,19 @@ func make_equipment() -> void:
 	var hand: Node3D = get_node(hand_socket_path)
 	var cargo: Node3D = get_node(cargo_socket_path)
 	rifle = get_node_or_null(rifle_path)
-	axe = attach(axe_scene,hand,"WorkAxe",tool_grip)
-	if not axe_scene:
-		box(axe,Vector3(0.07,0.07,0.85),Vector3(0,0,0.25),Color("654b33"))
-		box(axe,Vector3(0.09,0.28,0.27),Vector3(0,0.05,0.62),Color("a0a6a2"))
+	# A single flared, tapered blade distinguishes the axe from the hammer.
+	axe = attach(null,hand,"WorkAxe",tool_grip)
+	box(axe,Vector3(0.065,0.065,0.84),Vector3(0,0,0.30),Color("825633"))
+	box(axe,Vector3(0.075,0.078,0.19),Vector3(0,0,-0.015),Color("503822"))
+	box(axe,Vector3(0.15,0.105,0.13),Vector3(-0.025,0,0.70),Color("657a7a"))
+	axe_blade(axe, PackedVector2Array([Vector2(0,.64),Vector2(.285,.548),Vector2(.285,.852),Vector2(0,.76)]), Color("9eadad"))
+	axe_blade(axe, PackedVector2Array([Vector2(.285,.548),Vector2(.29,.54),Vector2(.34,.59),Vector2(.34,.81),Vector2(.29,.86),Vector2(.285,.852)]), Color("e0e8df"))
+	chainsaw = attach(null,hand,"Chainsaw",tool_grip)
+	box(chainsaw,Vector3(.22,.22,.30),Vector3(0,0,.16),Color("bb813b"))
+	box(chainsaw,Vector3(.065,.16,.63),Vector3(0,0,.57),Color("99aaa5"))
+	for z in range(7): box(chainsaw,Vector3(.085,.20,.035),Vector3(0,0,.30+z*.09),Color("33453c"))
+	box(chainsaw,Vector3(.30,.045,.12),Vector3(0,.16,.16),Color("263e33"))
+	chainsaw.rotation_degrees = tool_rotation_degrees
 	hammer = attach(hammer_scene,hand,"WorkHammer",tool_grip)
 	if not hammer_scene:
 		box(hammer,Vector3(0.07,0.07,0.65),Vector3(0,0,0.22),Color("785838"))
@@ -108,7 +149,9 @@ func make_equipment() -> void:
 
 func show_equipment(action: String, carrying: bool, cargo_kind: String) -> void:
 	if not work_equipment: return
-	axe.visible = action == "chop"
+	axe.visible = action == "chop" and not saw_equipped
+	if action != "chop": axe.rotation_degrees = tool_rotation_degrees
+	chainsaw.visible = action == "chop" and saw_equipped
 	hammer.visible = action == "build"
 	pickaxe.visible = action == "mine"
 	var carrying_visible := carrying and action not in ["chop","build","mine","death"]
@@ -119,7 +162,8 @@ func show_equipment(action: String, carrying: bool, cargo_kind: String) -> void:
 func face(direction: Vector3, dt: float, sharpness: float = 14.0) -> void:
 	if Vector2(direction.x,direction.z).is_zero_approx(): return
 	var before := model.rotation.y
-	model.rotation.y = lerp_angle(model.rotation.y,atan2(direction.x,direction.z),1.0-exp(-sharpness*dt))
+	var turn := angle_difference(before, atan2(direction.x,direction.z)) * (1.0-exp(-sharpness*dt))
+	model.rotation.y = before + clampf(turn, -TAU * dt, TAU * dt)
 	if motion and dt > 0.0: motion.turn_velocity = angle_difference(before, model.rotation.y) / dt
 
 func play(action: String, dt: float) -> void:
@@ -134,6 +178,14 @@ func play(action: String, dt: float) -> void:
 func seek_work(action: String, phase: float, dt: float) -> void:
 	play(action,dt)
 	player.seek(phase,true)
+	if action == "chop" and axe:
+		# Add a clear wind-up and follow-through to the hand-authored arm clip.
+		var progress := clampf(phase / 1.1, 0.0, 1.0)
+		var swing := lerpf(-52.0, 28.0, smoothstep(0.0, 0.68, progress))
+		if progress > 0.68: swing = lerpf(28.0, 8.0, smoothstep(0.68, 1.0, progress))
+		axe.rotation_degrees = tool_rotation_degrees + Vector3(swing, 0, 0)
+	else:
+		if axe: axe.rotation_degrees = tool_rotation_degrees
 	if motion: motion.work(action, phase)
 
 func locomotion(speed: float, dt: float) -> void:
@@ -160,6 +212,7 @@ var outfit_signature := ""
 var outfit_parts: Array[Node3D] = []
 
 func set_outfit(inventory: Dictionary) -> void:
+	saw_equipped = inventory.get("chainsaw",0) > 0 and inventory.get("saw_enabled",true)
 	if not contact: return
 	var signature := "%d:%d:%d" % [inventory.boots, inventory.vest, inventory.rifle]
 	if outfit_signature == signature: return

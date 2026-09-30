@@ -84,12 +84,14 @@ func space_open(at: Vector3, body_radius: float, pawn: Node3D = null) -> bool:
 func move(pawn: Node3D, destination: Vector3, steer: bool = true) -> Vector3:
 	if not active(pawn): return pawn.position
 	var start: Vector3 = pawn.position
-	if segment_open(pawn,start,destination): return destination
+	if segment_open(pawn,start,destination):
+		return destination
 	var delta := destination-start
 	delta.y = 0
 	# Consistent right-hand passing prevents head-on actors choosing the same side.
 	if steer:
-		for angle in [0.65,-0.65,1.15,-1.15,PI*0.5,-PI*0.5]:
+		var side: float = pawn.get_meta("crowd_side", 1.0)
+		for angle in [0.65*side,1.15*side,PI*0.5*side]:
 			var candidate := start + delta.rotated(Vector3.UP,angle)
 			if segment_open(pawn,start,candidate) and pawn.segment_open(start,candidate): return candidate
 	# Stop at body contact rather than tunnelling on a long tick or pounce.

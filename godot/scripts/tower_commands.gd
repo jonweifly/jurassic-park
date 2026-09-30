@@ -20,11 +20,11 @@ func _init(owner_hud: Node, commands: VBoxContainer, head: HBoxContainer, headin
 	hud = owner_hud
 	title = heading
 	grid = build_grid
-	engineering_button = hud.button("箭塔工程")
+	engineering_button = hud.icon_button("箭塔工程", "tech")
 	engineering_button.pressed.connect(hud.open_tech)
 	engineering_button.tooltip_text = "在实验室研究箭塔工程，解锁三种箭塔升级。"
 	head.add_child(engineering_button)
-	camp_button = hud.button("营地建造")
+	camp_button = hud.icon_button("营地建造", "camp")
 	camp_button.pressed.connect(func():
 		if hud.world.paused: return
 		hud.world.selected_id = -1

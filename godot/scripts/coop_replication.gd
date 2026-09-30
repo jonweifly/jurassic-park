@@ -92,6 +92,7 @@ func apply_world(data: Dictionary) -> void:
 	world.vision.update()
 	world.weather.update_roofs()
 	world.outfitting.sync_visuals()
+	world.robots.sync_visuals()
 	for pawn in net.pawns.values(): world.outfitting.apply_equipment(pawn)
 
 func apply_pawn(pawn: Node3D, packet: Dictionary) -> void:

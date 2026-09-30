@@ -107,7 +107,7 @@ func refresh_visibility() -> void:
 		var visible_now: bool = world.vision.is_visible(site.cell)
 		if visible_now and site.status in ["hidden", "known"]:
 			site.status = "discovered"
-			note("发现 " + Catalog.SITES[id].name + "。右键调查，或按 %s 查看探索日志。" % world.preferences.key_name("journal"))
+		note("发现 " + Catalog.SITES[id].name + "。左键调查，或按 %s 查看探索日志。" % world.preferences.key_name("journal"))
 		if not visuals.has(id): continue
 		var n: Node3D = visuals[id]
 		n.visible = world.vision.explored.has(site.cell)

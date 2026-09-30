@@ -21,6 +21,37 @@ func run() -> void:
 	world.start_session(1500,"standard")
 	var ground: ShaderMaterial = world.scenery.ground
 	expect(ground != null and ground.shader != null,"Live terrain has the surface shader")
+	var layout: RefCounted = world.board.layout
+	var protected_error := 0.0
+	var modified := 0
+	var maximum_change := 0.0
+	for y in range(128):
+		for x in range(128):
+			for offset in [Vector2(.25,.25),Vector2(.8,.3),Vector2(.7,.8)]:
+				var px: float = (x+offset.x)*2-128
+				var pz: float = (y+offset.y)*2-128
+				var change := absf(layout.height_at(px,pz)-layout.source_height_at(px,pz))
+				maximum_change = maxf(maximum_change,change)
+				if Vector2(px,pz).length() < 35: continue # Authored opening has a new continuous profile.
+				if layout.walk[y*128+x] or layout.build[y*128+x]: protected_error = maxf(protected_error,change)
+				elif change > .02: modified += 1
+	expect(protected_error < .0001,"All traversable cells and building plots retain their original surface, not only their centres")
+	expect(modified > 1000 and maximum_change < .721,"Blocked slopes and shores become curved within a bounded height change")
+	var ground_node: MeshInstance3D = world.get_node("Island/ReferenceGround")
+	var arrays := ground_node.mesh.surface_get_arrays(0)
+	var terrain_vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var terrain_indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	expect(terrain_vertices.size()==257*257 and terrain_indices.size()==256*256*6,"Terrain uses shared vertices and one-metre surface samples")
+	await physics_frame
+	var pick_error := 0.0
+	for i in range(0,terrain_indices.size(),1239):
+		var at := (terrain_vertices[terrain_indices[i]]+terrain_vertices[terrain_indices[i+1]]+terrain_vertices[terrain_indices[i+2]])/3.0
+		var query := PhysicsRayQueryParameters3D.create(at+Vector3.UP*30,at-Vector3.UP*30,1)
+		var hit: Dictionary = world.get_world_3d().direct_space_state.intersect_ray(query)
+		if hit.is_empty(): pick_error = INF
+		else: pick_error = maxf(pick_error,absf(hit.position.y-layout.height_at(at.x,at.z)))
+	expect(pick_error < .002,"Rendered terrain, CPU surface samples and physics picking match across the island")
+	print("TERRAIN GEOMETRY: protected_error=",protected_error," modified_samples=",modified," maximum_change=",maximum_change," pick_error=",pick_error)
 	for kind in ["turf","soil","litter","rock"]:
 		var texture: Texture2D = ground.get_shader_parameter(kind+"_surface")
 		expect(texture != null and texture.get_size()==Vector2(1024,1024),kind+" texture is imported and bound to terrain")

@@ -1,6 +1,7 @@
 extends RefCounted
 ## Versioned data-only saves. Never deserialize objects or write into the project.
 const VERSION := 4
+const TERRAIN_REVISION := 1
 const ExpeditionCatalog = preload("res://scripts/expedition_catalog.gd")
 const Features = preload("res://scripts/feature_policy.gd")
 const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
@@ -50,7 +51,7 @@ static func snapshot(w: Node) -> Dictionary:
 		animals.append({"pawn": fields(d, PAWN_FIELDS), "meta": metadata, "visual": visual_state(d)})
 		if d.get_instance_id() == w.hero.target_id: target_uid = d.get_meta("save_id")
 	return {
-		"version": VERSION, "map": MAP_ID, "saved_at": int(Time.get_unix_time_from_system() * 1000000),
+		"version": VERSION, "map": MAP_ID, "terrain_revision": TERRAIN_REVISION, "saved_at": int(Time.get_unix_time_from_system() * 1000000),
 		"session": fields(w.session, SESSION_FIELDS + ["kills_by_species", "outfitting"]), "survival": fields(w.session, SURVIVAL_FIELDS), "worker": fields(w.worker, WORKER_FIELDS),
 		"hero": fields(w.hero, PAWN_FIELDS), "hero_visual": visual_state(w.hero), "animals": animals, "trees": stocks,
 		"explored": w.vision.explored.duplicate(), "rng_seed": w.rng.seed, "rng_state": w.rng.state,
@@ -82,6 +83,8 @@ static func safe_data(value: Variant, depth: int = 0) -> bool:
 	return true
 
 static func validate(data: Dictionary) -> String:
+	if not data.get("terrain_revision",0) is int: return "存档地形版本无效"
+	if data.get("terrain_revision",0) not in range(TERRAIN_REVISION+1): return "存档地形版本不兼容"
 	if data.get("version") != VERSION: return "存档版本不兼容"
 	if data.get("map") != MAP_ID: return "存档地图版本不兼容"
 	if not safe_data(data): return "存档含无效数据"
@@ -329,6 +332,10 @@ static func apply(w: Node, data: Dictionary) -> void:
 	w.adventure.restore()
 	w.outfitting.initialize()
 	w.outfitting.apply_equipment(w.hero)
+	if data.get("terrain_revision",0) < TERRAIN_REVISION:
+		reseat_pawn(w,w.hero)
+		for d in w.dinosaurs: reseat_pawn(w,d)
+		w.worker.resource_target = ground_point(w,w.worker.resource_target)
 	for d in w.dinosaurs:
 		d.last_board_revision = w.board.revision
 		var strike: Dictionary = d.get_meta("ai_strike", {})
@@ -337,6 +344,7 @@ static func apply(w: Node, data: Dictionary) -> void:
 	w.hero_route_revision = w.board.revision
 	w.order = data.order
 	w.order_target = data.order_target
+	if data.get("terrain_revision",0) < TERRAIN_REVISION: w.order_target = ground_point(w,w.order_target)
 	if not Features.peripheral_enabled and w.order == "expedition":
 		w.order = "idle"
 		w.hero.route.clear()
@@ -370,3 +378,33 @@ static func apply(w: Node, data: Dictionary) -> void:
 	w.destination.visible = w.order == "move"
 	w.refresh_shelters()
 	w.update_shelter_visuals()
+
+static func ground_point(w: Node, point: Vector3) -> Vector3:
+	point.y = w.board.layout.height_at(point.x,point.z)
+	return point
+
+static func reseat_pawn(w: Node, pawn: Node3D) -> void:
+	# Legacy saves contain absolute heights and routes from the old plateau.
+	# Keep dry positions; actors now in deep water move to the closest clear bank.
+	pawn.position = ground_point(w,pawn.position)
+	if pawn.health > 0 and not pawn.is_sheltered() and not w.board.body_open(pawn.position,pawn.body_radius):
+		var origin: Vector2i = w.board.cell_at(pawn.position)
+		var banks: Array[Vector3] = []
+		for y in range(-16,17):
+			for x in range(-16,17):
+				var cell := origin+Vector2i(x,y)
+				if not w.board.inside(cell): continue
+				var point: Vector3 = w.board.point(cell)
+				if w.board.body_open(point,pawn.body_radius): banks.append(point)
+		banks.sort_custom(func(a,b): return a.distance_squared_to(pawn.position) < b.distance_squared_to(pawn.position))
+		var destination: Vector3 = ground_point(w,pawn.route[-1]) if not pawn.route.is_empty() else w.board.point(Vector2i(65,62))
+		for bank in banks:
+			# A clear cell can still be isolated behind trees. Keep the saved
+			# actor connected to its destination, not stranded on a tiny shore.
+			if bank.distance_to(destination) < .1 or not w.board.route(bank,destination,false,pawn.body_radius).is_empty():
+				pawn.position = bank
+				break
+		if not w.board.body_open(pawn.position,pawn.body_radius) and not banks.is_empty(): pawn.position = banks[0]
+	if not pawn.route.is_empty(): pawn.route = w.board.route(pawn.position,ground_point(w,pawn.route[-1]),false,pawn.body_radius)
+	pawn.current_speed = 0
+	if pawn.crowd: pawn.crowd.relocate(pawn)

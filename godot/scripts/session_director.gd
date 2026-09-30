@@ -82,7 +82,7 @@ func spawn_group(species: Array, finale: bool = false, pressure: float = 0.0, he
 		elif finale: world.dino_ai.spawn_patrol(species[i], world.extraction)
 		elif i == 0: world.dino_ai.spawn_patrol(species[i])
 		else: world.spawn_dinosaur(Vector3(10000, 0, 0), species[i])
-	if hard and available < species.size():
+	if available < species.size():
 		# A population cap must not leave the camp quiet forever while old
 		# patrols idle elsewhere. Reuse nearby animals without healing/scaling them.
 		var needed: int = species.size() - available
@@ -144,9 +144,9 @@ func objective() -> String:
 	for b in s.buildings:
 		if b.hp > 0 and b.remaining <= 0 and b.hp < world.Catalog.max_health(b) * 0.6:
 			return "修复营地：" + world.Catalog.BUILDINGS[b.kind].name + "受损"
-	if not s.has_completed("fire"): return "② 右键树木，返送 5 木建营火"
+	if not s.has_completed("fire"): return "② 左键树木，返送 5 木建营火"
 	if not s.has_completed("fossil"): return "③ 采集 10 木，建化石挖掘场"
-	if not s.has_completed("generator"): return "④ 右键挖掘场采金，建立电力"
+	if not s.has_completed("generator"): return "④ 左键挖掘场采金，建立电力"
 	if not s.has_completed("tower"): return "⑤ 建立弓箭塔与围栏防线"
 	if s.duration - s.elapsed <= 180: return "救援准备：治疗并检查北侧路线"
 	if not s.has_completed("laboratory"): return "⑥ 建基础建筑，选中后升级实验室"

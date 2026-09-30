@@ -96,7 +96,8 @@ func test_runtime() -> void:
 	expect(w.dinosaurs.size() == 3 and w.dinosaurs[0].max_health == 1000 and w.dinosaurs[0].attack_damage == 20, "Standard enemies retain original stats and wave size")
 	clear_animals(w)
 	w.session.elapsed = 0.0
-	w.hud.hard_start_button.pressed.emit()
+	w.hud.difficulty_select.select(1)
+	w.hud.standard_start_button.pressed.emit()
 	expect(w.session.mode == "hard" and w.started and w.session.duration == 1500 and w.spawn_clocks[0].next == 100, "New-game button starts hard mode with preparation window")
 	w.session.elapsed = 99.0
 	w.director.update()

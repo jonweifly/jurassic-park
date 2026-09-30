@@ -41,6 +41,7 @@ var dino_ai: RefCounted
 var defense: RefCounted
 var hero: Node3D
 var camera: Camera3D
+var interaction_targets: RefCounted
 var pointer_feedback: Control
 var camera_rig: RefCounted
 var scenery: RefCounted
@@ -93,6 +94,7 @@ var outage_warned := false
 var defense_notice_after := 0.0
 var shelter_warned: Dictionary = {}
 var coop: Node
+var robots: RefCounted
 var encounter: Control
 
 func _ready() -> void:
@@ -109,6 +111,7 @@ func _ready() -> void:
 	make_environment()
 	if has_node("Island"): register_terrain()
 	else: make_terrain()
+	extraction = preload("res://scripts/landing_site.gd").choose(self, board.point(Vector2i(65,62)))
 	if "--bake-map" in OS.get_cmdline_user_args():
 		bake_terrain()
 		set_process(false)
@@ -135,20 +138,13 @@ func _ready() -> void:
 	dino_ai = DinosaurAI.new(self)
 	adventure = Expedition.new(self)
 	outfitting = preload("res://scripts/outfitting.gd").new(self)
+	robots = preload("res://scripts/repair_robots.gd").new(self)
 	ghost = mesh_box(Vector3(1.96, 0.06, 1.96), Color(0.45, 0.8, 0.58, 0.55))
 	ghost.visible = false
-	destination = ring(0.42, Color("d8c885"))
+	destination = movement_marker()
 	destination.visible = false
 	extraction_marker = ring(2.7, Color("c9b575"))
 	extraction_marker.position = extraction + Vector3(0, 0.08, 0)
-	var landing_label := Label3D.new()
-	landing_label.text = "H"
-	landing_label.font_size = 150
-	landing_label.pixel_size = 0.035
-	landing_label.rotation_degrees.x = -90
-	landing_label.position = extraction + Vector3(0, 0.11, 0)
-	landing_label.modulate = Color("c0ad75")
-	add_child(landing_label)
 	extraction_feedback = ExtractionFeedback.new(self)
 	sound = Sound.new()
 	sound.world = self
@@ -166,6 +162,7 @@ func _ready() -> void:
 	encounter = EncounterPresentation.new()
 	encounter.world = self
 	hud.root.add_child(encounter)
+	interaction_targets = preload("res://scripts/interaction_targets.gd").new(self)
 	pointer_feedback = PointerFeedback.new()
 	pointer_feedback.world = self
 	hud.root.add_child(pointer_feedback)
@@ -244,6 +241,19 @@ func mesh_box(dimensions: Vector3, color: Color, pos: Vector3 = Vector3.ZERO) ->
 	m.position = pos
 	add_child(m)
 	return m
+
+func movement_marker() -> MeshInstance3D:
+	var marker := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(2.2, 2.2)
+	marker.mesh = plane
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://shaders/movement_marker.gdshader")
+	mat.render_priority = 1
+	marker.material_override = mat
+	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(marker)
+	return marker
 
 func ring(radius: float, color: Color) -> MeshInstance3D:
 	var n := MeshInstance3D.new()
@@ -345,6 +355,15 @@ func make_terrain() -> void:
 		if child != island and child not in before: child.reparent(island)
 
 func register_terrain() -> void:
+	# The opening lake replaces part of the imported ground. Remove submerged
+	# resource clusters before registering them with navigation or forest batches.
+	if $Island.has_node("TreesFromMap"):
+		for cluster in $Island/TreesFromMap.get_children():
+			if not cluster.has_meta("harvest_tree"): continue
+			var submerged := false
+			for part in cluster.get_children():
+				if part is Node3D and board.layout.submerged_at(part.global_position.x,part.global_position.z): submerged = true
+			if submerged: cluster.free()
 	for n in $Island.find_children("*", "Node3D", true, false):
 		var cell: Vector2i = board.cell_at(n.global_position)
 		if n.has_meta("harvest_tree"):
@@ -456,6 +475,7 @@ func _physics_process(dt: float) -> void:
 		worker.update(dt)
 	outfitting.tick_actor(dt)
 	outfitting.update(dt)
+	robots.update(dt)
 	if coop.active: coop.tick_partner(dt)
 	# Exploration, hunger, fatigue and cooking remain readable in old saves but
 	# are dormant while the core dinosaur/building loop is being polished.
@@ -565,41 +585,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if not build_mode.is_empty(): place_building(board.cell_at(p),false,event.shift_pressed)
 		else:
-			selected_id = pick_building(event.position)
+			# Resolve the same visible object used by hover feedback.
+			command(action_point(event.position, p), false)
 	if event.button_index == MOUSE_BUTTON_RIGHT:
 		if not build_mode.is_empty():
 			build_mode = ""
 			return
-		command(p)
+		command(p, true)
 
-func pick_building(screen: Vector2) -> int:
-	# Selection uses render bounds, independent of pathfinding collision. Tall
-	# tower decks and rotating weapons must be clickable above their ground cell.
-	var ray := camera.project_ray_origin(screen)
-	var direction := camera.project_ray_normal(screen)
-	var nearest := INF
-	var chosen := -1
-	for b in session.buildings:
-		if b.hp <= 0 or not visuals.has(b.id): continue
-		var model: Node3D = visuals[b.id].get_node("Model")
-		for mesh in model.find_children("*", "MeshInstance3D", true, false):
-			if not mesh.is_visible_in_tree() or mesh.mesh == null: continue
-			var local: Transform3D = mesh.global_transform.affine_inverse()
-			var hit: Variant = mesh.get_aabb().intersects_ray(local * ray, local.basis * direction)
-			if hit == null: continue
-			var distance: float = ray.distance_squared_to(mesh.global_transform * hit)
-			if distance < nearest:
-				nearest = distance
-				chosen = b.id
-	if chosen >= 0: return chosen
-	# Preserve the forgiving footprint selection for foundations and empty frames.
-	var point := ground_at(screen)
-	for b in session.buildings:
-		var distance: float = board.point(b.cell).distance_to(point)
-		if b.hp > 0 and distance < 1.5 and distance < nearest:
-			nearest = distance
-			chosen = b.id
-	return chosen
+func action_point(screen: Vector2, ground: Vector3) -> Vector3:
+	return interaction_targets.action_point(screen, ground)
 
 func select_build(kind: String) -> void:
 	if paused or session.phase != "playing": return
@@ -748,19 +743,24 @@ func context_at(p: Vector3) -> Dictionary:
 		if b.remaining > 0 and not b.get("upgrading", false): return {"kind": "build", "position": target, "id": b.id}
 		if b.remaining <= 0:
 			if b.kind == "gate": return {"kind": "gate", "position": target, "id": b.id}
-			if b.kind == "fossil": return {"kind": "gold", "position": target}
-			if b.kind == "tent" and worker.cargo > 0: return {"kind": "return", "position": target}
+			if b.kind == "fossil": return {"kind": "gold", "position": target, "id": b.id}
+			if b.kind == "tent" and worker.cargo > 0: return {"kind": "return", "position": target, "id": b.id}
 			if b.hp < Catalog.max_health(b): return {"kind": "repair", "position": target, "id": b.id}
+		return {"kind": "select", "position": target, "id": b.id}
 	if trees.has(cell) and vision.explored.has(cell): return {"kind": "wood", "position": target}
 	return {"kind": "move", "position": target}
 
-func command(p: Vector3) -> void:
+func command(p: Vector3, move_only: bool = false) -> void:
 	if coop.active and hero.health <= 0: return
-	if coop.route("command",[p]):
-		if pointer_feedback: pointer_feedback.confirm(context_at(p))
+	if coop.route("command",[p, move_only]):
+		if pointer_feedback: pointer_feedback.confirm({"kind": "move", "position": p})
 		return
-	var target := context_at(p)
+	var target := {"kind": "move", "position": p} if move_only else context_at(p)
 	var kind: String = target.kind
+	selected_id = int(target.get("id", -1)) if target.has("id") else -1
+	if kind == "select":
+		if pointer_feedback: pointer_feedback.confirm(target)
+		return
 	if kind == "blocked":
 		if pointer_feedback: pointer_feedback.confirm(target, false)
 		return
@@ -777,7 +777,6 @@ func command(p: Vector3) -> void:
 	adventure.cancel_job()
 	outfitting.cancel()
 	leave_shelter(hero)
-	selected_id = -1
 	worker.recovery = 0
 	destination.visible = false
 	order_target = target.position
@@ -797,11 +796,13 @@ func command(p: Vector3) -> void:
 				order = "idle"
 			else:
 				destination.position = (hero.route[-1] if not hero.route.is_empty() else order_target) + Vector3.UP * 0.12
-				destination.visible = true
+				var direction := destination.position - hero.position
+				destination.rotation.y = atan2(direction.x, direction.z)
+				destination.visible = kind == "move"
 	if pointer_feedback: pointer_feedback.confirm(target, order != "idle")
 
 func order_description() -> String:
-	return {"field": outfitting.brief(), "idle": "等待命令", "move": "正在移动", "wood": "正在采集木材", "gold": "正在挖掘化石", "attack": "正在攻击恐龙", "build": "正在施工（右键工地可继续）", "repair": "正在修理", "return": "正在返送资源", "waiting_dropoff": "等待可用帐篷", "heal": "返回帐篷治疗（每秒 1 金，%s / %s）" % [preferences.key_name("heal"), preferences.key_name("stop")], "expedition": "前往设施调查（%s 可中断）" % preferences.key_name("stop")}.get(order, "等待命令")
+	return {"field": outfitting.brief(), "idle": "等待命令", "move": "正在移动", "wood": "正在采集木材", "gold": "正在挖掘化石", "attack": "正在攻击恐龙", "build": "正在施工（左键工地可继续）", "repair": "正在修理", "return": "正在返送资源", "waiting_dropoff": "等待可用帐篷", "heal": "返回帐篷治疗（每秒 1 金，%s / %s）" % [preferences.key_name("heal"), preferences.key_name("stop")], "expedition": "前往设施调查（%s 可中断）" % preferences.key_name("stop")}.get(order, "等待命令")
 
 func update_order(dt: float) -> void:
 	var route_changed := false
@@ -1126,7 +1127,7 @@ func heal() -> void:
 		if b.hp <= 0 or b.kind != "tent" or b.remaining > 0: continue
 		var p: Vector3 = board.point(b.cell)
 		var route: PackedVector3Array = board.route(hero.position, p, true)
-		if route.is_empty() and hero.position.distance_to(p) > 3: continue
+		if route.is_empty() and hero.position.distance_to(p) > worker.work_distance("heal"): continue
 		if route.size() < best:
 			best = route.size()
 			nearest = b
@@ -1134,7 +1135,7 @@ func heal() -> void:
 		hud.toast("需要一座可到达、已完成的帐篷。")
 		return
 	worker.assign("heal", board.point(nearest.cell), nearest.id)
-	hud.toast("返回帐篷治疗，每秒消耗 1 黄金。右键或 X 可中断。")
+	hud.toast("返回帐篷治疗，每秒消耗 1 黄金。按 X 可中断。")
 
 func enter_shelter(survivor: Node3D, tent: Dictionary) -> void:
 	if survivor.sheltered_id == tent.id: return
@@ -1303,6 +1304,7 @@ func outfit_action(action: String, id: int = -1, item: String = "") -> void:
 		"explore": result = outfitting.explore(item)
 		"return": result = outfitting.return_home()
 		"kit": result = outfitting.use_kit()
+		"saw": result = outfitting.toggle_saw()
 	if not result.is_empty(): hud.toast(result)
 
 func use_medkit() -> void:

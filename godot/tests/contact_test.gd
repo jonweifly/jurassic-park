@@ -88,6 +88,15 @@ func run() -> void:
 			expect((contact.pose(chain[0])*rest).distance_to(contact.pose(chain[1]).origin) < 0.001, fixture[0] + " IK does not stretch or disconnect arm bones")
 		pawn.work_pose(fixture[0],Vector3(0,0,fixture[1]),fixture[2],1)
 		expect(pawn.visual.work_tip().distance_to(tip) < 0.001, "Repeated animation evaluation must not accumulate correction")
+	for action in ["chop", "mine", "build"]:
+		pawn.visual.show_equipment(action, false, "")
+		expect(pawn.visual.axe.visible == (action == "chop") and pawn.visual.pickaxe.visible == (action == "mine") and pawn.visual.hammer.visible == (action == "build") and not pawn.visual.chainsaw.visible, action + " shows only its matching tool")
+	pawn.visual.saw_equipped = true
+	pawn.work_pose("chop",Vector3(0,0,1.36),1.1,1)
+	expect(pawn.visual.chainsaw.visible and not pawn.visual.axe.visible and not pawn.visual.hammer.visible, "Equipped chainsaw replaces the axe without a duplicate tool")
+	var actual_saw_tip: Vector3 = contact.skeleton.to_global(contact.pose("handR") * pawn.visual.get_node(pawn.visual.hand_socket_path).transform * pawn.visual.chainsaw.transform * Vector3(0,0,.88))
+	expect(actual_saw_tip.distance_to(pawn.visual.work_tip()) < .001, "Chainsaw impact follows its own cutting bar rather than the hidden axe")
+	pawn.visual.saw_equipped = false
 	pawn.advance(0.3)
 	expect(pawn.animation_state == "idle" and not pawn.visual.axe.visible, "Work corrections release with the work state")
 	pawn.free()
@@ -122,6 +131,7 @@ func run() -> void:
 	world.board = Board.new()
 	world.board.layout = Data.new()
 	world.board.layout.heights.fill(0)
+	world.board.layout.rebuild_surface()
 	world.trees.clear()
 	world.session.buildings.clear()
 	world.hero.position = Vector3(81,0,81)

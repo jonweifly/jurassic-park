@@ -36,7 +36,9 @@ float canopy_coverage(vec3 p) {
 	float along = dot(offset,camera_axis);
 	float across = length(offset-camera_axis*along);
 	float front = smoothstep(0.05,0.6,along)*(1.0-smoothstep(10.0,14.0,along));
-	float mask = (1.0-smoothstep(0.65,1.45,across))*front*cutout_enabled;
+	// Keep a clear aperture around the survivor. A narrow transition produced
+	// a conspicuous dotted halo when the camera cut through leaves.
+	float mask = (1.0-smoothstep(1.20,1.85,across))*front*cutout_enabled;
 	return 1.0-mask*0.98;
 }
 

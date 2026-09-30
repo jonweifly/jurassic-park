@@ -12,8 +12,9 @@ var kill_stats_button: Button
 var pause_stats_button: Button
 var content_seed_input: LineEdit
 var profession_select: OptionButton
+var duration_select: OptionButton
+var difficulty_select: OptionButton
 var standard_start_button: Button
-var hard_start_button: Button
 var preferences_panel: RefCounted
 var guide_panel: RefCounted
 var tech_button: Button
@@ -35,6 +36,7 @@ var objective: Label
 var tip: Label
 var minimap: Control
 var build_buttons: Dictionary = {}
+var build_key_labels: Dictionary = {}
 var pause_panel: PanelContainer
 var pause_title: Label
 var resume_button: Button
@@ -92,6 +94,7 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_theme_font_override("font", font)
 	root.add_theme_color_override("font_color", Color("e7e4cc"))
+	root.theme = preload("res://scripts/ui_theme.gd").make(font)
 	add_child(root)
 	var status_line := HBoxContainer.new()
 	status_line.add_theme_constant_override("separation", 14)
@@ -107,29 +110,29 @@ func _ready() -> void:
 	status_line.add_child(clock_label)
 	var action_row := HBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 4)
-	settings_button = button("设置  F10")
+	settings_button = icon_button("设置  F10", "settings")
 	settings_button.tooltip_text = "画面、镜头、声音和键位"
 	settings_button.pressed.connect(func(): preferences_panel.open())
-	tech_button = button("科技  T")
+	tech_button = icon_button("科技  T", "tech")
 	tech_button.pressed.connect(open_tech)
 	action_row.add_child(tech_button)
-	heal_button = button("治疗  H")
+	heal_button = icon_button("治疗  H", "heal")
 	heal_button.tooltip_text = "前往帐篷，每秒消耗 1 黄金恢复 10 生命；医疗研究后恢复 25。"
 	heal_button.pressed.connect(world.heal)
 	action_row.add_child(heal_button)
-	eat_button = button("进食")
+	eat_button = icon_button("进食", "eat")
 	eat_button.tooltip_text = "食用熟肉、浆果或补给，恢复饱腹度。"
 	eat_button.pressed.connect(world.eat_food)
 	action_row.add_child(eat_button)
-	cook_button = button("烤肉")
+	cook_button = icon_button("烤肉", "cook")
 	cook_button.tooltip_text = "在已建成的营火消耗生肉制作熟肉。"
 	cook_button.pressed.connect(world.cook_food)
 	action_row.add_child(cook_button)
 	action_row.add_child(settings_button)
-	var pause := button("暂停  Esc")
+	var pause := icon_button("暂停  Esc", "pause")
 	pause.pressed.connect(world.toggle_pause)
 	action_row.add_child(pause)
-	kill_stats_button = button("击杀统计")
+	kill_stats_button = icon_button("击杀统计", "stats")
 	kill_stats_button.tooltip_text = "查看本局各类恐龙的击杀数量；打开时暂停。"
 	kill_stats_button.pressed.connect(func(): kill_stats.open())
 	action_row.add_child(kill_stats_button)
@@ -158,10 +161,10 @@ func _ready() -> void:
 	# permanently occupying the playfield with secondary text.
 	expedition_summary.visible = false
 	quest_column.add_child(expedition_summary)
-	journal_button = button("探索 / 任务  L")
+	journal_button = icon_button("探索 / 任务  L", "journal")
 	journal_button.pressed.connect(func(): expedition_panel.open())
 	quest_column.add_child(journal_button)
-	camp_view_button = button("查看营地")
+	camp_view_button = icon_button("查看营地", "camp")
 	camp_view_button.pressed.connect(world.outfitting.view_camp)
 	camp_view_button.tooltip_text = "只切换镜头；空格回到人物，不中断当前命令。"
 	quest_column.add_child(camp_view_button)
@@ -176,7 +179,7 @@ func _ready() -> void:
 	boarding_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	boarding_bar.hide()
 	quest_column.add_child(boarding_bar)
-	extraction_button = button("前往 H 撤离点")
+	extraction_button = icon_button("前往 H 撤离点", "return")
 	extraction_button.tooltip_text = "沿实际可通行路线前往停机坪；途中仍可能遇到恐龙。"
 	extraction_button.pressed.connect(world.go_to_extraction)
 	extraction_button.hide()
@@ -202,7 +205,7 @@ func _ready() -> void:
 	# building labels on short windows; it remains close to the original height.
 	# Content now drives a shorter panel; the right building grid no longer
 	# reserves the old tall column beneath its last row.
-	bottom.offset_top = -190
+	bottom.offset_top = -202
 	bottom.offset_bottom = -6
 	(bottom.get_theme_stylebox("panel") as StyleBoxFlat).set_content_margin_all(8)
 	var columns := HBoxContainer.new()
@@ -263,29 +266,31 @@ func _ready() -> void:
 	tactics.add_theme_constant_override("v_separation", 4)
 	middle.add_child(tactics)
 	priority_button = OptionButton.new()
+	priority_button.icon = load("res://assets/ui/actions/focus.svg")
+	priority_button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	for text in world.DefenseCombat.LABELS: priority_button.add_item(text)
 	priority_button.item_selected.connect(func(index):
 		var selected: Dictionary = world.selected_building()
 		if not world.paused and not selected.is_empty(): world.set_tower_priority(selected.id,index))
 	priority_button.tooltip_text = "设置选中箭塔的目标优先级；没有对应目标时攻击最近的恐龙。集火标记优先。"
 	tactics.add_child(priority_button)
-	focus_button = button("集火标记")
+	focus_button = icon_button("集火标记", "focus")
 	focus_button.tooltip_text = "点击后在场景中左键选择恐龙；不改变人物命令。右键或 Esc 取消选择。"
 	focus_button.pressed.connect(func():
 		if world.paused: return
 		world.build_mode = ""
 		world.defense.marking = not world.defense.marking)
 	tactics.add_child(focus_button)
-	clear_focus_button = button("取消集火")
+	clear_focus_button = icon_button("取消集火", "clear")
 	clear_focus_button.pressed.connect(func():
 		if world.paused: return
 		world.clear_focus()
 		world.defense.marking = false)
 	tactics.add_child(clear_focus_button)
-	outfit_button = button("装备 / 探索  L")
+	outfit_button = icon_button("装备 / 探索  L", "outfit")
 	outfit_button.pressed.connect(func(): outfit_panel.open())
 	tactics.add_child(outfit_button)
-	kit_button = button("急救包  J")
+	kit_button = icon_button("急救包  J", "heal")
 	kit_button.pressed.connect(world.use_medkit)
 	tactics.add_child(kit_button)
 	columns.add_child(middle)
@@ -301,32 +306,32 @@ func _ready() -> void:
 	var title := label("营地建造", 15, Color("d8c398"))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	command_head.add_child(title)
-	demolish_button = button("拆除")
+	demolish_button = icon_button("拆除", "demolish")
 	demolish_button.pressed.connect(request_demolition)
 	demolish_button.hide()
 	command_head.add_child(demolish_button)
-	repair_button = button("修理")
+	repair_button = icon_button("修理", "repair")
 	repair_button.tooltip_text = "派幸存者修理；每秒消耗 1 木材恢复 8% 耐久。电门也可修理。"
 	repair_button.pressed.connect(world.repair_selected)
 	command_head.add_child(repair_button)
 	for option in ["brace"]:
-		var refit_button := button(Catalog.REFITS[option].name)
+		var refit_button := icon_button(Catalog.REFITS[option].name, "brace")
 		refit_button.pressed.connect(world.refit_selected.bind(option))
 		refit_button.visible = false
 		refit_buttons[option] = refit_button
 		tactics.add_child(refit_button)
-	reinforce_button = button("加固箭塔")
+	reinforce_button = icon_button("加固箭塔", "brace")
 	reinforce_button.pressed.connect(world.reinforce_selected)
 	reinforce_button.hide()
 	tactics.add_child(reinforce_button)
-	research_button = button("升级实验室  R")
+	research_button = icon_button("升级实验室  R", "tech")
 	research_button.pressed.connect(world.research)
 	command_head.add_child(research_button)
-	workshop_button = button("升级工坊")
+	workshop_button = icon_button("升级工坊", "workshop")
 	workshop_button.tooltip_text = "基础建筑升级为装备工坊 · 10 木 / 8 金 / 15 秒 · 额外 1 点电力"
 	workshop_button.pressed.connect(world.research.bind("workshop"))
 	command_head.add_child(workshop_button)
-	rotate_build_button = button("旋转")
+	rotate_build_button = icon_button("旋转", "rotate")
 	rotate_build_button.pressed.connect(world.rotate_building_preview)
 	rotate_build_button.hide()
 	command_head.add_child(rotate_build_button)
@@ -339,14 +344,47 @@ func _ready() -> void:
 	for i in range(Catalog.ORDER.size()):
 		var kind: String = Catalog.ORDER[i]
 		var spec: Dictionary = Catalog.BUILDINGS[kind]
-		var b := button("%d  %s\n木 %d   金 %d   电 %d" % [i + 1, spec.name, spec.wood, spec.gold, spec.power])
-		b.custom_minimum_size = Vector2(76, 46)
+		var b := button("")
+		b.custom_minimum_size = Vector2(98, 70)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.tooltip_text = spec.description
 		var tile: StyleBoxFlat = b.get_theme_stylebox("normal").duplicate()
 		tile.border_color = Color("506659")
 		tile.border_width_left = 3
 		b.add_theme_stylebox_override("normal", tile)
+		var card := VBoxContainer.new()
+		card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		card.offset_left = 4
+		card.offset_right = -4
+		card.offset_top = 3
+		card.offset_bottom = -2
+		card.add_theme_constant_override("separation", 0)
+		b.add_child(card)
+		var headline := HBoxContainer.new()
+		headline.add_theme_constant_override("separation", 2)
+		card.add_child(headline)
+		var picture := TextureRect.new()
+		picture.texture = load("res://assets/ui/buildings/%s.svg" % kind)
+		picture.custom_minimum_size = Vector2(39, 39)
+		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		headline.add_child(picture)
+		var names := VBoxContainer.new()
+		names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		names.add_theme_constant_override("separation", 0)
+		headline.add_child(names)
+		var shortcut := label(str(i + 1), 11, Color("e4c184"))
+		names.add_child(shortcut)
+		build_key_labels[kind] = shortcut
+		var name_label := label(spec.name, 11, Color("e8e8d3"))
+		name_label.clip_text = true
+		names.add_child(name_label)
+		var cost := label("木%d · 金%d · 电%d" % [spec.wood, spec.gold, spec.power], 10, Color("aac1ac"))
+		cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cost.clip_text = true
+		card.add_child(cost)
+		for part in [card, headline, picture, names, shortcut, name_label, cost]:
+			part.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.pressed.connect(world.select_build.bind(kind))
 		build_buttons[kind] = b
 		grid.add_child(b)
@@ -442,10 +480,10 @@ func make_start() -> void:
 	start_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	start_panel.offset_left = -265
 	start_panel.offset_right = 265
-	start_panel.offset_top = -300
-	start_panel.offset_bottom = 300
+	start_panel.offset_top = -260
+	start_panel.offset_bottom = 260
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 18)
+	col.add_theme_constant_override("separation", 12)
 	start_panel.add_child(col)
 	var title := label("进入侏罗纪公园", 30, Color("d8c38d"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -477,26 +515,33 @@ func make_start() -> void:
 		profession_select.set_item_metadata(profession_select.item_count - 1, id)
 	profession_row.add_child(profession_select)
 	profession_row.visible = Features.peripheral_enabled
-	standard_start_button = button("标准生存 · 25 分钟  +  5 分钟撤离")
-	standard_start_button.custom_minimum_size.y = 48
-	standard_start_button.pressed.connect(start_selected_session.bind(1500.0, "standard"))
-	col.add_child(standard_start_button)
-	hard_start_button = button("困难生存 · 25 分钟  +  5 分钟撤离")
-	hard_start_button.custom_minimum_size.y = 44
-	hard_start_button.tooltip_text = "恐龙群随时间、营地建设和科技逐步增强；数量与属性有上限。"
-	hard_start_button.pressed.connect(start_selected_session.bind(1500.0, "hard"))
-	col.add_child(hard_start_button)
-	col.add_child(label("采集建设 · 防线改造 · 恐龙来袭 · 最终撤离", 13, Color("a6b59e")))
-	col.add_child(label("长局模式 · 保留原有恐龙刷新节奏", 14, Color("a6b59e")))
 	var choices := HBoxContainer.new()
-	choices.add_theme_constant_override("separation", 10)
+	choices.add_theme_constant_override("separation", 16)
 	col.add_child(choices)
-	for minutes in [45, 60, 80]:
-		var b := button("%d 分钟%s" % [minutes, ""])
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size.y = 54
-		b.pressed.connect(start_selected_session.bind(minutes * 60.0, "classic"))
-		choices.add_child(b)
+	var time_column := VBoxContainer.new()
+	time_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choices.add_child(time_column)
+	time_column.add_child(label("游戏时长", 14, Color("a6b59e")))
+	duration_select = OptionButton.new()
+	duration_select.custom_minimum_size = Vector2(220, 42)
+	for minutes in [25, 45, 60, 80]:
+		duration_select.add_item("%d 分钟" % minutes, minutes)
+	time_column.add_child(duration_select)
+	var difficulty_column := VBoxContainer.new()
+	difficulty_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choices.add_child(difficulty_column)
+	difficulty_column.add_child(label("游戏难度", 14, Color("a6b59e")))
+	difficulty_select = OptionButton.new()
+	difficulty_select.custom_minimum_size = Vector2(220, 42)
+	difficulty_select.add_item("普通")
+	difficulty_select.add_item("困难")
+	difficulty_select.tooltip_text = "困难：恐龙群随时间与营地成长增强。两种难度均可自由选择时长。"
+	difficulty_column.add_child(difficulty_select)
+	col.add_child(label("时长结束后，另有 5 分钟前往 H 区撤离。", 13, Color("a6b59e")))
+	standard_start_button = button("开始游戏")
+	standard_start_button.custom_minimum_size.y = 48
+	standard_start_button.pressed.connect(func(): start_selected_session(selected_duration(), selected_difficulty()))
+	col.add_child(standard_start_button)
 	continue_button = button("继续上次游戏")
 	continue_button.pressed.connect(world.load_game)
 	col.add_child(continue_button)
@@ -505,7 +550,7 @@ func make_start() -> void:
 	col.add_child(browse)
 	start_hint = label("", 13, Color("a6b59e"))
 	col.add_child(start_hint)
-	add_help_settings(col, true)
+	add_help_settings(col)
 	load("res://scripts/coop_panel.gd").new(self,col)
 
 func panel(color: Color = Color(0.055, 0.10, 0.082, 0.96)) -> PanelContainer:
@@ -560,6 +605,13 @@ func button(text: String) -> Button:
 		style.set_corner_radius_all(3)
 		style.set_content_margin_all(7)
 		b.add_theme_stylebox_override(state, style)
+	return b
+
+func icon_button(text: String, icon_name: String) -> Button:
+	var b := button(text)
+	b.icon = load("res://assets/ui/actions/%s.svg" % icon_name)
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.add_theme_constant_override("h_separation", 5)
 	return b
 
 func make_pause() -> void:
@@ -657,7 +709,7 @@ func refresh(dt: float) -> void:
 		selection_label.text = spec.name
 		health.max_value = maximum
 		health.value = b.hp
-		detail_label.text = "%s\n生命 %d / %d%s" % ["施工剩余 %.1f 秒 · 右键继续" % b.remaining if b.remaining > 0 else spec.description, b.hp, maximum, " · 改造：" + Catalog.REFITS[b.refit].name if b.get("refit", "") in Catalog.REFITS else ""]
+		detail_label.text = "%s\n生命 %d / %d%s" % ["施工剩余 %.1f 秒 · 左键继续" % b.remaining if b.remaining > 0 else spec.description, b.hp, maximum, " · 改造：" + Catalog.REFITS[b.refit].name if b.get("refit", "") in Catalog.REFITS else ""]
 		if b.get("refit", "") in Catalog.REFITS:
 			detail_label.text = "%s\n生命 %d / %d · %s" % [Catalog.REFITS[b.refit].description, b.hp, maximum, "改造剩余 %.0f 秒" % b.remaining if b.remaining > 0 else Catalog.REFITS[b.refit].name]
 		if b.kind == "tower" and b.remaining <= 0:
@@ -863,6 +915,7 @@ func request_demolition() -> void:
 
 func make_confirmation() -> void:
 	confirmation = ConfirmationDialog.new()
+	confirmation.theme = root.theme
 	confirmation.title = "确认操作"
 	confirmation.ok_button_text = "确认"
 	confirmation.cancel_button_text = "取消"
@@ -960,8 +1013,8 @@ func refresh_key_hints() -> void:
 	research_button.text = "升级实验室  " + keys.key_name("upgrade")
 	save_button.text = "保存游戏  " + keys.key_name("save")
 	load_button.text = "选择存档  " + keys.key_name("load")
-	controls_hint.text = "右键下令 · %s 归位 · %s 手册 · %s 设置" % [keys.key_name("center"), keys.key_name("guide"), keys.key_name("settings")]
-	start_hint.text = "右键移动与采集 · %s 跟随角色 · %s 生存手册" % [keys.key_name("center"), keys.key_name("guide")]
+	controls_hint.text = "左键使用工具 · 右键移动 · %s 归位 · %s 手册 · %s 设置" % [keys.key_name("center"), keys.key_name("guide"), keys.key_name("settings")]
+	start_hint.text = "左键使用工具 · 右键移动 · %s 跟随角色 · %s 生存手册" % [keys.key_name("center"), keys.key_name("guide")]
 	follow_button.tooltip_text = "%s：切换跟随；镜头平移键或方向键可退出跟随" % keys.key_name("follow")
 	camera_panel.get_child(0).get_child(0).tooltip_text = "%s：回到并持续跟随角色；%s：重置镜头" % [keys.key_name("center"), keys.key_name("reset_camera")]
 	for index in [2, 3]:
@@ -969,7 +1022,7 @@ func refresh_key_hints() -> void:
 	for i in range(Catalog.ORDER.size()):
 		var kind: String = Catalog.ORDER[i]
 		var spec: Dictionary = Catalog.BUILDINGS[kind]
-		build_buttons[kind].text = "%s  %s\n木 %d   金 %d   电 %d" % [keys.key_name("build_%d" % i), spec.name, spec.wood, spec.gold, spec.power]
+		build_key_labels[kind].text = keys.key_name("build_%d" % i)
 
 func start_selected_session(duration: float, mode: String) -> void:
 	var input := content_seed_input.text.strip_edges()
@@ -985,3 +1038,9 @@ func start_selected_session(duration: float, mode: String) -> void:
 	if profession_select and profession_select.selected >= 0:
 		profession = str(profession_select.get_item_metadata(profession_select.selected))
 	world.start_session(duration, mode, seed_value, profession)
+
+func selected_duration() -> float:
+	return float(duration_select.get_selected_id()) * 60.0
+
+func selected_difficulty() -> String:
+	return "hard" if difficulty_select.selected == 1 else "standard"

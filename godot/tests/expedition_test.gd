@@ -240,6 +240,7 @@ func test_tactics() -> void:
 	world.board.layout.heights.fill(0.0)
 	world.board.layout.walk.fill(1)
 	world.board.layout.build.fill(1)
+	world.board.layout.rebuild_surface()
 	world.trees.clear()
 	world.hero.position = world.board.point(Vector2i(65, 62))
 	var leader: Node3D = world.spawn_dinosaur(world.board.point(Vector2i(62, 62)), "raptor")

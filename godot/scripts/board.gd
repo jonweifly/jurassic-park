@@ -10,6 +10,7 @@ var structures: Dictionary = {}
 var revision: int = 0
 var clearance_grids := {}
 var reachability := {}
+var body_navigation: RefCounted
 
 # AStar exhausts the entire connected region for each impossible destination.
 # Cache component membership per body radius and board revision, then retain
@@ -124,11 +125,19 @@ func route(from: Vector3, to: Vector3, adjacent: bool = false, radius: float = 0
 			best_score = score
 			best = path
 	if start_solid: search.set_point_solid(start, true)
+	if best.is_empty() and radius > 1.0:
+		if body_navigation == null: body_navigation = load("res://scripts/body_navigation.gd").new(self)
+		return body_navigation.route(from,to,adjacent,radius)
 	for i in range(1, best.size()): result.append(point(best[i]))
 	# A pawn can be inside the destination cell but still en route to its center.
 	# Preserve that final segment when a moving pawn replans an adjacent-cell route.
 	if best.size() == 1 and from.distance_to(point(best[0])) > 0.05:
 		result.append(point(best[0]))
+	if is_open(start) and not result.is_empty() and not body_segment_open(from, result[0], radius):
+		var center := point(start)
+		if body_segment_open(from, center, radius) and body_segment_open(center, result[0], radius):
+			result.insert(0, center)
+		else: return PackedVector3Array()
 	if radius > 1 and adjacent and not best.is_empty():
 		# Finish within the existing bite range while keeping the whole body outside walls.
 		var end := result[-1] if not result.is_empty() else from

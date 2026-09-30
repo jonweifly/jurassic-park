@@ -18,7 +18,7 @@ void vertex() {
 }
 void fragment() {
  vec2 uv = world_point.xz / 256.0 + vec2(0.5);
- float ground = texture(ground_heights,(uv*128.0+0.5)/129.0).r;
+ float ground = texture(ground_heights,(uv*256.0+0.5)/257.0).r;
  float roof = texture(roof_heights,uv).r;
  float floor_height = max(ground+0.06,roof);
  if (world_point.y < floor_height) { discard; }

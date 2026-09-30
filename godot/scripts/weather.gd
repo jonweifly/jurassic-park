@@ -80,9 +80,7 @@ func apply_lighting() -> void:
 	world.environment.fog_density = lerpf(0.0007,0.0027,rain)
 
 func create_rain() -> void:
-	var height_image := Image.create(129,129,false,Image.FORMAT_RF)
-	for y in range(129):
-		for x in range(129): height_image.set_pixel(x,y,Color(float(world.board.layout.heights[y*129+x]),0,0))
+	var height_image: Image = world.board.layout.height_image()
 	rain_material = ShaderMaterial.new()
 	rain_material.shader = load("res://shaders/rain.gdshader")
 	rain_material.set_shader_parameter("ground_heights",ImageTexture.create_from_image(height_image))

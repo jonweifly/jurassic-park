@@ -1,12 +1,11 @@
 extends Control
 ## Presentation-only pointer, target and route feedback. Commands own the simulation.
-const CURSOR_SIZE := Vector2(32, 32)
-const CURSOR_HOTSPOT := Vector2(2, 2) * (32.0 / 44.0)
-const LABELS = {"move": "", "wood": "右键砍树", "gold": "右键采金", "build": "右键继续施工", "repair": "右键修理", "attack": "右键攻击", "return": "右键返送资源", "gate": "右键开关电门", "inspect": "右键调查", "blocked": "无法到达", "heal": "返回帐篷治疗"}
+const MOVE_PULSE_SECONDS := 0.95
+const ACTION_ICON_SIZE := Vector2(32, 32)
+const LABELS = {"move": "", "select": "左键选中建筑", "wood": "左键砍树", "gold": "左键采金", "build": "左键继续施工", "repair": "左键修理", "attack": "左键攻击", "return": "左键返送资源", "gate": "左键开关电门", "inspect": "左键调查", "field_site": "左键搜寻", "blocked": "无法到达", "heal": "返回帐篷治疗"}
 const COLORS = {"move": Color("a8e6b2"), "wood": Color("bde3a0"), "gold": Color("f2d386"), "attack": Color("ffa594"), "blocked": Color("f5988b")}
 var world: Node
 var icons: Dictionary = {}
-var target_icons: Dictionary = {}
 var cursor_kind := "move"
 var cursor_text := ""
 var pointer := Vector2.ZERO
@@ -29,8 +28,8 @@ func _ready() -> void:
 	tooltip_box.bg_color = Color(0.035, 0.075, 0.06, 0.94)
 	tooltip_box.set_corner_radius_all(4)
 	for kind in LABELS:
-		icons[kind] = load("res://assets/cursors/%s.svg" % kind)
-		if kind != "move": target_icons[kind] = load("res://assets/interaction_icons/%s.svg" % kind)
+		if kind not in ["move", "select"]:
+			icons[kind] = load("res://assets/interaction_icons/%s.svg" % ("inspect" if kind == "field_site" else kind))
 
 func _exit_tree() -> void:
 	release_cursor()
@@ -49,22 +48,33 @@ func _notification(what: int) -> void:
 func confirm(target: Dictionary, accepted: bool = true) -> void:
 	pulse_position = target.position
 	pulse_kind = target.kind if accepted else "blocked"
-	pulse_left = 0.85
+	pulse_left = MOVE_PULSE_SECONDS
+	world.interaction_targets.confirm(target, accepted)
+	update_movement_marker()
+
+func update_movement_marker() -> void:
+	# Animate the existing destination mesh, never a second screen-space marker.
+	world.destination.visible = pulse_kind == "move" and pulse_left > 0 and world.started and not world.paused
+	if not world.destination.visible: return
+	world.destination.material_override.set_shader_parameter("progress", clampf(1.0 - pulse_left / MOVE_PULSE_SECONDS, 0.0, 1.0))
 
 func reachable(target: Dictionary) -> bool:
-	if target.kind in ["blocked", "gate", "inspect", "return"]: return target.kind != "blocked"
+	if target.kind in ["blocked", "gate", "inspect", "return", "select", "field_site"]: return target.kind != "blocked"
 	var cell: Vector2i = world.board.cell_at(target.position)
 	var key := "%s:%s:%s:%d" % [target.kind, cell, world.board.cell_at(world.hero.position), world.board.revision]
 	if key != cached_key or clock >= cached_until:
 		cached_key = key
 		cached_until = clock + 0.15
-		var route: PackedVector3Array = world.board.route(world.hero.position, target.position, target.kind != "move")
-		cached_reachable = not route.is_empty() or world.hero.position.distance_to(target.position) <= 3
+		var route: PackedVector3Array = world.worker.work_route(target.kind, target.position)
+		var at_target: bool = world.worker.wood_contact(world.hero.position, target.position) if target.kind == "wood" else world.hero.position.distance_to(target.position) <= 3
+		cached_reachable = not route.is_empty() or at_target
 	return cached_reachable
 
 func update_hover(screen: Vector2, point: Vector3) -> void:
 	pointer = screen
-	var target: Dictionary = world.context_at(point)
+	var action_point: Vector3 = world.action_point(screen, point) if world.build_mode.is_empty() else point
+	var target: Dictionary = world.context_at(action_point)
+	world.interaction_targets.hover_target = target
 	cursor_kind = target.kind
 	cursor_text = LABELS[cursor_kind]
 	if not world.build_mode.is_empty():
@@ -74,21 +84,30 @@ func update_hover(screen: Vector2, point: Vector3) -> void:
 		if error.is_empty():
 			var warning: String = world.placement_warning(world.board.cell_at(point))
 			if not warning.is_empty(): cursor_text = "注意：" + warning
+	elif target.kind == "move" and world.vision.explored.has(world.board.cell_at(point)) and world.board.layout.submerged_at(point.x,point.z) and not world.board.layout.wading_at(point.x,point.z):
+		cursor_kind = "blocked"
+		cursor_text = "深水 · 请从浅滩绕行"
 	elif not reachable(target):
 		cursor_kind = "blocked"
 		cursor_text = "无法到达 · 清理道路或另选位置"
+	elif target.kind == "move" and world.vision.explored.has(world.board.cell_at(point)) and world.board.layout.wading_at(point.x,point.z):
+		cursor_text = "浅滩 · 可涉水，移动减慢 30%"
 
 func refresh(dt: float) -> void:
 	clock += dt
 	if not world.paused: pulse_left = maxf(0, pulse_left - dt)
+	update_movement_marker()
 	pointer = get_viewport().get_mouse_position()
 	var in_window := get_viewport_rect().has_point(pointer) and DisplayServer.window_is_focused()
 	active = in_window and world.started and not world.paused and world.session.phase in ["playing", "evacuate"] and not world.hud.covers(pointer) and not world.camera_rig.dragging
 	if active:
 		update_hover(pointer, world.ground_at(pointer))
-		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
-		owns_cursor = true
+		if icons.has(cursor_kind):
+			Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+			owns_cursor = true
+		else: release_cursor()
 	else: release_cursor()
+	world.interaction_targets.refresh(active, cursor_kind == "blocked", dt)
 	queue_redraw()
 
 func screen_point(point: Vector3) -> Vector2:
@@ -98,36 +117,24 @@ func screen_point(point: Vector3) -> Vector2:
 func clear_screen(p: Vector2) -> bool:
 	return get_viewport_rect().grow(-12).has_point(p) and not world.hud.covers(p)
 
-func draw_target(point: Vector3, kind: String, alpha: float, radius: float, show_icon: bool = true) -> void:
-	var p := screen_point(point)
-	if not clear_screen(p): return
-	var color: Color = COLORS.get(kind, Color("e4cf8e"))
-	color.a = alpha
-	draw_arc(p, radius, 0, TAU, 40, Color(0.03, 0.09, 0.06, alpha * 0.8), 5, true)
-	draw_arc(p, radius, 0, TAU, 40, color, 2, true)
-	for direction in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
-		draw_line(p + direction * (radius + 4), p + direction * (radius + 9), color, 2, true)
-	if show_icon and target_icons.has(kind): draw_texture_rect(target_icons[kind], Rect2(p + Vector2(-12, -36 - sin(clock * 4)), Vector2(24, 24)), false, Color(1, 1, 1, alpha))
-
 func _draw() -> void:
 	if not world.started or world.paused or world.session.phase not in ["playing", "evacuate"]: return
 	var kind: String = world.order
 	if kind in ["move", "wood", "gold", "build", "repair", "return", "attack", "heal", "expedition"]:
 		# Route dots come from the pawn's actual current route, including replans.
-		for i in range(mini(24, world.hero.route.size()) if world.preferences.values.route_dots else 0):
+		for i in range(mini(24, maxi(0, world.hero.route.size() - 1)) if world.preferences.values.route_dots else 0):
 			var point: Vector3 = world.hero.route[i]
 			if not world.vision.explored.has(world.board.cell_at(point)): continue
 			var p := screen_point(point)
 			if clear_screen(p):
 				draw_circle(p, 3.0, Color(0.03, 0.09, 0.06, 0.65))
 				draw_circle(p, 1.7, Color(0.72, 0.87, 0.63, 0.75))
-		var target: Vector3 = world.order_target
-		if kind == "move" and not world.hero.route.is_empty(): target = world.hero.route[-1]
-		draw_target(target, "inspect" if kind == "expedition" else kind, 0.9, 12 + sin(clock * 4) * 1.5)
-	if pulse_left > 0:
-		draw_target(pulse_position, pulse_kind, minf(1, pulse_left * 2.0), 13 + (0.85 - pulse_left) * 22, false)
-	if active and icons.has(cursor_kind):
-		draw_texture_rect(icons[cursor_kind], Rect2(pointer - CURSOR_HOTSPOT, CURSOR_SIZE), false)
+	# Target rings live in the world; the cursor stays a single tool glyph.
+	if active and (icons.has(cursor_kind) or not cursor_text.is_empty()):
+		# Keep the building footprint clear while the player chooses a cell.
+		var icon_center := pointer + (Vector2(20, -20) if not world.build_mode.is_empty() else Vector2.ZERO)
+		icon_center = icon_center.clamp(Vector2(17, 17), get_viewport_rect().size - Vector2(17, 17))
+		if icons.has(cursor_kind): draw_texture_rect(icons[cursor_kind], Rect2(icon_center - ACTION_ICON_SIZE * 0.5, ACTION_ICON_SIZE), false)
 		if cursor_text.is_empty(): return
 		var font: Font = world.hud.font
 		var size := font.get_string_size(cursor_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13) + Vector2(12, 8)

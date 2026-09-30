@@ -13,6 +13,10 @@ func _init(owner_world: Node) -> void: world = owner_world
 
 func data() -> Dictionary:
 	if world.session.outfitting.is_empty(): world.session.outfitting = Catalog.empty()
+	for inventory in world.session.outfitting.actors.values():
+		if not inventory.has("chainsaw"): inventory.chainsaw = 0
+		if not inventory.has("saw_enabled"): inventory.saw_enabled = true
+	if not world.session.outfitting.has("robots"): world.session.outfitting.robots = []
 	return world.session.outfitting
 
 func actor(pawn: Node3D = null) -> Dictionary:
@@ -64,7 +68,7 @@ func sync_visuals() -> void:
 			visuals[id] = node
 		visuals[id].visible = world.vision.explored.has(site.cell)
 		visuals[id].get_node("Title").visible = world.vision.is_visible(site.cell)
-		visuals[id].get_node("Title").text = Catalog.SITES[id].name + (" · 已回收" if site.status != "known" else " · 右键搜寻")
+		visuals[id].get_node("Title").text = Catalog.SITES[id].name + (" · 已回收" if site.status != "known" else " · 左键搜寻")
 
 func at_point(point: Vector3) -> String:
 	for id in data().sites:
@@ -87,10 +91,14 @@ func craft_error(id: int, item: String) -> String:
 	if data().jobs.has(str(id)): return "工坊有制作任务或待领物品"
 	var spec: Dictionary = Catalog.ITEMS[item]
 	var inventory := actor()
+	if item == "repair_bot":
+		if not world.session.technologies.has("mechanical"): return "需要实验室研究「机械工程」"
+		var pending: int = data().jobs.values().filter(func(job): return job.item == "repair_bot").size()
+		if data().robots.size() + pending >= 3: return "营地最多部署 3 台维修机器人（含制作中）"
 	if spec.rank > 0 and inventory[spec.slot] >= spec.rank: return "已装备同级或更好的物品"
 	if spec.slot == "kits" and inventory.kits >= 3: return "急救包已达携带上限"
 	for job in data().jobs.values():
-		if job.owner == owner_slot() and Catalog.ITEMS[job.item].slot == spec.slot: return "已有同类物品正在制作或等待领取"
+		if item != "repair_bot" and job.owner == owner_slot() and Catalog.ITEMS[job.item].slot == spec.slot: return "已有同类物品正在制作或等待领取"
 	if not spec.blueprint.is_empty():
 		if spec.blueprint not in data().blueprints: return "需要从%s带回图纸" % Catalog.SITES[spec.blueprint].name
 		if not world.session.technologies.has("field_equipment"): return "需要实验室研究「野外装备工程」"
@@ -128,6 +136,7 @@ func collect(id: int) -> String:
 	if not error.is_empty(): return error
 	var job: Dictionary = data().jobs.get(str(id), {})
 	if job.is_empty() or job.remaining > 0: return "尚无制作完成的物品"
+	if job.item == "repair_bot": return "机器人完成后自动部署，无需领取"
 	if job.owner != owner_slot(): return "这是队友订制的装备"
 	if job.item == "medkit" and actor().kits >= 3: return "急救包已满，物品会留在工坊"
 	return travel(world.board.point(world.session.building(id).cell), "collect", id)
@@ -173,6 +182,14 @@ func use_kit() -> String:
 func damage_multiplier(pawn: Node3D) -> float: return [1.0, 1.25, 1.5][actor(pawn).rifle]
 func incoming_damage(pawn: Node3D, amount: float, direct: bool = true) -> float:
 	return amount * ([1.0, 0.85, 0.75][actor(pawn).vest] if direct else 1.0)
+
+func saw_active() -> bool:
+	return actor().chainsaw > 0 and actor().saw_enabled
+
+func toggle_saw() -> String:
+	if actor().chainsaw <= 0: return "请先在工坊制作并领取电锯"
+	actor().saw_enabled = not actor().saw_enabled
+	return "已切换：电锯开路（不采木、不返营）" if actor().saw_enabled else "已切换：普通采木（自动返送）"
 
 func apply_equipment(pawn: Node3D) -> void:
 	var inventory := actor(pawn)
@@ -245,9 +262,18 @@ func update(dt: float) -> void:
 			# Materials and finished goods are lost with the workshop; worn gear survives.
 			data().jobs.erase(key)
 			continue
+		if job.remaining <= 0 and job.item == "repair_bot":
+			world.robots.deploy(b)
+			data().jobs.erase(key)
+			continue
 		if job.remaining <= 0 or b.remaining > 0 or world.session.supply() < world.session.demand(): continue
 		job.remaining = maxf(0, job.remaining - dt)
-		if job.remaining <= 0: world.hud.toast("工坊制作完成：%s。前往领取后生效。" % Catalog.ITEMS[job.item].name)
+		if job.remaining <= 0:
+			if job.item == "repair_bot":
+				world.robots.deploy(b)
+				data().jobs.erase(key)
+				world.hud.toast("维修机器人已部署，自动巡检附近建筑。")
+			else: world.hud.toast("工坊制作完成：%s。前往领取后生效。" % Catalog.ITEMS[job.item].name)
 	refresh_clock -= dt
 	if refresh_clock > 0: return
 	refresh_clock = 0.3

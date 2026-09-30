@@ -95,12 +95,12 @@ func ground(layout: RefCounted) -> void:
 		solve("thigh" + side, "shin" + side, "foot" + side, target, basis)
 
 func tool_transform(action: String) -> Transform3D:
-	var prop: Node3D = visual.axe if action == "chop" else (visual.pickaxe if action == "mine" else visual.hammer)
+	var prop: Node3D = (visual.chainsaw if visual.saw_equipped else visual.axe) if action == "chop" else (visual.pickaxe if action == "mine" else visual.hammer)
 	var grip: Node3D = visual.get_node(visual.hand_socket_path)
 	return grip.transform * prop.transform
 
 func tip_offset(action: String) -> Vector3:
-	var point := Vector3(0, 0, 0.69)
+	var point := Vector3(0, 0, 0.88) if visual.saw_equipped else Vector3(0.34, 0, 0.70)
 	if action == "mine": point = Vector3(0.35, -0.03, 0.53)
 	if action == "build": point = Vector3(0, 0, 0.65)
 	return tool_transform(action) * point

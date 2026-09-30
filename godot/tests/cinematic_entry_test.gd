@@ -31,8 +31,10 @@ func run() -> void:
 	check(change_scene_to_file("res://scenes/main.tscn") == OK,"Main scene must load")
 	await settle()
 	var game: Node = current_scene
-	var entry: Button = game.hud.start_panel.find_child("CinematicSampleEntry",true,false)
-	check(entry != null and entry.is_visible_in_tree(),"Preview entry must be visible in the main menu")
+	game.hud.preferences_panel.open()
+	await settle()
+	var entry: Button = game.hud.preferences_panel.panel.find_child("CinematicSampleEntry",true,false)
+	check(entry != null and entry.is_visible_in_tree(),"Preview entry must be visible in settings")
 	if not entry: quit(1); return
 	check(root.get_visible_rect().encloses(entry.get_global_rect()),"Preview entry must fit inside the viewport")
 	check(not game.started,"Entry must be accessible before a survival session starts")

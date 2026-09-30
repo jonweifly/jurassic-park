@@ -173,6 +173,7 @@ func test_tactics_and_pacing() -> void:
 	world.board.layout.heights.fill(0.0)
 	world.board.layout.walk.fill(1)
 	world.board.layout.build.fill(1)
+	world.board.layout.rebuild_surface()
 	world.trees.clear()
 	world.session.wood = 1000
 	world.session.gold = 1000

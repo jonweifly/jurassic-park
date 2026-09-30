@@ -42,13 +42,20 @@ func run() -> void:
 	var cells: Array = world.trees.keys()
 	cells.sort_custom(func(a,b): return world.board.point(a).distance_squared_to(world.hero.position) < world.board.point(b).distance_squared_to(world.hero.position))
 	var tree := Vector3.ZERO
+	var found_tree := false
 	for cell in cells:
 		var target: Vector3 = world.board.point(cell)
 		var route: PackedVector3Array = world.worker.work_route("wood",target)
-		if route.is_empty() or route[-1].distance_to(target) > 1.4: continue
+		if route.is_empty() or not world.worker.wood_contact(route[-1], target): continue
+		found_tree = true
 		tree = target
 		world.hero.position = route[-1]
 		break
+	if not found_tree:
+		push_error("No reachable tree for contact capture")
+		world.free()
+		quit(1)
+		return
 	world.vision.update()
 	var direction: Vector3 = (tree-world.hero.position).normalized()
 	world.hero.visual.face(direction,1)

@@ -1,6 +1,6 @@
 extends Node
 ## Two-player ENet room. Only this node exposes RPCs; clients send bounded intents.
-const PROTOCOL := "jp-coop-2"
+const PROTOCOL := "jp-coop-3"
 const DEFAULT_PORT := 24565
 const Actor = preload("res://scripts/coop_actor.gd")
 const Replication = preload("res://scripts/coop_replication.gd")
@@ -49,9 +49,9 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(_server_left)
 	replication=Replication.new(world,self)
 
-func host(mode: String = "standard", selected_port: int = DEFAULT_PORT, password: String = "", resume: bool = false) -> String:
+func host(mode: String = "standard", selected_port: int = DEFAULT_PORT, password: String = "", resume: bool = false, duration: float = 1500.0) -> String:
 	if active or connecting or world.started: return "请先返回开始界面再创建合作局。"
-	if selected_port<1024 or selected_port>65535 or mode not in ["standard","hard"] or password.length()>64: return "房间设置无效。"
+	if selected_port<1024 or selected_port>65535 or mode not in ["standard","hard"] or password.length()>64 or duration not in [1500.0,2700.0,3600.0,4800.0]: return "房间设置无效。"
 	var saved := read_save() if resume else {}
 	if resume and saved.has("error"): return saved.error
 	var peer := ENetMultiplayerPeer.new()
@@ -71,6 +71,7 @@ func host(mode: String = "standard", selected_port: int = DEFAULT_PORT, password
 			make_pawn(2)
 			partner.run(func():
 				Save.restore_fields(world.hero,saved.partner.pawn,Save.PAWN_FIELDS)
+				if saved.world.get("terrain_revision",0) < Save.TERRAIN_REVISION: Save.reseat_pawn(world,world.hero)
 				Save.restore_fields(world.worker,saved.partner.worker,Save.WORKER_FIELDS)
 				world.order="idle"
 				world.hero.route.clear()
@@ -84,7 +85,7 @@ func host(mode: String = "standard", selected_port: int = DEFAULT_PORT, password
 				elif task.task == "return": world.outfitting.return_home()
 				)
 		world.paused=false
-	else: world.start_session(1500,mode)
+	else: world.start_session(duration,mode)
 	status="房间已创建 · 等待朋友加入"
 	decorate_pawn(1)
 	return ""
@@ -342,11 +343,12 @@ func _intent(sequence: int, action: String, args: Array) -> void:
 func valid_intent(action: String, args: Array) -> bool:
 	if args.size()>4 or not Save.safe_data(args): return false
 	match action:
-		"command", "focus": return args.size()==1 and args[0] is Vector3 and absf(args[0].x)<128 and absf(args[0].z)<128 and absf(args[0].y)<64
+		"command": return args.size() in [1, 2] and args[0] is Vector3 and absf(args[0].x)<128 and absf(args[0].z)<128 and absf(args[0].y)<64 and (args.size() == 1 or args[1] is bool)
+		"focus": return args.size()==1 and args[0] is Vector3 and absf(args[0].x)<128 and absf(args[0].z)<128 and absf(args[0].y)<64
 		"place": return args.size()==4 and args[0] is String and args[0] in world.Catalog.BUILDINGS and args[1] is Vector2i and world.board.inside(args[1]) and args[2] is float and absf(args[2])<=TAU and args[3] is bool
 		"demolish", "repair", "research", "reinforce": return args.size()==1 and args[0] is int and args[0]>0
 		"upgrade_base": return args.size()==2 and args[0] is int and args[0]>0 and args[1] in ["laboratory", "workshop"]
-		"outfit": return args.size()==3 and args[0] in ["craft", "collect", "explore", "return", "kit"] and args[1] is int and args[2] is String and (args[0]!="craft" or args[2] in world.outfitting.Catalog.ITEMS) and (args[0]!="explore" or args[2] in world.outfitting.Catalog.SITES)
+		"outfit": return args.size()==3 and args[0] in ["craft", "collect", "explore", "return", "kit", "saw"] and args[1] is int and args[2] is String and (args[0]!="craft" or args[2] in world.outfitting.Catalog.ITEMS) and (args[0]!="explore" or args[2] in world.outfitting.Catalog.SITES)
 		"refit": return args.size()==2 and args[0] is int and args[1] is String and args[1] in world.Catalog.REFITS
 		"priority": return args.size()==2 and args[0] is int and args[1] is int and args[1] in range(3)
 		"tech": return args.size()==1 and args[0] is String and args[0] in world.Catalog.TECH
@@ -355,7 +357,7 @@ func valid_intent(action: String, args: Array) -> bool:
 
 func dispatch(action: String, args: Array) -> void:
 	match action:
-		"command": world.command(args[0])
+		"command": world.command(args[0], args[1] if args.size() > 1 else false)
 		"place":
 			world.build_mode=args[0]
 			world.build_rotation=args[2]
@@ -467,7 +469,7 @@ static func read_save() -> Dictionary:
 	if file.get_length()>4194304: return {"error":"合作存档无效。"}
 	var data: Variant = bytes_to_var(file.get_buffer(file.get_length()))
 	# Live peers require the current protocol; older local saves can still migrate.
-	if not data is Dictionary or data.get("protocol") not in ["jp-coop-1", PROTOCOL] or not data.get("world") is Dictionary or not Save.safe_data(data): return {"error":"合作存档版本或数据无效。"}
+	if not data is Dictionary or data.get("protocol") not in ["jp-coop-1", "jp-coop-2", PROTOCOL] or not data.get("world") is Dictionary or not Save.safe_data(data): return {"error":"合作存档版本或数据无效。"}
 	if not Save.validate(data.world).is_empty(): return {"error":"合作存档校验失败。"}
 	if data.has("partner"):
 		var pawn = load("res://scripts/pawn.gd").new()

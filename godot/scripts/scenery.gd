@@ -2,6 +2,7 @@ extends RefCounted
 const TowerVisuals = preload("res://scripts/tower_visuals.gd")
 const CampDetail = preload("res://scripts/camp_detail.gd")
 const TerrainRelief = preload("res://scripts/terrain_relief.gd")
+const TerrainSurface = preload("res://scripts/terrain_surface.gd")
 ## Render-only decoration. Never consumes gameplay RNG or changes navigation.
 const FlameShader = preload("res://shaders/flame.gdshader")
 const GroundShader = preload("res://shaders/ground.gdshader")
@@ -40,8 +41,23 @@ func _init(owner_world: Node) -> void:
 	if not world.has_node("Island"): return
 	var island: Node = world.get_node("Island")
 	if island.has_node("ReferenceGround"):
+		var ground_node: MeshInstance3D = island.get_node("ReferenceGround")
+		ground_node.mesh = TerrainSurface.build(world.board.layout)
+		# Picking and the rendered bank share the same tessellation. Walkable
+		# cells are pinned by TerrainSurface, including existing building plots.
+		for child in ground_node.get_children():
+			if child is StaticBody3D: child.free()
+		ground_node.create_trimesh_collision()
+		for cluster in island.get_node("TreesFromMap").get_children():
+			if cluster.has_meta("harvest_tree"):
+				for part in cluster.get_children():
+					if part is Node3D: part.global_position.y = world.board.layout.height_at(part.global_position.x,part.global_position.z)
+			elif cluster is Node3D:
+				cluster.global_position.y = world.board.layout.height_at(cluster.global_position.x,cluster.global_position.z)
 		ground = ShaderMaterial.new()
 		ground.shader = GroundShader
+		var water_levels := Image.create_from_data(128,128,false,Image.FORMAT_RF,world.board.layout.water_cells.to_byte_array())
+		ground.set_shader_parameter("water_levels",ImageTexture.create_from_image(water_levels))
 		ground.set_shader_parameter("detail_map",load("res://assets/materials/ground_detail.png"))
 		ground_palette = GroundPalette.new(world)
 		ground.set_shader_parameter("usage_map",ground_palette.texture)
@@ -58,19 +74,15 @@ func _init(owner_world: Node) -> void:
 		island.get_node("Water").mesh = WaterSurface.build(world.board.layout)
 		water = ShaderMaterial.new()
 		water.shader = WaterShader
-		var coverage := Image.create(128,128,false,Image.FORMAT_R8)
-		for y in range(128):
-			for x in range(128):
-				var i := y*129+x
-				var level: float = world.board.layout.water[i]
-				var wet := level > -90.0 and minf(minf(float(world.board.layout.heights[i]),float(world.board.layout.heights[i+1])),minf(float(world.board.layout.heights[i+129]),float(world.board.layout.heights[i+130]))) < level
-				coverage.set_pixel(x,y,Color.WHITE if wet else Color.BLACK)
-		water.set_shader_parameter("water_coverage",ImageTexture.create_from_image(coverage))
+		# Water already has alpha: a second coplanar transparent fog pass sorts
+		# against the entire island as the camera moves. Apply fog once in-shader.
+		water.render_priority = 1
+		water.set_shader_parameter("visibility_map",world.vision.texture)
+		island.get_node("Water").material_overlay = null
+		island.get_node("Water").cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		# Depth comes from the terrain height map: gl_compatibility has no
 		# usable depth texture, and the pond beds never change at runtime.
-		var bed := Image.create(129,129,false,Image.FORMAT_RF)
-		for y in range(129):
-			for x in range(129): bed.set_pixel(x,y,Color(float(world.board.layout.heights[y*129+x]),0,0))
+		var bed: Image = world.board.layout.height_image()
 		water.set_shader_parameter("ground_heights",ImageTexture.create_from_image(bed))
 		island.get_node("Water").material_override = water
 	variation = TreeVariation.new(world, cinematic_enabled)
@@ -175,8 +187,7 @@ func add_ground_cover(island: Node) -> void:
 		var cell: Vector2i = world.board.cell_at(p)
 		if not world.board.is_open(cell): continue
 		p.y = world.board.layout.height_at(p.x, p.z)
-		var index := cell.y * 129 + cell.x
-		if world.board.layout.water[index] != null and float(world.board.layout.water[index]) > p.y - 0.08: continue
+		if world.board.layout.water_level_at(p.x,p.z) > p.y-0.08: continue
 		if world.Regions.at(p) == "ice": continue
 		# Leave the opening camp legible; cover grows mostly outside its center.
 		if p.distance_to(world.hero.position) < 4.5: continue
@@ -219,8 +230,7 @@ func add_ferns(parent: Node3D) -> void:
 		if not world.board.is_open(cell) or world.Regions.at(p) == "ice": continue
 		if p.distance_to(world.hero.position) < 4.5: continue
 		p.y = world.board.layout.height_at(p.x,p.z)
-		var index := cell.y*129+cell.x
-		if world.board.layout.water[index] != null and float(world.board.layout.water[index]) > p.y-0.08: continue
+		if world.board.layout.water_level_at(p.x,p.z) > p.y-0.08: continue
 		var chunk := Vector2i(floori(p.x/16),floori(p.z/16))
 		if not chunks.has(chunk): chunks[chunk] = []
 		var size := random.randf_range(0.55,1.05)

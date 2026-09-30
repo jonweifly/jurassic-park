@@ -48,6 +48,11 @@ func _init(owner_hud: Node) -> void:
 	var info: Label = hud.label("画质只影响阴影、抗锯齿和装饰草丛；树木、恐龙、地形和通行规则保持一致。", 14, Color("a6b59e"))
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	graphics.add_child(info)
+	var sample: Button = hud.button("01 美术样板 · 独立预览")
+	sample.name = "CinematicSampleEntry"
+	sample.pressed.connect(hud.open_art_sample)
+	graphics.add_child(sample)
+
 	var camera := page("镜头与提示")
 	for entry in [["pan_speed", "镜头平移速度"], ["rotation_speed", "镜头旋转灵敏度"], ["zoom_speed", "滚轮缩放速度"]]: slider(camera, entry[0], entry[1])
 	check(camera, "invert_y", "反转中键拖动的上下俯仰")

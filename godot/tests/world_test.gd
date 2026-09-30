@@ -15,7 +15,7 @@ func _initialize() -> void:
 func step(seconds: float) -> void:
 	for i in range(ceili(seconds * 30)): world._physics_process(1.0 / 30)
 
-func free_cell(origin: Vector3, distance: float = 4) -> Vector2i:
+func free_cell(origin: Vector3, distance: float = 4, require_sight: bool = false) -> Vector2i:
 	var center: Vector2i = world.board.cell_at(origin)
 	for radius in range(1, 6):
 		for x in range(-radius, radius + 1):
@@ -23,6 +23,7 @@ func free_cell(origin: Vector3, distance: float = 4) -> Vector2i:
 				var c := center + Vector2i(x, y)
 				var p: Vector3 = world.board.point(c)
 				if p.distance_to(origin) < distance: continue
+				if require_sight and not world.vision.clear_line(center,c): continue
 				if world.board.can_build(c) and p.distance_to(world.hero.position) >= 1.5 and not world.board.route(world.hero.position, p, true).is_empty(): return c
 	push_error("No free fixture cell near survivor")
 	return center
@@ -51,7 +52,7 @@ func run() -> void:
 		for tree_part in world.trees[cell].node.get_children():
 			if world.board.layout.submerged_at(tree_part.global_position.x, tree_part.global_position.z): submerged_trees += 1
 	expect(submerged_trees == 0, "Reference map does not register harvestable trees inside water")
-	expect(world.hero.position.y > 5, "Survivor must stand on the original elevated terrain")
+	expect(world.hero.position.y > 1 and world.hero.position.y < 2.2, "Survivor starts in the low opening meadow")
 	var reachable: Dictionary = {}
 	var queue: Array[Vector2i] = [world.board.cell_at(world.hero.position)]
 	reachable[queue[0]] = true
@@ -159,7 +160,7 @@ func run() -> void:
 	var tower := place("tower")
 	step(22)
 	expect(not tower.is_empty() and tower.remaining == 0, "Bow tower must be constructed through worker simulation")
-	var enemy_cell := free_cell(world.board.point(tower.cell), 3)
+	var enemy_cell := free_cell(world.board.point(tower.cell), 3, true)
 	var target = world.spawn_dinosaur(world.board.point(enemy_cell))
 	expect(is_instance_valid(target), "Tower combat fixture must spawn")
 	if is_instance_valid(target):

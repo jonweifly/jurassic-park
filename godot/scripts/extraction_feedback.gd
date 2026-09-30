@@ -11,6 +11,7 @@ var boundary_radii: Array[float] = []
 
 func _init(owner: Node) -> void:
 	world = owner
+	make_landing_mark()
 	# Match the existing 3-D distance rule even where the landing zone slopes.
 	for i in range(SEGMENTS + 1):
 		var angle := float(i) / SEGMENTS * TAU - PI / 2
@@ -101,3 +102,28 @@ func fill_arc(mesh: ImmediateMesh, count: int, inner: float, outer: float) -> vo
 		var outer_b := point(i+1,outer)
 		for vertex in [inner_a, outer_a, outer_b, inner_a, outer_b, inner_b]: mesh.surface_add_vertex(vertex)
 	mesh.surface_end()
+
+func make_landing_mark() -> void:
+	var mesh := ImmediateMesh.new()
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	for rect in [Rect2(-1.05,-1.6,.4,3.2),Rect2(.65,-1.6,.4,3.2),Rect2(-.65,-.2,1.3,.4)]:
+		var steps := 16
+		for i in range(steps):
+			var low: float = rect.position.y + rect.size.y*float(i)/steps
+			var high: float = rect.position.y + rect.size.y*float(i+1)/steps
+			var points := [Vector2(rect.position.x,low),Vector2(rect.end.x,low),Vector2(rect.end.x,high),Vector2(rect.position.x,high)]
+			for index in [0,2,1,0,3,2]:
+				var p: Vector3 = world.extraction+Vector3(points[index].x,0,points[index].y)
+				p.y = world.board.layout.height_at(p.x,p.z)+.12
+				mesh.surface_add_vertex(p)
+	mesh.surface_end()
+	var mark := MeshInstance3D.new()
+	mark.name = "LandingH"
+	mark.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("dbc58e")
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mark.material_override = material
+	mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(mark)

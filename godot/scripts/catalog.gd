@@ -4,8 +4,8 @@ extends RefCounted
 ## See docs/research/jurassic-park-6.5-reference.md; combat and terrain remain provisional.
 
 const BUILDINGS = {
-	"fossil": {"source_id": "n000", "name": "化石挖掘场", "wood": 10, "gold": 0, "power": 0, "supply": 0, "hp": 100.0, "time": 10.0, "requires": ["tent", "fire"], "description": "建成后右键采金，幸存者会将化石送回帐篷。"},
-	"gate": {"source_id": "h00N", "name": "电门", "wood": 12, "gold": 12, "power": 1, "supply": 0, "hp": 300.0, "time": 10.0, "requires": ["generator"], "description": "右键开关，切换需要 5 秒。开门可通行，电击停止。"},
+	"fossil": {"source_id": "n000", "name": "化石挖掘场", "wood": 10, "gold": 0, "power": 0, "supply": 0, "hp": 100.0, "time": 10.0, "requires": ["tent", "fire"], "description": "建成后左键采金，幸存者会将化石送回帐篷。"},
+	"gate": {"source_id": "h00N", "name": "电门", "wood": 12, "gold": 12, "power": 1, "supply": 0, "hp": 300.0, "time": 10.0, "requires": ["generator"], "description": "左键开关，切换需要 5 秒。开门可通行，电击停止。"},
 	"tent": {"source_id": "h002", "name": "帐篷", "wood": 0, "gold": 0, "power": 0, "supply": 0, "hp": 100.0, "time": 10.0, "requires": [], "description": "营地的起点。建成后可以建造营火和发电站。"},
 	"fire": {"source_id": "h001", "name": "营火", "wood": 5, "gold": 0, "power": 0, "supply": 0, "hp": 75.0, "time": 4.0, "requires": ["tent"], "description": "照亮夜间营地。需要已完成的帐篷。"},
 	"generator": {"source_id": "h004", "name": "发电站", "wood": 10, "gold": 10, "power": 0, "supply": 5, "hp": 100.0, "time": 10.0, "requires": ["tent"], "description": "提供 5 点电力，解锁防御设施。需要帐篷。"},
@@ -47,8 +47,9 @@ const EXTRACTION_RADIUS = 3.0
 const DAY_SECONDS = 150.0 # Still provisional, not Warcraft's verified day length.
 
 # Original single-player progression, not verified Warcraft 6.5 rules.
-const TECH_ORDER = ["tower_engineering", "pack_1", "pack_2", "pack_3", "tools", "defense", "medicine", "radio", "field_equipment"]
+const TECH_ORDER = ["tower_engineering", "pack_1", "pack_2", "pack_3", "tools", "defense", "medicine", "radio", "field_equipment", "mechanical"]
 const TECH = {
+	"mechanical": {"name":"机械工程", "wood":25, "gold":25, "time":40.0, "requires":"tools", "description":"解锁工坊维修机器人；自动巡检工坊周围 24 米建筑，每次消耗 1 木恢复 8% 耐久，最多 3 台。"},
 	"field_equipment": {"name":"野外装备工程", "wood":18, "gold":15, "time":30.0, "requires":"", "description":"结合带回营地的图纸，在工坊改良鞋子、护甲和步枪；基础装备无需研究。"},
 	"tower_engineering": {"name": "箭塔工程", "wood": 20, "gold": 15, "time": 25.0, "requires": "", "description": "解锁远射塔、速射塔与重弩塔。研究后选中箭塔，支付费用升级一项专精。"},
 	"pack_1": {"name": "背负改良 I", "wood": 8, "gold": 5, "time": 20.0, "requires": "", "description": "每趟携带 2 单位资源。"},

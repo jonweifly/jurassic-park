@@ -19,6 +19,7 @@ var next_noise_id := 1
 var generator_clock := 0.0
 var tactics: RefCounted
 var specials: RefCounted
+var forest: RefCounted
 
 func spawn_patrol(species: String, destination_override: Variant = null) -> Node3D:
 	# One member of each timed group approaches a snapshot of the camp location.
@@ -55,7 +56,9 @@ func spawn_patrol(species: String, destination_override: Variant = null) -> Node
 
 func patrol_route(from: Vector3, destination: Vector3, radius: float) -> PackedVector3Array:
 	var route: PackedVector3Array = world.board.route(from, destination, true, radius)
-	if not route.is_empty() or world.session.mode != "hard": return route
+	if not route.is_empty(): return route
+	route = forest.route(from,destination,radius)
+	if not route.is_empty(): return route
 	# A sealed camp or narrow landing pad must not turn heavy attackers into
 	# unrelated wilderness spawns. Approach a reachable outer defense first.
 	for b in world.session.buildings:
@@ -92,6 +95,7 @@ func _init(owner_world: Node) -> void:
 	world = owner_world
 	tactics = Tactics.new(self, world)
 	specials = Specials.new(self, world)
+	forest = preload("res://scripts/forest_navigation.gd").new(world)
 
 func register(d: Node3D, species: String) -> void:
 	d.set_meta("ai_state", "idle")
@@ -155,6 +159,12 @@ func update_one(d: Node3D, dt: float) -> void:
 		d.path_cooldown = 0
 		d.set_meta("ai_wander_clock", 0.0)
 		d.last_board_revision = world.board.revision
+	if forest.clearing(d,dt):
+		var pending_route: PackedVector3Array = d.route
+		d.route = PackedVector3Array()
+		d.advance(dt)
+		d.route = pending_route
+		return
 	d.advance(dt)
 	d.position.y = world.board.layout.height_at(d.position.x, d.position.z)
 	if resolve_strike(d, dt): return
@@ -311,6 +321,8 @@ func pursue_last_known(d: Node3D) -> void:
 	if d.path_cooldown > 0 and d.last_board_revision == world.board.revision: return
 	d.path_cooldown = 0.65
 	d.last_board_revision = world.board.revision
+	if not d.route.is_empty() and d.get_meta("ai_route_cell", Vector2i(-1,-1)) == world.board.cell_at(destination): return
+	d.set_meta("ai_route_cell", world.board.cell_at(destination))
 	d.route = patrol_route(d.position, destination, d.body_radius)
 	if d.route.is_empty() and d.position.distance_to(destination) > 3:
 		var blocker := reachable_local_building(d)
@@ -382,6 +394,8 @@ func update_patrol(d: Node3D, dt: float) -> void:
 		return
 	if d.path_cooldown > 0: return
 	d.path_cooldown = 1.0
+	if not d.route.is_empty() and d.get_meta("ai_route_cell", Vector2i(-1,-1)) == world.board.cell_at(destination): return
+	d.set_meta("ai_route_cell", world.board.cell_at(destination))
 	d.route = patrol_route(d.position, destination, d.body_radius)
 	if d.route.is_empty():
 		var blocker := reachable_local_building(d)
@@ -409,7 +423,7 @@ func attack_if_close(d: Node3D) -> void:
 	d.attack_cooldown = d.attack_interval
 	var heavy: bool = tactics.heavy(d)
 	d.swing = 0 if heavy else 1
-	d.visual.face(position - d.position, 1)
+	d.visual.face(position - d.position, 1.0 / 60.0)
 	if not heavy: d.play_animation("attack", 0)
 	if heavy:
 		tactics.telegraph(d, 0.65)
@@ -420,6 +434,7 @@ func resolve_strike(d: Node3D, dt: float) -> bool:
 	var strike: Dictionary = d.get_meta("ai_strike", {})
 	if strike.is_empty(): return false
 	strike.remaining -= dt
+	d.visual.face(Vector3(d.get_meta("ai_last_known")) - d.position, dt)
 	d.route.clear()
 	if strike.has("special"):
 		specials.advance(d, strike, dt)

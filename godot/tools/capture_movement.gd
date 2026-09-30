@@ -12,6 +12,7 @@ func shot(title: String, at: Vector3) -> void:
 		world.hud.refresh(0)
 		world.pointer_feedback.update_hover(world.camera.unproject_position(at), at)
 		world.pointer_feedback.active = not world.hud.covers(world.pointer_feedback.pointer)
+		world.pointer_feedback.update_movement_marker()
 		world.pointer_feedback.queue_redraw()
 		await process_frame
 	RenderingServer.force_draw(false)
@@ -31,13 +32,28 @@ func run() -> void:
 	world.update_camera(0)
 	world.vision.update()
 	var target := Vector3.ZERO
-	for x in range(5, 12):
-		var cell: Vector2i = world.board.cell_at(world.hero.position) + Vector2i(x, 0)
-		if world.board.is_open(cell) and not world.board.route(world.hero.position, world.board.point(cell)).is_empty():
-			target = world.board.point(cell)
-			break
-	world.command(target)
-	world.pointer_feedback.pulse_left = 0.6
+	var found_target := false
+	for x in range(-4, 5):
+		for z in range(-4, 5):
+			var cell: Vector2i = world.board.cell_at(world.hero.position) + Vector2i(x, z)
+			var point: Vector3 = world.board.point(cell)
+			var screen: Vector2 = world.camera.unproject_position(point)
+			if point.distance_to(world.hero.position) < 5 or screen.x < 350 or screen.x > 1000 or screen.y < 240 or screen.y > 530: continue
+			if world.board.is_open(cell) and not world.board.route(world.hero.position, point).is_empty():
+				target = point
+				found_target = true
+				break
+		if found_target: break
+	if not found_target:
+		push_error("No visible destination for movement capture")
+		world.free()
+		quit(1)
+		return
+	world.command(target, true)
+	for phase in [0.0, 0.25, 0.5, 0.8, 1.0]:
+		world.pointer_feedback.pulse_left = world.pointer_feedback.MOVE_PULSE_SECONDS * (1.0 - phase)
+		await shot("move-ring-%02d" % int(phase * 100), target)
+	world.pointer_feedback.pulse_left = 0.7
 	await shot("move-start", target)
 	await shot("move-separated", world.hero.position)
 	for i in range(24):
@@ -51,7 +67,7 @@ func run() -> void:
 	for cell in world.trees:
 		var p: Vector3 = world.board.point(cell)
 		var screen: Vector2 = world.camera.unproject_position(p)
-		if p.distance_to(world.hero.position) < 10 and screen.x > 360 and screen.x < 1000 and screen.y > 220 and screen.y < 630 and not world.board.route(world.hero.position, p, true).is_empty():
+		if p.distance_to(world.hero.position) < 10 and screen.x > 360 and screen.x < 1000 and screen.y > 220 and screen.y < 630 and not world.worker.wood_route(p).is_empty():
 			tree = p
 			world.vision.explored[cell] = true
 			break

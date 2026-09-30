@@ -8,6 +8,8 @@ const ITEMS := {
 	"boots_2": {"name":"越野靴", "slot":"boots", "rank":2, "wood":14, "gold":20, "time":25.0, "description":"移动速度 +15% · 替换探险靴，不叠加", "blueprint":"ranger"},
 	"vest_2": {"name":"强化背心", "slot":"vest", "rank":2, "wood":18, "gold":24, "time":30.0, "description":"直接攻击伤害 -25% · 替换旧护甲，不抵挡毒液", "blueprint":"ranger"},
 	"rifle_2": {"name":"精校步枪", "slot":"rifle", "rank":2, "wood":20, "gold":30, "time":35.0, "description":"步枪伤害 +50% · 替换旧枪，仍需站定射击", "blueprint":"arsenal"},
+	"chainsaw": {"name":"便携电锯", "slot":"chainsaw", "rank":1, "wood":14, "gold":20, "time":25.0, "description":"开路模式：左键树木，1.1 秒锯倒；不带回木材、不自动返营。可切回普通采木。", "blueprint":""},
+	"repair_bot": {"name":"维修机器人", "slot":"robots", "rank":0, "wood":20, "gold":30, "time":35.0, "description":"需机械工程 · 完成自动部署 · 24 米巡检，每秒 1 木修复 8% 耐久；断电暂停，最多 3 台。", "blueprint":""},
 }
 const SITES := {
 	"supplies": {"name":"林缘补给箱", "at":Vector2(18, 12), "scene":"survey_camp", "seconds":6.0, "wood":8, "gold":6, "kits":1, "guards":[], "description":"短途 · 带回补给后获得 8 木 / 6 金 / 急救包 ×1"},
@@ -16,7 +18,7 @@ const SITES := {
 }
 
 static func actor() -> Dictionary:
-	return {"boots":0, "vest":0, "rifle":0, "kits":0, "cooldown":0.0, "cargo":[], "task":"", "target":-1, "site":""}
+	return {"chainsaw":0, "saw_enabled":true, "boots":0, "vest":0, "rifle":0, "kits":0, "cooldown":0.0, "cargo":[], "task":"", "target":-1, "site":""}
 
 static func empty() -> Dictionary:
 	return {"actors":{"1":actor(), "2":actor()}, "jobs":{}, "sites":{}, "blueprints":[], "reserve_kits":0}
@@ -31,7 +33,9 @@ static func validate(value: Variant, buildings: Array) -> bool:
 	var carried := []
 	for entry in value.actors.values():
 		if not entry is Dictionary: return false
+		if entry.get("chainsaw",0) not in [0,1] or not entry.get("saw_enabled",true) is bool: return false
 		for key in actor():
+			if key in ["chainsaw", "saw_enabled"] and not entry.has(key): continue
 			if not entry.has(key) or typeof(entry[key]) != typeof(actor()[key]): return false
 		for slot in ["boots", "vest", "rifle"]:
 			if entry[slot] not in range(3): return false
@@ -65,4 +69,11 @@ static func validate(value: Variant, buildings: Array) -> bool:
 		if job.remaining < 0 or job.remaining > ITEMS[job.item].time: return false
 		# Destroyed workshops may persist until the next simulation tick clears their job.
 		if not buildings.any(func(b): return b is Dictionary and b.get("id") == int(key) and b.get("kind") == "workshop"): return false
+	var robots: Variant = value.get("robots", [])
+	if not robots is Array or robots.size() > 3: return false
+	for robot in robots:
+		if not robot is Dictionary: return false
+		if not robot.get("position") is Vector3 or not robot.position.is_finite(): return false
+		if not Rect2(-128,-128,256,256).has_point(Vector2(robot.position.x,robot.position.z)): return false
+		if not robot.get("workshop") is int or not robot.get("clock") is float or not is_finite(robot.clock) or robot.clock < 0 or robot.clock > 1: return false
 	return true

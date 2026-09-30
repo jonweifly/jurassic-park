@@ -3,6 +3,7 @@ render_mode diffuse_burley;
 uniform sampler2D detail_map : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D buildable_map : filter_nearest, repeat_disable;
 uniform sampler2D usage_map : filter_linear, repeat_disable;
+uniform sampler2D water_levels : filter_nearest, repeat_disable;
 uniform sampler2D soil_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D forest_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 // 4m colour/height tiles, blended at two orientations to suppress repetition.
@@ -28,7 +29,7 @@ vec4 surface_sample(sampler2D tex, vec2 uv, float patch) {
 void fragment() {
  vec3 original=COLOR.rgb;
  float saturation=max(original.r,max(original.g,original.b))-min(original.r,min(original.g,original.b));
- float grass=smoothstep(0.025,0.13,original.g-original.b);
+	float grass=smoothstep(0.025,0.13,original.g-original.b);
  float snow=smoothstep(0.60,0.78,max(original.r,max(original.g,original.b)))*(1.0-smoothstep(0.08,0.20,saturation));
  float slope=1.0-clamp(terrain_normal.y,0.0,1.0);
  float rock=smoothstep(0.045,0.30,slope);
@@ -58,6 +59,7 @@ void fragment() {
  earth*=.94+noise(terrain_position.xz*.075)*.12;
  // The open clearing receives a full grass-and-earth surface too, not just
  // tiny colour grain. Usage masks expose worn soil and fallen leaves naturally.
+ // Keep larger leaves/blades readable at the tactical camera distance.
  vec2 surface_uv=terrain_position.xz*.25;
  float patch=noise(terrain_position.xz*.14);
  vec4 turf=surface_sample(turf_surface,surface_uv,patch);
@@ -71,13 +73,19 @@ void fragment() {
            +texture(rock_surface,terrain_position.xy*.25)*rock_weights.z;
  float grass_patches=smoothstep(.34,.65,noise(terrain_position.xz*.63)+noise(terrain_position.xz*1.8)*.16);
  float bare=clamp((1.0-grass)*.65+camp*.82+(1.0-grass_patches)*.42,0.0,1.0);
+ // Expose a granular bed and a damp bank at the actual lake elevation.
+ float lake_level=texture(water_levels,terrain_position.xz/256.0+vec2(.5)).r;
+ float bank=(1.0-smoothstep(.05,.48,terrain_position.y-lake_level+(breakup-.5)*.10))*step(-90.0,lake_level);
+ bare=max(bare,bank);
  vec4 surface=mix(turf,dirt,clamp(bare,0.0,1.0));
  surface=mix(surface,leaves,floor_blend*(1.0-camp)*.90);
  surface=mix(surface,stone,rock*.88);
+ vec3 sand=mix(vec3(.32,.27,.16),vec3(.58,.49,.30),clamp(dirt.r*1.2+fine.b*.18,0.0,1.0));
+ surface.rgb=mix(surface.rgb,sand,bank*.85);
  vec3 tint=mix(vec3(.95,1.02,.85),vec3(1.09,1.01,.88),broad);
  // Large readable colour masses retain the hill silhouette at an RTS camera
  // distance; the fine texture must not flatten every face into the same grain.
- earth=mix(earth,surface.rgb*tint*(.90+noise(terrain_position.xz*.055)*.20),(1.0-snow)*.84);
+ earth=mix(earth,surface.rgb*tint*(.88+noise(terrain_position.xz*.055)*.24),(1.0-snow)*.91);
  float hollow=smoothstep(.54,.86,usage.b);
  float ridge=1.0-smoothstep(.20,.47,usage.b);
  vec3 face_tint=mix(vec3(.79,.83,.87),vec3(1.04,1.03,.94),smoothstep(.50,.98,terrain_normal.y));
@@ -87,7 +95,7 @@ void fragment() {
  earth*=1.0-rock*(1.0-snow)*smoothstep(.48,.91,strata)*.085;
  // Height-derived micro normal: low amplitude, mip-filtered; no distance shimmer.
  float relief_fade=1.0-smoothstep(.045,.20,length(fwidth(terrain_position.xz)));
- float h=(detail*.002+surface.a*.030*(1.0-snow))*relief_fade;
+ float h=(detail*.003+surface.a*.065*(1.0-snow))*relief_fade;
  vec3 q1=dFdx(VERTEX),q2=dFdy(VERTEX);
  vec3 n=normalize(NORMAL);
  vec3 r1=cross(q2,n),r2=cross(n,q1);
@@ -98,7 +106,10 @@ void fragment() {
  ALBEDO=earth;
  AO=1.0-hollow*.25;
  float low_spots=1.0-smoothstep(.38,.65,surface.a);
- ROUGHNESS=mix(.94,.48,wetness*(.25+low_spots*.65)*(1.0-grass*.3));
+ float material_roughness=mix(.94,.81,rock);
+ material_roughness=mix(material_roughness,.87,floor_blend*(1.0-camp));
+ material_roughness=clamp(material_roughness+(surface.a-.5)*.10,.76,.98);
+ ROUGHNESS=mix(material_roughness,.48,wetness*(.25+low_spots*.65)*(1.0-grass*.3));
  SPECULAR=0.18;
  if (build_preview && distance(terrain_position.xz,builder_position.xz)<12.0) {
   float allowed=texture(buildable_map,terrain_position.xz/256.0+vec2(0.5)).r;
