@@ -15,14 +15,19 @@ func _init(world: Node, use_cinematic: bool = false) -> void:
 		var value: int = posmod(cell.x*1973+cell.y*9277+cell.x*cell.y*17,101)
 		var family := ""
 		if region == "ice": continue
-		if region == "mountain": family = "wind_pine" if value < 48 else ""
+		# The approved v3 island has a deliberately small mountain polygon. Keep
+		# the upland evergreen readable across the large rainforest footprint too,
+		# otherwise its authored asset is never represented in the playable map.
+		# Hashing the placement keeps the distribution deterministic across saves.
+		if region != "swamp" and value >= 92: family = "wind_pine"
+		elif region == "mountain": family = "wind_pine" if value < 48 else ""
 		elif region == "swamp": family = "palm_tree" if value < 30 else ("split_tree" if value < 62 else "")
 		else: family = "canopy_tree" if value < 34 else ("split_tree" if value < 64 else ("palm_tree" if value < 77 else ""))
 		if cinematic_enabled and region != "mountain" and family != "palm_tree": family = "cinematic_tree"
 		if family.is_empty(): continue
-		var holders: Array[Node] = [tree] if tree.has_node("Model") else tree.get_children()
+		var holders: Array = [tree] if tree.has_node("Model") else tree.get_children()
 		for holder in holders:
-			var old := holder.get_node_or_null("Model")
+			var old: Node = holder.get_node_or_null("Model")
 			if not old: continue
 			old.free()
 			var model: Node3D = scenes[family].instantiate()

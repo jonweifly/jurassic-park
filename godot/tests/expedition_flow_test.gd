@@ -51,7 +51,12 @@ func run() -> void:
 	expect(world.session.has_completed("tent"), "Real worker builds the free return tent")
 	world.build_mode = ""
 	# This route fixture starts with coordinates; discovery still requires physical sight.
-	for id in Catalog.SITE_ORDER: world.session.adventure.sites[id].status = "known"
+	for id in Catalog.SITE_ORDER:
+		world.session.adventure.sites[id].status = "known"
+		# This regression isolates route/work/save behavior.  Mark the optional
+		# guard wave as already handled so a nearby encounter cannot pause a
+		# repair job while the test is measuring its completion contract.
+		world.session.adventure.sites[id].guarded = true
 	for id in Catalog.SITE_ORDER:
 		expect(world.adventure.go_to(id).is_empty(), "Travel order accepted: " + id)
 		for i in range(1800):

@@ -20,11 +20,16 @@ func run() -> void:
 		if arg.begins_with("--tag="): tag = arg.trim_prefix("--tag=")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(folder))
 	load("res://scripts/save_store.gd").directory = "user://art_direction_fixture"
+	load("res://scripts/preferences.gd").file_path = "user://art_direction_fixture/preferences.cfg"
 	world = load("res://scenes/main.tscn").instantiate()
+	world.persistence_enabled = false
 	root.add_child(world)
 	world.set_process(false)
 	world.set_physics_process(false)
 	world.sound.set_process(false)
+	world.preferences.values.quality = 2
+	world.preferences.values.perspective = true
+	world.preferences.apply(world, false)
 	world.start_session(1500, "standard")
 	world.spawn_clocks.clear()
 	world.prepare_demo()
@@ -53,6 +58,11 @@ func run() -> void:
 	world.session.elapsed = 300
 	world.weather.preview_kind = 2
 	await shot("rain")
+	world.session.elapsed = world.Catalog.DAY_SECONDS * (0.5 + 0.5/TAU)
+	world.weather.preview_kind = 3
+	await shot("storm-night")
+	world.session.elapsed = 300
+	world.weather.preview_kind = 2
 	world.preferences.values.quality = 0
 	world.preferences.apply(world, false)
 	await shot("low")

@@ -129,7 +129,13 @@ func test_save_roundtrip() -> void:
 	for b in world.session.buildings:
 		if b.kind == "tower": site = b
 	expect(site.remaining == 3.5 and world.board.structures.has(site.cell), "Unfinished construction keeps time, power reservation and collision")
-	world.dino_ai.update_death(world.dinosaurs[1], 0.1)
+	var loaded_corpse: Node3D = null
+	var loaded_attacker: Node3D = null
+	for animal in world.dinosaurs:
+		if animal.dying: loaded_corpse = animal
+		if animal.has_meta("ai_strike"): loaded_attacker = animal
+	expect(loaded_corpse != null and loaded_attacker != null, "Saved attack and corpse both restore")
+	if loaded_corpse: world.dino_ai.update_death(loaded_corpse, 0.1)
 	expect(world.session.kills == 1 and world.session.gold == 70, "Saved corpse cannot grant a second kill or gold reward")
 	expect(world.paused and world.started, "Continue loads paused with a live session")
 	expect(world.session.wood == 90 and world.session.gold == 70 and world.session.elapsed == 410, "Stock and game clock are restored")
@@ -137,8 +143,8 @@ func test_save_roundtrip() -> void:
 	expect(world.session.research_job.remaining == 12.5 and world.session.harvest_level == 1, "Technology and research timer persist")
 	expect(not world.trees.has(removed) and world.trees[reduced].wood == 7, "Depleted and partially harvested trees persist")
 	expect(world.board.is_open(gate.cell) and world.session.building(gate.id).gate_timer == 2.5, "Open gate and in-flight gate transition persist")
-	expect(world.dinosaurs.size() == snap.animals.size() and world.dinosaurs[0].get_meta("ai_strike").remaining == 0.12, "Dinosaurs and wind-up attacks persist")
-	expect(world.hero.target_id == world.dinosaurs[0].get_instance_id(), "Attack target remaps stable save ID to new scene instance")
+	expect(world.dinosaurs.size() == snap.animals.size() and loaded_attacker != null and loaded_attacker.get_meta("ai_strike").remaining == 0.12, "Dinosaurs and wind-up attacks persist")
+	expect(loaded_attacker != null and world.hero.target_id == loaded_attacker.get_instance_id(), "Attack target remaps stable save ID to new scene instance")
 	expect(world.rng.randi() == expected_random, "Loading does not advance the saved gameplay RNG")
 	expect(world.vision.explored.has(Vector2i(80, 80)) and world.camera_rig.target_yaw == 2.1, "Exploration and camera survive loading")
 	expect(world.dino_ai.noises == snap.noises, "Unexpired AI hearing events persist independently of audio")

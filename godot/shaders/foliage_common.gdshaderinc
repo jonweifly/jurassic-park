@@ -7,6 +7,7 @@ uniform float cutout_enabled = 0.0;
 uniform float weather_clock = 0.0;
 uniform float wind_power = 0.16;
 uniform vec2 wind_direction = vec2(0.9,0.35);
+uniform float rain_power = 0.0;
 
 vec3 wind_vertex(vec3 local, mat4 model, float clock) {
 	vec3 p = (model * vec4(local,1.0)).xyz;
@@ -19,11 +20,15 @@ vec3 wind_vertex(vec3 local, mat4 model, float clock) {
 	float flutter = sin(weather_clock*2.1+p.x*5.3+p.z*4.7)*sin(weather_clock*1.37+p.y*7.1+phase);
 	// Second, faster micro-layer on top of the coarse leaf flutter for a shimmering canopy edge.
 	float shiver = sin(weather_clock*4.6+p.x*9.1-p.z*6.3+phase*2.3);
+	// Rain strikes are deliberately tiny: they read as leaf response in close
+	// views while adding no per-drop CPU work or extra draw calls.
+	float rain_hit = sin(weather_clock*7.2+phase*3.1+p.x*2.7+p.z*1.9);
 	// A curved (not linear) response widens the gap between breeze and gale so escalation reads clearly.
 	float response = 0.14+0.86*pow(clamp(wind_power,0.0,1.0),0.85);
 	// World-space movement bound: canopy tip sway up to ~8.5 cm, leaf detail up to ~2.9 cm at full gale.
 	float sway = 0.085*tip*breeze*gust;
 	float leaf = 0.022*smoothstep(0.03,0.6,max(local.y,0.0))*flutter + 0.007*tip*shiver;
+	leaf += rain_power*0.006*tip*rain_hit;
 	float displacement = (sway+leaf)*response*clamp(strength/0.055,0.0,1.0);
 	vec3 offset = vec3(wind_direction.x,0.0,wind_direction.y)*displacement;
 	local += inverse(mat3(model))*offset;

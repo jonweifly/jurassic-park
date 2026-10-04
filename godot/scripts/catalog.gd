@@ -4,7 +4,7 @@ extends RefCounted
 ## See docs/research/jurassic-park-6.5-reference.md; combat and terrain remain provisional.
 
 const BUILDINGS = {
-	"fossil": {"source_id": "n000", "name": "化石挖掘场", "wood": 10, "gold": 0, "power": 0, "supply": 0, "hp": 100.0, "time": 10.0, "requires": ["tent", "fire"], "description": "建成后左键采金，幸存者会将化石送回帐篷。"},
+	"fossil": {"source_id": "n000", "name": "化石挖掘场", "wood": 10, "gold": 0, "power": 0, "supply": 0, "hp": 100.0, "time": 10.0, "requires": ["tent", "fire"], "description": "可在任意适合建造的平坦地面建造，幸存者会将化石送回帐篷。"},
 	"gate": {"source_id": "h00N", "name": "电门", "wood": 12, "gold": 12, "power": 1, "supply": 0, "hp": 300.0, "time": 10.0, "requires": ["generator"], "description": "左键开关，切换需要 5 秒。开门可通行，电击停止。"},
 	"tent": {"source_id": "h002", "name": "帐篷", "wood": 0, "gold": 0, "power": 0, "supply": 0, "hp": 100.0, "time": 10.0, "requires": [], "description": "营地的起点。建成后可以建造营火和发电站。"},
 	"fire": {"source_id": "h001", "name": "营火", "wood": 5, "gold": 0, "power": 0, "supply": 0, "hp": 75.0, "time": 4.0, "requires": ["tent"], "description": "照亮夜间营地。需要已完成的帐篷。"},

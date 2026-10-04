@@ -68,7 +68,7 @@ func refresh() -> void:
 	current_text.text = step.title + "\n\n" + step.text
 	if world.started:
 		current_text.text += "\n\n当前库存：%d 木 / %d 金\n携带：%d / %d（未返送部分不计入库存）\n电力：需求 %d / 供给 %d" % [world.session.wood, world.session.gold, world.worker.cargo, world.worker.capacity(), world.session.demand(), world.session.supply()]
-	controls_text.text = "鼠标\n左键使用工具或放置；右键移动；中键拖动旋转，Shift + 中键平移，滚轮缩放。Esc 取消放置 / 关闭面板 / 暂停。方向键始终可平移镜头。\n\n键盘控制镜头，不直接控制角色行走。以下按键随你的设置同步：\n\n"
+	controls_text.text = "鼠标\n左键使用工具、选中建筑或放置；右键移动，点击受损建筑时维修；中键拖动旋转，Shift + 中键平移，滚轮缩放。Esc 取消放置 / 关闭面板 / 暂停。方向键始终可平移镜头。\n\n键盘控制镜头，不直接控制角色行走。以下按键随你的设置同步：\n\n"
 	for action in world.preferences.ACTIONS:
 		controls_text.text += "%s    %s\n" % [world.preferences.key_name(action), world.preferences.ACTIONS[action][0]]
 	action_button.visible = not step.action.is_empty()

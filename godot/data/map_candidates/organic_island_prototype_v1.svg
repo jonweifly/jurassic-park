@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000" viewBox="0 0 1500 1000">
+<title>原始荒岛布局原型 V1</title>
+<defs>
+<clipPath id="island-clip"><polygon points="162.1,203.6 267.3,154.3 405.4,136.7 530.4,157.8 652.1,196.6 747.4,256.5 819.8,341.0 806.6,422.0 859.2,478.4 836.2,548.9 780.3,594.7 829.6,661.6 796.8,739.1 701.4,784.9 612.6,763.8 537.0,813.1 454.8,784.9 385.7,848.3 273.9,809.5 204.8,735.6 175.2,651.0 119.3,591.1 142.3,506.6 116.0,429.1 158.8,362.2 106.2,291.7"/></clipPath>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#06191c" flood-opacity=".5"/></filter>
+</defs>
+<rect width="1500" height="1000" fill="#102f3b"/>
+<text x="52" y="48" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="32px" font-weight="700" text-anchor="start">原始荒岛布局原型</text>
+<text x="53" y="79" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="500" text-anchor="start">LOW-FIDELITY LAYOUT  /  只确认地貌、边界与自然探索方向</text>
+<rect x="54" y="89" width="887" height="807" rx="22" fill="#183f4b" stroke="#3e6e64" stroke-width="2" filter="url(#shadow)"/>
+<polygon points="162.1,203.6 267.3,154.3 405.4,136.7 530.4,157.8 652.1,196.6 747.4,256.5 819.8,341.0 806.6,422.0 859.2,478.4 836.2,548.9 780.3,594.7 829.6,661.6 796.8,739.1 701.4,784.9 612.6,763.8 537.0,813.1 454.8,784.9 385.7,848.3 273.9,809.5 204.8,735.6 175.2,651.0 119.3,591.1 142.3,506.6 116.0,429.1 158.8,362.2 106.2,291.7" fill="#d6bd79" stroke="#d6bd79" stroke-width="16" opacity="1.0"/>
+<g clip-path="url(#island-clip)">
+<polygon points="162.1,203.6 267.3,154.3 405.4,136.7 530.4,157.8 652.1,196.6 747.4,256.5 819.8,341.0 806.6,422.0 859.2,478.4 836.2,548.9 780.3,594.7 829.6,661.6 796.8,739.1 701.4,784.9 612.6,763.8 537.0,813.1 454.8,784.9 385.7,848.3 273.9,809.5 204.8,735.6 175.2,651.0 119.3,591.1 142.3,506.6 116.0,429.1 158.8,362.2 106.2,291.7" fill="#9ca66e" stroke="none" stroke-width="1" opacity="1.0"/>
+<polygon points="369.2,436.1 441.6,390.3 520.5,397.4 599.4,460.8 586.3,538.3 527.1,577.0 428.4,559.4 336.4,506.6" fill="#b9b978" stroke="none" stroke-width="1" opacity="0.8"/>
+<polygon points="326.5,594.7 398.8,577.0 461.3,615.8 444.9,693.3 359.4,707.4 287.0,654.5" fill="#b9b978" stroke="none" stroke-width="1" opacity="0.75"/>
+<polygon points="602.7,654.5 648.8,601.7 734.3,615.8 793.5,682.7 770.4,746.1 698.1,767.3 632.3,732.0 586.3,693.3" fill="#5d8570" stroke="#46704b" stroke-width="2" opacity="0.9"/>
+<polygon points="405.4,193.1 464.6,256.5 527.1,281.1 576.4,344.5 540.2,422.0 481.1,397.4 441.6,326.9 382.4,281.1" fill="#4e5148" stroke="#77755b" stroke-width="2" opacity="0.97"/>
+<polygon points="405.4,193.1 464.6,256.5 527.1,281.1 576.4,344.5" fill="#77755b" stroke="none" stroke-width="1" opacity="0.38"/>
+<polygon points="619.2,245.9 684.9,319.9 704.7,415.0 665.2,506.6 612.6,460.8 596.2,372.7" fill="#4e5148" stroke="#77755b" stroke-width="2" opacity="0.97"/>
+<polygon points="619.2,245.9 684.9,319.9 704.7,415.0" fill="#77755b" stroke="none" stroke-width="1" opacity="0.38"/>
+<polygon points="195.0,622.8 257.4,584.1 293.6,510.1 250.9,457.3 158.8,478.4 129.2,559.4" fill="#4e5148" stroke="#77755b" stroke-width="2" opacity="0.97"/>
+<polygon points="195.0,622.8 257.4,584.1 293.6,510.1" fill="#77755b" stroke="none" stroke-width="1" opacity="0.38"/>
+<polygon points="132.5,341.0 198.2,260.0 293.6,238.9 375.8,281.1 408.7,351.6 356.1,425.6 273.9,408.0 208.1,464.3 142.3,418.5" fill="#285842" stroke="#46704b" stroke-width="2" opacity="0.96"/>
+<circle cx="132.5" cy="341.0" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="293.6" cy="238.9" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="408.7" cy="351.6" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="273.9" cy="408.0" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="142.3" cy="418.5" r="13" fill="#183f32" opacity=".35"/>
+<polygon points="260.7,182.5 372.5,161.4 477.8,217.7 507.4,295.2 444.9,365.7 342.9,326.9 287.0,274.1" fill="#285842" stroke="#46704b" stroke-width="2" opacity="0.96"/>
+<circle cx="260.7" cy="182.5" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="477.8" cy="217.7" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="444.9" cy="365.7" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="287.0" cy="274.1" r="13" fill="#183f32" opacity=".35"/>
+<polygon points="625.8,231.8 727.7,260.0 786.9,337.5 734.3,411.5 648.8,393.9 599.4,319.9" fill="#285842" stroke="#46704b" stroke-width="2" opacity="0.96"/>
+<circle cx="625.8" cy="231.8" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="786.9" cy="337.5" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="648.8" cy="393.9" r="13" fill="#183f32" opacity=".35"/>
+<polygon points="221.3,601.7 296.9,689.8 385.7,749.7 464.6,682.7 438.3,584.1 349.5,545.3 277.2,555.9" fill="#285842" stroke="#46704b" stroke-width="2" opacity="0.96"/>
+<circle cx="221.3" cy="601.7" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="385.7" cy="749.7" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="438.3" cy="584.1" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="277.2" cy="555.9" r="13" fill="#183f32" opacity=".35"/>
+<polygon points="599.4,612.3 675.1,570.0 773.7,622.8 770.4,714.4 694.8,767.3 609.3,714.4" fill="#285842" stroke="#46704b" stroke-width="2" opacity="0.96"/>
+<circle cx="599.4" cy="612.3" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="773.7" cy="622.8" r="13" fill="#183f32" opacity=".35"/>
+<circle cx="694.8" cy="767.3" r="13" fill="#183f32" opacity=".35"/>
+<path d="M 481.1 288.2 L 458.0 355.1 L 471.2 418.5 L 504.1 474.9 L 550.1 534.8 L 596.2 594.7 L 642.2 661.6 L 717.8 739.1" fill="none" stroke="#55a9a4" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+<path d="M 481.1 288.2 L 458.0 355.1 L 471.2 418.5 L 504.1 474.9 L 550.1 534.8 L 596.2 594.7 L 642.2 661.6 L 717.8 739.1" fill="none" stroke="#9ce0c5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+<path d="M 428.4 534.8 L 375.8 570.0 L 329.8 619.3 L 270.6 668.6 L 211.4 700.3" fill="none" stroke="#55a9a4" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+<path d="M 428.4 534.8 L 375.8 570.0 L 329.8 619.3 L 270.6 668.6 L 211.4 700.3" fill="none" stroke="#9ce0c5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+<path d="M 162.1 323.4 L 221.3 351.6 L 290.3 383.3 L 366.0 422.0 L 438.3 460.8 L 507.4 485.5 L 550.1 517.2" fill="none" stroke="#f5df9c" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>
+<path d="M 438.3 460.8 L 415.3 404.4 L 425.2 344.5 L 461.3 302.3 L 513.9 312.8 L 560.0 355.1" fill="none" stroke="#d7efc4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 9" opacity="0.88"/>
+<path d="M 510.7 485.5 L 550.1 527.7 L 589.6 587.6 L 638.9 644.0 L 694.8 682.7" fill="none" stroke="#f5df9c" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>
+<path d="M 208.1 700.3 L 270.6 693.3 L 336.4 710.9 L 405.4 739.1 L 471.2 739.1 L 543.5 760.2 L 612.6 742.6" fill="none" stroke="#d7efc4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 9" opacity="0.88"/>
+<path d="M 550.1 517.2 L 599.4 474.9 L 655.3 432.6 L 727.7 443.2 L 800.0 481.9" fill="none" stroke="#d7efc4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="10 9" opacity="0.88"/>
+</g>
+<polygon points="162.1,203.6 267.3,154.3 405.4,136.7 530.4,157.8 652.1,196.6 747.4,256.5 819.8,341.0 806.6,422.0 859.2,478.4 836.2,548.9 780.3,594.7 829.6,661.6 796.8,739.1 701.4,784.9 612.6,763.8 537.0,813.1 454.8,784.9 385.7,848.3 273.9,809.5 204.8,735.6 175.2,651.0 119.3,591.1 142.3,506.6 116.0,429.1 158.8,362.2 106.2,291.7" fill="none" stroke="#f0d995" stroke-width="3" opacity="1.0"/>
+<text x="540.25" y="422.04545454545456" fill="#f2e7bb" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">北侧山脊</text>
+<text x="665.2115384615385" y="506.5909090909091" fill="#f2e7bb" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">东侧岩脊</text>
+<text x="250.8653846153846" y="457.27272727272725" fill="#f2e7bb" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">西南断崖</text>
+<text x="408.71153846153845" y="351.5909090909091" fill="#d6e8c8" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">西侧原始森林</text>
+<text x="507.3653846153846" y="295.22727272727275" fill="#d6e8c8" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">北部高冠林</text>
+<text x="734.2692307692308" y="411.47727272727275" fill="#d6e8c8" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">东侧雨林</text>
+<text x="464.61538461538464" y="682.7272727272727" fill="#d6e8c8" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">南部低地林</text>
+<text x="770.4423076923076" y="714.4318181818182" fill="#d6e8c8" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">湿地边缘林</text>
+<text x="704.6730769230769" y="686.25" fill="#d6e8c8" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">东南沼泽 / 湿地</text>
+<text x="559.9807692307693" y="577.0454545454545" fill="#f4edc8" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">中央开阔河谷</text>
+<text x="365.96153846153845" y="404.4318181818182" fill="#f5df9c" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="12px" font-weight="500" text-anchor="middle">登陆海湾 → 河谷</text>
+<text x="461.32692307692304" y="284.6590909090909" fill="#f5df9c" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="12px" font-weight="500" text-anchor="middle">北侧山口线</text>
+<text x="589.576923076923" y="570.0" fill="#f5df9c" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="12px" font-weight="500" text-anchor="middle">溪流 → 湿地</text>
+<text x="405.4230769230769" y="721.4772727272727" fill="#f5df9c" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="12px" font-weight="500" text-anchor="middle">南岸林缘线</text>
+<text x="655.3461538461538" y="415.0" fill="#f5df9c" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="12px" font-weight="500" text-anchor="middle">东侧峡谷线</text>
+<circle cx="162.1" cy="323.4" r="8" fill="#f5c86a" stroke="#4c3a1e" stroke-width="2"/><text x="162.0769230769231" y="348.06818181818187" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">可能登陆海湾</text>
+<circle cx="510.7" cy="485.5" r="7" fill="#f5c86a" stroke="#4c3a1e" stroke-width="2"/><text x="510.65384615384613" y="510.1136363636364" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">中央河谷</text>
+<polygon points="461.3,292.3 470.3,309.3 452.3,309.3" fill="#f5c86a" stroke="#4c3a1e" stroke-width="2"/><text x="461.32692307692304" y="326.9318181818182" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">北侧山口</text>
+<rect x="686.8" y="674.7" width="16" height="16" rx="3" fill="#f5c86a" stroke="#4c3a1e" stroke-width="2"/><text x="694.8076923076923" y="707.3863636363636" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">沼泽边缘</text>
+<circle cx="270.6" cy="693.3" r="7" fill="#f5c86a" stroke="#4c3a1e" stroke-width="2"/><text x="270.5961538461538" y="717.9545454545455" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="600" text-anchor="middle">南岸滩地</text>
+<path d="M 106 170 L 106 127 M 106 127 L 98 140 M 106 127 L 114 140" stroke="#f5f0d2" stroke-width="3" fill="none"/>
+<text x="97" y="193" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="17px" font-weight="700" text-anchor="start">N</text>
+<path d="M 155.5 802.5 L 254.2 802.5" fill="none" stroke="#f5f0d2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="1.0"/>
+<text x="184.82692307692307" y="824.5" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="12px" font-weight="400" text-anchor="start">约 30 世界单位</text>
+<rect x="970" y="105" width="475" height="775" rx="18" fill="#102c2b" stroke="#3e6e64" stroke-width="2"/>
+<text x="998" y="147" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="24px" font-weight="700" text-anchor="start">这张原型先确认什么</text>
+<text x="998" y="175" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="500" text-anchor="start">暂不涉及资源、建筑或运行时碰撞</text>
+<text x="998" y="225" fill="#f5c86a" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="700" text-anchor="start">01</text>
+<text x="1043" y="225" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="18px" font-weight="700" text-anchor="start">岛屿轮廓</text>
+<text x="1043" y="253" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">海湾、岬角、狭窄地峡和不规则海岸线。</text>
+<text x="998" y="317" fill="#f5c86a" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="700" text-anchor="start">02</text>
+<text x="1043" y="317" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="18px" font-weight="700" text-anchor="start">天然屏障</text>
+<text x="1043" y="345" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">北侧山脊、东侧岩脊、西南断崖与密林边缘。</text>
+<text x="998" y="409" fill="#f5c86a" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="700" text-anchor="start">03</text>
+<text x="1043" y="409" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="18px" font-weight="700" text-anchor="start">自然水系</text>
+<text x="1043" y="437" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">溪流从山口穿过中央河谷，汇入东南湿地。</text>
+<text x="998" y="501" fill="#f5c86a" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="15px" font-weight="700" text-anchor="start">04</text>
+<text x="1043" y="501" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="18px" font-weight="700" text-anchor="start">探索方向</text>
+<text x="1043" y="529" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">登陆海湾、河谷、林缘、山口和湿地形成分叉路线。</text>
+<text x="998" y="597" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="18px" font-weight="700" text-anchor="start">图例</text>
+<rect x="1000" y="614" width="18" height="18" rx="3" fill="#183f4b"/>
+<text x="1030" y="629" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">海水 / 岛外不可达</text>
+<rect x="1000" y="643" width="18" height="18" rx="3" fill="#d6bd79"/>
+<text x="1030" y="658" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">海岸带</text>
+<rect x="1000" y="672" width="18" height="18" rx="3" fill="#285842"/>
+<text x="1030" y="687" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">原始森林 / 视觉与通行屏障</text>
+<rect x="1000" y="701" width="18" height="18" rx="3" fill="#4e5148"/>
+<text x="1030" y="716" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">山地 / 岩壁天然阻隔</text>
+<rect x="1000" y="730" width="18" height="18" rx="3" fill="#5d8570"/>
+<text x="1030" y="745" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">沼泽 / 湿地低地</text>
+<rect x="1000" y="759" width="18" height="18" rx="3" fill="#55a9a4"/>
+<text x="1030" y="774" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">溪流 / 低洼水系</text>
+<text x="998" y="817" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="18px" font-weight="700" text-anchor="start">路线线型</text>
+<line x1="972" y1="812" x2="1014" y2="812" stroke="#f5df9c" stroke-width="4" stroke-linecap="round"/>
+<text x="1030" y="821" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">主要探索方向</text>
+<line x1="972" y1="840" x2="1014" y2="840" stroke="#d7efc4" stroke-width="4" stroke-linecap="round" stroke-dasharray="10 9"/>
+<text x="1030" y="849" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">次要支线 / 山口线</text>
+<line x1="998" y1="876" x2="1417" y2="876" stroke="#3e6e64"/>
+<text x="998" y="905" fill="#f5f0d2" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="18px" font-weight="700" text-anchor="start">下一步（确认后）</text>
+<text x="998" y="934" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">把这份布局转成 Godot 地形与明确边界，再加入</text>
+<text x="998" y="957" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="400" text-anchor="start">木材分布、出生点、建筑空间和碰撞测试。</text>
+<text x="52" y="942" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="500" text-anchor="start">原型状态：独立预览，不会改变当前可玩地图</text>
+<text x="1445" y="942" fill="#b5cfbf" font-family="Noto Sans CJK SC, PingFang SC, sans-serif" font-size="14px" font-weight="500" text-anchor="end">V1  /  layout-only</text>
+</svg>

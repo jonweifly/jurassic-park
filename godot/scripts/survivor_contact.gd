@@ -7,7 +7,7 @@ var bones := {}
 func _init(owner_visual: Node, rig: Skeleton3D) -> void:
 	visual = owner_visual
 	skeleton = rig
-	for name in ["root", "spine", "neck", "head", "thighL", "shinL", "footL", "thighR", "shinR", "footR", "upper_armL", "forearmL", "upper_armR", "forearmR", "handR"]:
+	for name in ["root", "spine", "neck", "head", "thighL", "shinL", "footL", "thighR", "shinR", "footR", "upper_armL", "forearmL", "handL", "upper_armR", "forearmR", "handR"]:
 		bones[name] = skeleton.find_bone(name)
 
 func ready() -> bool:
@@ -112,7 +112,9 @@ func work(action: String, target: Vector3, phase: float) -> void:
 	if action not in ["chop", "mine", "build"]: return
 	var contact_time := 0.65 if action == "build" else 1.1
 	var weight := smoothstep(contact_time - 0.28, contact_time - 0.02, phase) * (1.0 - smoothstep(contact_time + 0.04, contact_time + 0.25, phase))
-	if weight <= 0: return
+	if weight <= 0:
+		support_tool(action, phase)
+		return
 	var pawn: Node3D = visual.get_parent()
 	var direction := target - pawn.global_position
 	direction.y = 0
@@ -137,3 +139,14 @@ func work(action: String, target: Vector3, phase: float) -> void:
 	# An unreachable target never stretches limbs or teleports the gameplay root.
 	wrist = hand.origin + (wrist - hand.origin).limit_length(0.30 if action == "mine" else 0.22) * weight
 	solve("upper_armR", "forearmR", "handR", wrist, basis)
+	support_tool(action, phase)
+
+func support_tool(action: String, phase: float) -> void:
+	if action not in ["chop", "mine"] or (action == "chop" and visual.saw_equipped): return
+	var grip_weight := smoothstep(0.0, 0.22, phase) * (1.0 - smoothstep(1.16, 1.35, phase))
+	if grip_weight <= 0.0: return
+	var hand := pose("handL")
+	var handle := pose("handR") * tool_transform(action)
+	var target := handle * Vector3(0, 0, 0.18 if action == "mine" else 0.24)
+	target = hand.origin.lerp(target, grip_weight)
+	solve("upper_armL", "forearmL", "handL", target, hand.basis)

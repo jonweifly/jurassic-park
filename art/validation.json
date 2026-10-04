@@ -1,7 +1,21 @@
 {
-  "assets": 25,
+  "assets": 47,
   "errors": [],
   "results": [
+    {
+      "name": "alpha_trex_v2",
+      "triangles": 28880,
+      "weighted_vertices": 17457,
+      "blended_vertices": 10053,
+      "bones": 20,
+      "clips": [
+        "idle",
+        "walk",
+        "attack",
+        "death"
+      ],
+      "bytes": 1441240
+    },
     {
       "name": "axe",
       "triangles": 196,
@@ -28,6 +42,38 @@
       "bones": 0,
       "clips": [],
       "bytes": 92360
+    },
+    {
+      "name": "canopy_tree",
+      "triangles": 3046,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 193684
+    },
+    {
+      "name": "canopy_tree_lod",
+      "triangles": 1366,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 76504
+    },
+    {
+      "name": "elite_raptor_v2",
+      "triangles": 28088,
+      "weighted_vertices": 17102,
+      "blended_vertices": 7593,
+      "bones": 20,
+      "clips": [
+        "idle",
+        "walk",
+        "attack",
+        "death"
+      ],
+      "bytes": 1432368
     },
     {
       "name": "fern",
@@ -75,6 +121,15 @@
       "bytes": 54448
     },
     {
+      "name": "generator_dressing",
+      "triangles": 3612,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 248840
+    },
+    {
       "name": "hammer",
       "triangles": 196,
       "weighted_vertices": 0,
@@ -93,6 +148,15 @@
       "bytes": 56728
     },
     {
+      "name": "lab_dressing",
+      "triangles": 2900,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 203924
+    },
+    {
       "name": "ore_cargo",
       "triangles": 510,
       "weighted_vertices": 0,
@@ -100,6 +164,24 @@
       "bones": 0,
       "clips": [],
       "bytes": 21320
+    },
+    {
+      "name": "palm_tree",
+      "triangles": 3364,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 200824
+    },
+    {
+      "name": "palm_tree_lod",
+      "triangles": 1636,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 100652
     },
     {
       "name": "pickaxe",
@@ -123,6 +205,20 @@
         "death"
       ],
       "bytes": 217160
+    },
+    {
+      "name": "raptor_v2",
+      "triangles": 24328,
+      "weighted_vertices": 15000,
+      "blended_vertices": 7593,
+      "bones": 20,
+      "clips": [
+        "idle",
+        "walk",
+        "attack",
+        "death"
+      ],
+      "bytes": 1265800
     },
     {
       "name": "rifle",
@@ -152,6 +248,20 @@
       "bytes": 42996
     },
     {
+      "name": "small_raptor_v2",
+      "triangles": 24328,
+      "weighted_vertices": 15275,
+      "blended_vertices": 7837,
+      "bones": 20,
+      "clips": [
+        "idle",
+        "walk",
+        "attack",
+        "death"
+      ],
+      "bytes": 1284504
+    },
+    {
       "name": "snow_tree",
       "triangles": 4360,
       "weighted_vertices": 0,
@@ -170,10 +280,42 @@
       "bytes": 116728
     },
     {
+      "name": "spitter_v2",
+      "triangles": 26236,
+      "weighted_vertices": 16296,
+      "blended_vertices": 8763,
+      "bones": 20,
+      "clips": [
+        "idle",
+        "walk",
+        "attack",
+        "death"
+      ],
+      "bytes": 1365404
+    },
+    {
+      "name": "split_tree",
+      "triangles": 2132,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 136020
+    },
+    {
+      "name": "split_tree_lod",
+      "triangles": 980,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 55652
+    },
+    {
       "name": "survivor",
-      "triangles": 3238,
-      "weighted_vertices": 2053,
-      "blended_vertices": 102,
+      "triangles": 3776,
+      "weighted_vertices": 1992,
+      "blended_vertices": 88,
       "bones": 16,
       "clips": [
         "idle",
@@ -186,7 +328,7 @@
         "carry",
         "carry_idle"
       ],
-      "bytes": 249624
+      "bytes": 224292
     },
     {
       "name": "tent",
@@ -198,6 +340,15 @@
       "bytes": 98916
     },
     {
+      "name": "tent_dressing",
+      "triangles": 4060,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 285916
+    },
+    {
       "name": "tower",
       "triangles": 1042,
       "weighted_vertices": 0,
@@ -205,6 +356,42 @@
       "bones": 0,
       "clips": [],
       "bytes": 45560
+    },
+    {
+      "name": "tower_dressing",
+      "triangles": 4068,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 284660
+    },
+    {
+      "name": "tower_heavy",
+      "triangles": 3348,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 217652
+    },
+    {
+      "name": "tower_range",
+      "triangles": 3412,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 220840
+    },
+    {
+      "name": "tower_rapid",
+      "triangles": 4620,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 301564
     },
     {
       "name": "tree",
@@ -239,6 +426,38 @@
       "bytes": 206972
     },
     {
+      "name": "trex_v2",
+      "triangles": 23640,
+      "weighted_vertices": 14399,
+      "blended_vertices": 7567,
+      "bones": 20,
+      "clips": [
+        "idle",
+        "walk",
+        "attack",
+        "death"
+      ],
+      "bytes": 1200856
+    },
+    {
+      "name": "wind_pine",
+      "triangles": 2006,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 117540
+    },
+    {
+      "name": "wind_pine_lod",
+      "triangles": 1526,
+      "weighted_vertices": 0,
+      "blended_vertices": 0,
+      "bones": 0,
+      "clips": [],
+      "bytes": 84120
+    },
+    {
       "name": "wood_cargo",
       "triangles": 236,
       "weighted_vertices": 0,
@@ -246,6 +465,20 @@
       "bones": 0,
       "clips": [],
       "bytes": 11084
+    },
+    {
+      "name": "young_trex_v2",
+      "triangles": 23640,
+      "weighted_vertices": 14595,
+      "blended_vertices": 7593,
+      "bones": 20,
+      "clips": [
+        "idle",
+        "walk",
+        "attack",
+        "death"
+      ],
+      "bytes": 1214196
     }
   ]
 }

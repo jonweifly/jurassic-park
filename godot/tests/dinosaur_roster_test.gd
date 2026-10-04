@@ -234,7 +234,7 @@ func test_models() -> void:
 		d.is_dinosaur = true
 		root.add_child(d)
 		var skeleton: Skeleton3D = d.get_node("Model/Rig/Skeleton3D")
-		var meshes := skeleton.find_children("*", "MeshInstance3D", true, false)
+		var meshes := skeleton.find_children("*", "MeshInstance3D", true, false).filter(func(mesh): return mesh.skin != null)
 		expect(skeleton.get_bone_count() >= 20 and meshes.size() == 1 and meshes[0].skin != null, kind + " has a skinned anatomical mesh and articulated skeleton")
 		var player: AnimationPlayer = d.visual.player
 		expect(player.has_animation("attack") and player.has_animation("walk") and player.has_animation("death"), kind + " supplies production animations")

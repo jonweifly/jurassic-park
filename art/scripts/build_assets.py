@@ -170,6 +170,21 @@ def animate(r,kind):
     else: a=-.9+.35*(t-contact)/(duration-contact)
     rot('upper_armR',a,0,.12); rot('forearmR',-.4 if t<wind else -.18); rot('handR',.15)
     rot('upper_armL',a*.55,0,-.18); rot('forearmL',-.65); rot('spine',.10+max(0,a+1)*.18,0,.08*sin(phase*pi)); rot('head',-.1)
+    if human:
+     load=min(1,t/wind); hit=max(0,min(1,(t-wind)/(contact-wind))); release=max(0,min(1,(t-contact)/(duration-contact)))
+     tension=sin(load*pi/2)*(1-hit); drive=hit*(1-release)
+     if name=='mine':
+      rot('upper_armR',a-.14*tension,0,.06); rot('upper_armL',a*.78,0,-.06)
+      rot('forearmL',-.52); rot('spine',.10-.12*tension+.22*drive,0,.02*tension)
+      rot('head',-.10+.08*tension)
+     elif name=='chop':
+      rot('spine',.10+.09*drive,0,.08*tension-.04*drive)
+      rot('upper_armL',a*.70,0,-.12); rot('forearmL',-.55)
+     else:
+      # The free arm braces the body while the shorter hammer stroke stays one-handed.
+      rot('upper_armR',a*.85,0,.08); rot('forearmR',-.28)
+      rot('upper_armL',-.28,0,-.20); rot('forearmL',-.45)
+      rot('spine',.12+.07*drive,0,.025*tension)
    if name=='attack':
     strike=sin(min(1,phase/.65)*pi)
     if human: rot('upper_armR',-1.25+strike*.12); rot('forearmR',-.4); rot('upper_armL',-1.1,0,-.3); rot('forearmL',-.9)
@@ -264,6 +279,23 @@ def survivor():
   m.loft([((s*.354,1.28,.01),.075,.074),(elbow,.066,.065),((s*.385,1.07,.028),.069,.068),(wrist,.045,.044)],2,12,[{'upper_arm'+side:1},{'upper_arm'+side:.5,'forearm'+side:.5},{'forearm'+side:1},{'forearm'+side:1}])
   m.ellipsoid((s*.402,.896,.058),(.052,.071,.042),2,{'hand'+side:1},10,5)
   for j in range(3): m.tube([(s*.39+(j-1)*.018,.88,.086),(s*.39+(j-1)*.018,.852,.08)],[.012,.01],2,5,{'hand'+side:1})
+ # Close-up readability pass: small field details sit on the same weighted
+ # surface as the body, so they follow the authored clips instead of floating
+ # as static props when the camera is zoomed in.
+ m.box((0,1.455,.205),(.23,.11,.035),4,.012,{'spine':1})
+ m.tube([(0,1.12,.197),(0,1.32,.196),(0,1.45,.188)],[.007]*3,3,5,{'spine':1})
+ for s in (-1,1):
+  side='L' if s<0 else 'R'
+  m.tube([(s*.09,1.515,.07),(s*.14,1.46,.15),(s*.065,1.435,.175)],[.015,.019,.011],0,6,{'spine':1})
+  m.loft([((s*.353,1.285,.01),.092,.094),((s*.357,1.25,.01),.09,.093)],4,12,[{'upper_arm'+side:1}]*2)
+ for s in (-1,1):
+  m.box((s*.18,1.30,.235),(.105,.14,.06),4,.014,{'spine':1})
+  m.box((s*.135,1.00,.155),(.075,.09,.06),11,.012,{'root':1})
+  m.ellipsoid((s*.14,.555,.085),(.075,.065,.026),11,{'thigh'+('L' if s < 0 else 'R'):.5,'shin'+('L' if s < 0 else 'R'):.5},10,5)
+ # A low-profile headset and radio mic give the survivor a recognizable
+ # silhouette without changing the expedition palette or adding a second mesh.
+ m.box((.108,1.735,.02),(.026,.055,.045),11,.008,{'head':1})
+ m.tube([(.11,1.72,.025),(.145,1.70,.12),(.065,1.69,.157)],[.009,.008,.007],11,5,{'head':1})
  ob=m.object(); r=rig(bones,[ob]); animate(r,'survivor'); export('survivor')
 
 def dinosaur(name):

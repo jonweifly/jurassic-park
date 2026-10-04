@@ -9,26 +9,13 @@ ROOT=Path(__file__).resolve().parents[2]
 source=(ROOT/'art/scripts/build_assets.py').read_text()
 # Reuse the original meshing/IK library without overwriting the shared environment atlas.
 source=source.replace("'expedition_albedo'", "'dinosaur_albedo'").replace("'expedition_roughness'", "'dinosaur_roughness'").replace("'expedition_normal'", "'dinosaur_normal'")
+source=source.replace("export_apply=False", "export_apply=True")
 base=types.ModuleType('dinosaur_mesh_library');base.__file__=str(ROOT/'art/scripts/build_assets.py')
 exec(compile(source,base.__file__,'exec'),base.__dict__)
-N=base.N; tile=N//4
-palette=['b9b291','657b56','49664c','906449','a38256','346f69','526779','53463f','5d7850','303f38','e0d2ac','17211c','d0a151','806143','a9b4a0','b45336']
-rng=np.random.default_rng(650206)
-albedo=np.ones((N,N,4),np.float32); rough=np.ones_like(albedo); normals=np.ones_like(albedo)
-for i,color in enumerate(palette):
- y,x=np.mgrid[0:tile,0:tile].astype(float)
- # Staggered pebble scales, dark seams, soft domed normal relief and mottled pigmentation.
- sx=(x/12+(np.floor(y/10)%2)*.5)%1-.5; sy=(y/10)%1-.5
- r=np.sqrt((sx*1.85)**2+(sy*1.85)**2)
- ridge=np.clip(1-r,0,1)**.65
- pattern=.87+.14*np.sin(x*.045+np.sin(y*.03)*1.4)*np.cos(y*.027)
- stripes=1-.22*(np.sin(x*.07+np.sin(y*.02)*1.8)>.58)
- rgb=np.array([int(color[j:j+2],16)/255 for j in (0,2,4)])
- value=pattern*stripes*(.77+.26*ridge)+(rng.random((tile,tile))-.5)*.035
- a,b=(i//4)*tile,(i%4)*tile
- albedo[a:a+tile,b:b+tile,:3]=np.clip(rgb*value[:,:,None],0,1)
- rough[a:a+tile,b:b+tile,:3]=(.76+.12*(1-ridge))[:,:,None]
- dy,dx=np.gradient(ridge); normals[a:a+tile,b:b+tile,:3]=np.stack([.5-dx*.6,.5-dy*.6,np.ones_like(x)],axis=-1)
+# One deterministic authoring source for Blender and CPU-only texture refreshes.
+import runpy
+surface=runpy.run_path(str(ROOT/'art/scripts/build_dinosaur_surface.py'))
+albedo,rough,normals=surface['dinosaur_surface'](base.N)
 for im,arr in [(base.atlas,albedo),(base.rmap,rough),(base.normalmap,normals)]:
  im.pixels.foreach_set(arr.ravel());im.save()
 base.MAT.name='Dinosaur_Scale_PBR'
@@ -99,12 +86,19 @@ def detail(m,bones,name,rex):
   if kind=='spitter' and ('head' in w or 'jaw' in w):forward=.8+(forward-.8)*1.23;x*=.86
   if kind=='elite_raptor' and ('root' in w or 'spine' in w):x*=1.10
   if kind=='alpha_trex' and ('spine' in w or 'neck' in w):x*=1.20
-  m.v[i]=(x,-forward,y)
+  # Catmull-Clark smoothing lifts the lowest weighted skin by a small,
+  # consistent amount.  Lower the authored mesh before export so every
+  # species keeps its feet on the same ground plane as the rig.
+  m.v[i]=(x,-forward,y-.0523)
 
 base.detail=detail
 # Build fresh anatomical surface meshes from lofts, then bind using existing tested IK.
 start=source.index('def dinosaur(name):');end=source.index('\ndef tree(name):',start)
 fn=source[start:end].replace("c,18,", "c,24,").replace("c,16,", "c,24,")
+fn=fn.replace(
+ "r=rig(bones,[m.object()]); animate(r,name); export(name)",
+ "detail(m,bones,name,rex); ob=m.object(); smooth=ob.modifiers.new('Close-up anatomical smoothing','SUBSURF'); smooth.subdivision_type='CATMULL_CLARK'; smooth.levels=1; smooth.render_levels=1; bpy.context.view_layer.objects.active=ob; ob.select_set(True); bpy.ops.object.modifier_apply(modifier=smooth.name); r=rig(bones,[ob]); animate(r,name); export(roster_kind+'_v2')"
+)
 fn=fn.replace("r=rig(bones,[m.object()]); animate(r,name); export(name)", "detail(m,bones,name,rex); r=rig(bones,[m.object()]); animate(r,name); export(roster_kind+'_v2')")
 exec(fn,base.__dict__)
 # Bake distinct attack acting into each species while retaining the same clip contract.

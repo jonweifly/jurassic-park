@@ -58,7 +58,8 @@ func run() -> void:
 	for cell in world.trees:
 		var candidate_point: Vector3 = world.board.point(cell)
 		var candidate_screen: Vector2 = world.camera.unproject_position(candidate_point)
-		if world.vision.explored.has(cell) and not world.hud.covers(candidate_screen) and not world.board.route(world.hero.position, candidate_point, true).is_empty():
+		var wood_route: PackedVector3Array = world.worker.work_route("wood", candidate_point)
+		if world.vision.explored.has(cell) and not world.hud.covers(candidate_screen) and (not wood_route.is_empty() or world.worker.wood_contact(world.hero.position, candidate_point)):
 			tree_cell = cell
 			break
 	var tree_point: Vector3 = world.board.point(tree_cell)

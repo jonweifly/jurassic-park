@@ -137,7 +137,7 @@ func run() -> void:
 	tent.hp -= 10
 	expect(hover(world.board.point(tent.cell)) == "repair", "Damaged tent displays a repair tool")
 	world.command(world.board.point(tent.cell))
-	expect(world.order == "repair", "Repair preview dispatches repairs")
+	expect(world.selected_id == tent.id and world.order != "repair", "Left-click damaged building selects it without repairing")
 	var site := building("generator", 2.0)
 	expect(hover(world.board.point(site.cell)) == "build", "Unfinished construction displays a hammer")
 	world.command(world.board.point(site.cell))

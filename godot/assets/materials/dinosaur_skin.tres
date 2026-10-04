@@ -8,6 +8,6 @@ albedo_texture = ExtResource("albedo")
 roughness = 0.9
 roughness_texture = ExtResource("rough")
 normal_enabled = true
-normal_scale = 0.42
+normal_scale = 0.55
 normal_texture = ExtResource("normal")
 cull_mode = 2

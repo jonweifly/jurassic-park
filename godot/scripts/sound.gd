@@ -1,8 +1,34 @@
 extends Node
 ## Audio uses the camera's ground focus, avoiding isometric-camera height falloff.
 const FILES = ["click", "ready", "deposit", "complete", "warning", "rescue", "won", "lost", "chop", "hammer", "mine", "step", "shot", "bow", "electric", "gate", "hit", "roar", "collapse", "day", "night", "fire", "generator"]
-const ENVIRONMENT_FILES = ["small_raptor_call_1","small_raptor_call_2","raptor_call_1","raptor_call_2","young_trex_call_1","young_trex_call_2","trex_call_1","trex_call_2","wind_breeze","wind_gale","rain","thunder_1","thunder_2"]
-const LOOP_FILES = ["day","night","fire","generator","wind_breeze","wind_gale","rain"]
+const VARIANT_FILES = [
+	"click_soft", "click_confirm", "ready_2", "deposit_2", "complete_2", "warning_2", "rescue_2", "won_2", "lost_2",
+	"chop_2", "hammer_2", "mine_2", "step_2", "step_3", "shot_2", "bow_2", "electric_2", "gate_2", "hit_2", "roar_2", "collapse_2"
+]
+const ENVIRONMENT_FILES = ["small_raptor_call_1","small_raptor_call_2","raptor_call_1","raptor_call_2","young_trex_call_1","young_trex_call_2","trex_call_1","trex_call_2","wind_breeze","wind_gale","rain","thunder_1","thunder_2","jungle_day","jungle_night"]
+const LOOP_FILES = ["day","night","fire","generator","wind_breeze","wind_gale","rain","jungle_day","jungle_night"]
+const VARIANT_GROUPS := {
+	"click": ["click", "click_soft", "click_confirm"],
+	"ready": ["ready", "ready_2"],
+	"deposit": ["deposit", "deposit_2"],
+	"complete": ["complete", "complete_2"],
+	"warning": ["warning", "warning_2"],
+	"rescue": ["rescue", "rescue_2"],
+	"won": ["won", "won_2"],
+	"lost": ["lost", "lost_2"],
+	"chop": ["chop", "chop_2"],
+	"hammer": ["hammer", "hammer_2"],
+	"mine": ["mine", "mine_2"],
+	"step": ["step", "step_2", "step_3"],
+	"shot": ["shot", "shot_2"],
+	"bow": ["bow", "bow_2"],
+	"electric": ["electric", "electric_2"],
+	"gate": ["gate", "gate_2"],
+	"hit": ["hit", "hit_2"],
+	"roar": ["roar", "roar_2"],
+	"collapse": ["collapse", "collapse_2"]
+}
+const ALL_FILES = FILES + VARIANT_FILES + ENVIRONMENT_FILES
 const DinosaurAudio = preload("res://scripts/dinosaur_audio.gd")
 var dinosaur_audio: RefCounted
 var panners: Array[AudioEffectPanner] = []
@@ -12,6 +38,7 @@ var streams: Dictionary = {}
 var voices: Array[AudioStreamPlayer] = []
 var loops: Dictionary = {}
 var cooldowns: Dictionary = {}
+var variant_cursors: Dictionary = {}
 var levels := {"Master": 0.8, "Ambience": 0.7, "Effects": 0.85}
 var muted := false
 var previous_phase := "playing"
@@ -39,7 +66,7 @@ func _ready() -> void:
 			AudioServer.set_bus_name(AudioServer.bus_count - 1, bus_name)
 			AudioServer.set_bus_send(AudioServer.bus_count - 1, "Master")
 	dinosaur_audio = DinosaurAudio.new(self)
-	for key in FILES + ENVIRONMENT_FILES:
+	for key in ALL_FILES:
 		var stream: AudioStreamWAV = load("res://assets/audio/%s.wav" % key).duplicate()
 		if key in LOOP_FILES:
 			stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
@@ -97,7 +124,14 @@ func set_muted(value: bool) -> void:
 	save_settings()
 
 func play_ui(key: String) -> void:
-	play_voice(key, "Interface", -9.0)
+	play_voice(next_variant(key), "Interface", -9.0, false, 0.0, key)
+
+func next_variant(key: String) -> String:
+	var group: Array = VARIANT_GROUPS.get(key, [])
+	if group.is_empty(): return key
+	var cursor := int(variant_cursors.get(key, 0))
+	variant_cursors[key] = (cursor + 1) % group.size()
+	return group[cursor]
 
 func audible(position: Vector3) -> bool:
 	if not is_instance_valid(world): return false
@@ -114,14 +148,15 @@ func play_at(key: String, position: Vector3, gain_db: float = 0.0, priority: boo
 	var offset: Vector3 = position-world.camera_focus
 	var distance := Vector2(offset.x,offset.z).length()
 	var pan := clampf(offset.dot(world.camera.global_basis.x)/16.0,-0.8,0.8)
-	play_voice(key, "Effects", -5.0 + gain_db + linear_to_db(maxf(0.01, 1.0 - distance / 32.0)),priority,pan)
+	play_voice(next_variant(key), "Effects", -5.0 + gain_db + linear_to_db(maxf(0.01, 1.0 - distance / 32.0)),priority,pan,key)
 
 func play_dinosaur(d: Node3D, attack: bool = false) -> void:
 	if world.coop: world.coop.effect("dinosaur",[d.get_meta("save_id",-1),attack])
 	dinosaur_audio.cue(d,attack)
 
-func play_voice(key: String, bus_name: String, gain_db: float, priority: bool = false, pan: float = 0.0) -> void:
-	if not output_enabled or not streams.has(key) or cooldowns.get(key, 0.0) > 0: return
+func play_voice(key: String, bus_name: String, gain_db: float, priority: bool = false, pan: float = 0.0, cooldown_key: String = "") -> void:
+	var throttle_key := cooldown_key if not cooldown_key.is_empty() else key
+	if not output_enabled or not streams.has(key) or cooldowns.get(throttle_key, 0.0) > 0: return
 	var available := voices.filter(func(v): return not v.playing)
 	if available.is_empty() and priority:
 		available = voices.filter(func(v): return not v.get_meta("priority",false) and v.bus != "Interface")
@@ -135,7 +170,7 @@ func play_voice(key: String, bus_name: String, gain_db: float, priority: bool = 
 		voice.volume_db = gain_db
 		voice.pitch_scale = 1.0
 		voice.play()
-		cooldowns[key] = 0.07
+		cooldowns[throttle_key] = 0.07
 		return
 
 func _process(dt: float) -> void:
@@ -150,6 +185,8 @@ func _process(dt: float) -> void:
 	if world.encounter: duck *= 1.0 - world.encounter.tension * 0.25
 	set_loop("day", ambience_gain*(1-rain*.75)*duck if not world.night else 0.0, dt)
 	set_loop("night", ambience_gain*(1-rain*.65)*duck if world.night else 0.0, dt)
+	set_loop("jungle_day", ambience_gain*(1-rain*.82)*duck if not world.night else 0.0, dt)
+	set_loop("jungle_night", ambience_gain*(1-rain*.42)*duck if world.night else 0.0, dt)
 	set_loop("wind_breeze",ambience_gain*(0.3+wind*.3)*duck,dt)
 	set_loop("wind_gale",ambience_gain*maxf(0,wind-.3)*duck*.9,dt)
 	set_loop("rain",ambience_gain*rain*duck*.8,dt)

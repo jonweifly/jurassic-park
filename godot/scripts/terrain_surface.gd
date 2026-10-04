@@ -16,10 +16,15 @@ static func prepare(layout: RefCounted, authored_opening: bool = false) -> Packe
 	# weights keeps the entire cell at its exact original collision height.
 	for y in range(129):
 		for x in range(129):
+			# The fine surface has one metre samples while navigation cells are
+			# two metres wide.  Index the cell mask in that same coordinate space;
+			# using the raw fine-grid index only pinned the western half of the map.
+			var cell_x := floori(float(x) * 0.5)
+			var cell_y := floori(float(y) * 0.5)
 			for dy in [-1,0]:
 				for dx in [-1,0]:
-					var cx := clampi(x+dx,0,127)
-					var cy := clampi(y+dy,0,127)
+					var cx := clampi(cell_x+dx,0,127)
+					var cy := clampi(cell_y+dy,0,127)
 					if layout.walk[cy*128+cx] or layout.build[cy*128+cx]: strengths[y*129+x] = 0.0
 	# Existing resource roots/rocks are authored anchors too. A shoreline pass
 	# must not sink harvestable trees or expose their foundations.
@@ -34,6 +39,9 @@ static func prepare(layout: RefCounted, authored_opening: bool = false) -> Packe
 			var px := float(x)-128.0
 			var pz := float(y)-128.0
 			var original: float = layout.source_height_at(px,pz)
+			if layout.preserve_source_surface:
+				result[y*SIZE+x] = original
+				continue
 			if authored_opening and Vector2(px,pz).length() < 34.0:
 				result[y*SIZE+x] = preload("res://scripts/opening_terrain.gd").ground_height(px,pz)
 				continue

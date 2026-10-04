@@ -157,6 +157,8 @@ func run() -> void:
 	world.session.elapsed += 9
 	gear.sync_visuals()
 	expect(gear.recent_hits.is_empty(), "Camp alert expires through client presentation refresh without host simulation")
+	# Re-enable encounters for the threat checks after the isolated route/economy checks.
+	world.spawn_clocks.append({"period": 90.0, "next": 90.0, "species": ["raptor"]})
 	# Real map placement must produce the advertised threats, once per site.
 	for id in ["ranger", "arsenal"]:
 		var site: Dictionary = gear.data().sites[id]

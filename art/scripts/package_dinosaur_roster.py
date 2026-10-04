@@ -43,6 +43,9 @@ def package():
         body = struct.pack('<II', len(encoded), 0x4E4F534A) + encoded + struct.pack('<II', len(buf), 0x004E4942) + buf
         path.write_bytes(struct.pack('<III', 0x46546c67, 2, 12+len(body)) + body)
         print(path.name, len(raw), '->', path.stat().st_size)
+    # Native mesh / animation contracts stay intact during budget-neutral finishing.
+    import runpy
+    runpy.run_path(str(ROOT/'art/scripts/refine_dinosaur_geometry.py'),run_name='__main__')
     for filename in ['dinosaur-roster-manifest.json', 'asset-manifest.json']:
         path = ROOT/'art'/filename
         records = json.loads(path.read_text())

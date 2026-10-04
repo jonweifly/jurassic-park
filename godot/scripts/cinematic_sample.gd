@@ -47,7 +47,7 @@ func _ready() -> void:
 	previous_auto_quit = get_tree().auto_accept_quit
 	previous_title = get_window().title
 	get_tree().auto_accept_quit = true
-	DisplayServer.window_set_title("侏罗纪 · 01 写实场景样板")
+	DisplayServer.window_set_title("失落岛屿 · 场景样板")
 	Engine.max_fps = 60
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 	camera = Camera3D.new()

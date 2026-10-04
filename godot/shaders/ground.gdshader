@@ -4,6 +4,8 @@ uniform sampler2D detail_map : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D buildable_map : filter_nearest, repeat_disable;
 uniform sampler2D usage_map : filter_linear, repeat_disable;
 uniform sampler2D water_levels : filter_nearest, repeat_disable;
+uniform sampler2D continuous_water_levels : filter_linear, repeat_disable;
+uniform bool has_continuous_water = false;
 uniform sampler2D soil_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D forest_map : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 // 4m colour/height tiles, blended at two orientations to suppress repetition.
@@ -36,6 +38,8 @@ void fragment() {
  vec4 fine=texture(detail_map,terrain_position.xz*0.36);
  vec4 mid=texture(detail_map,terrain_position.xz*0.105+vec2(0.32));
  float broad=noise(terrain_position.xz*0.22);
+	float macro=noise(terrain_position.xz*0.052+vec2(13.7,4.1));
+	float micro=noise(terrain_position.xz*1.35+vec2(2.4,9.2));
  vec3 earth=mix(original,vec3(dot(original,vec3(0.3,0.5,0.2))),0.12);
  earth=mix(earth,earth*vec3(0.71,0.86,0.70),grass);
  earth=mix(earth,vec3(0.27,0.29,0.245),rock*(1.0-snow)*0.68);
@@ -44,7 +48,12 @@ void fragment() {
  detail=mix(detail,fine.b,rock);
  float litter=smoothstep(0.52,0.74,mid.a)*(1.0-rock)*(1.0-snow);
  earth=mix(earth,earth*vec3(0.83,0.76,0.65),litter*.34);
- earth*=0.88+broad*.12+(detail-.5)*.24+(mid.r-.5)*.16;
+	 earth*=0.84+broad*.12+(macro-.5)*.16+(detail-.5)*.24+(mid.r-.5)*.16;
+	// Break up the broad green field without introducing a visible tiled mask.
+	// The cool/warm balance follows the existing terrain palette and stays
+	// subtle enough to preserve tactical readability at the default zoom.
+	 vec3 ground_variation=mix(vec3(.90,.97,.83),vec3(1.08,.98,.78),smoothstep(.27,.76,macro));
+	 earth*=ground_variation*(.965+micro*.07);
  // Camp soil and a leaf-covered forest floor give use and ecology a visible
  // footprint. The masks follow actual structures/trees, never alter navigation.
  vec3 usage=texture(usage_map,terrain_position.xz/256.0+vec2(.5)).rgb;
@@ -75,6 +84,7 @@ void fragment() {
  float bare=clamp((1.0-grass)*.65+camp*.82+(1.0-grass_patches)*.42,0.0,1.0);
  // Expose a granular bed and a damp bank at the actual lake elevation.
  float lake_level=texture(water_levels,terrain_position.xz/256.0+vec2(.5)).r;
+ if (has_continuous_water) lake_level=texture(continuous_water_levels,(terrain_position.xz+vec2(128.5))/257.0).r;
  float bank=(1.0-smoothstep(.05,.48,terrain_position.y-lake_level+(breakup-.5)*.10))*step(-90.0,lake_level);
  bare=max(bare,bank);
  vec4 surface=mix(turf,dirt,clamp(bare,0.0,1.0));
@@ -85,7 +95,7 @@ void fragment() {
  vec3 tint=mix(vec3(.95,1.02,.85),vec3(1.09,1.01,.88),broad);
  // Large readable colour masses retain the hill silhouette at an RTS camera
  // distance; the fine texture must not flatten every face into the same grain.
- earth=mix(earth,surface.rgb*tint*(.88+noise(terrain_position.xz*.055)*.24),(1.0-snow)*.91);
+	 earth=mix(earth,surface.rgb*tint*(.86+macro*.26),(1.0-snow)*.91);
  float hollow=smoothstep(.54,.86,usage.b);
  float ridge=1.0-smoothstep(.20,.47,usage.b);
  vec3 face_tint=mix(vec3(.79,.83,.87),vec3(1.04,1.03,.94),smoothstep(.50,.98,terrain_normal.y));
@@ -102,15 +112,17 @@ void fragment() {
  float determinant=dot(q1,r1);
  vec3 gradient=sign(determinant)*(dFdx(h)*r1+dFdy(h)*r2);
  NORMAL=normalize(abs(determinant)*n-gradient);
- earth*=1.0-wetness*(1.0-snow)*0.16;
+	float low_spots=1.0-smoothstep(.38,.65,surface.a);
+	float wet_stain=wetness*(1.0-snow)*(0.25+low_spots*.75);
+	earth=mix(earth,earth*vec3(.80,.88,.88),wet_stain*.18);
+	earth*=1.0-wetness*(1.0-snow)*0.16;
  ALBEDO=earth;
  AO=1.0-hollow*.25;
- float low_spots=1.0-smoothstep(.38,.65,surface.a);
  float material_roughness=mix(.94,.81,rock);
  material_roughness=mix(material_roughness,.87,floor_blend*(1.0-camp));
  material_roughness=clamp(material_roughness+(surface.a-.5)*.10,.76,.98);
  ROUGHNESS=mix(material_roughness,.48,wetness*(.25+low_spots*.65)*(1.0-grass*.3));
- SPECULAR=0.18;
+	SPECULAR=mix(.18,.28,wetness);
  if (build_preview && distance(terrain_position.xz,builder_position.xz)<12.0) {
   float allowed=texture(buildable_map,terrain_position.xz/256.0+vec2(0.5)).r;
   float stripe=step(0.78,fract((terrain_position.x+terrain_position.z)*2.0));

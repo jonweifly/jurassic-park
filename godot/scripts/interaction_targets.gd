@@ -89,6 +89,19 @@ func action_point(screen: Vector2, ground: Vector3) -> Vector3:
 				nearest = distance
 				chosen = world.board.point(b.cell)
 				found = true
+		# A hidden model still needs a stable repair/select target during a
+		# vision refresh. Restrict the occupied-cell fallback to hidden models so
+		# visible neighboring meshes retain normal depth ordering.
+		if not world.visuals[b.id].is_visible_in_tree():
+			var center: Vector3 = world.board.point(b.cell)
+			var pick_box := AABB(center + Vector3(-1.8, 0.0, -1.8), Vector3(3.6, 4.5, 3.6))
+			var box_hit = pick_box.intersects_ray(origin, direction)
+			if box_hit != null:
+				var distance := origin.distance_squared_to(box_hit)
+				if distance < nearest:
+					nearest = distance
+					chosen = center
+					found = true
 	for d in world.dinosaurs:
 		if d.health <= 0 or not d.is_visible_in_tree(): continue
 		for mesh in d.get_node("Model").find_children("*", "MeshInstance3D", true, false):

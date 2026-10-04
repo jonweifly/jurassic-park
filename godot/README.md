@@ -1,8 +1,8 @@
-# 侏罗纪公园 — Godot 客户端
+# 失落岛屿：生存营地 — Godot 客户端
 
-目标是用户确认的魔兽争霸 III《侏罗纪公园》6.5。技术栈为 Godot 4、GDScript、原生可编辑 3D 场景。原网页项目仍保留。
+这是一款恐龙岛屿生存建造游戏。技术栈为 Godot 4、GDScript、原生可编辑 3D 场景。主游戏目前只保留“原始荒岛”一张地图。发行前素材与平台核验见 [素材与发行审计](../docs/release/asset-license-audit.md)。
 
-当前为已接入独立 3D 资源的可玩版本，**尚未达到原版规则的一比一还原**。已补全开局资源返送和施工、可通行电门、战争迷雾，并导入候选原图的地形与布置坐标；在用角色、恐龙、树木和建筑已替换为原创 Blender 模型。已核对的规则来自本地 6.5 汉化修正版候选，该候选含附加作弊脚本，不能称作纯净官方版本。只读取布局和规则，未运行其 JASS，也未导入魔兽模型或贴图。
+当前为已接入独立 3D 资源的可玩版本。已补全开局资源返送和施工、可通行电门、战争迷雾；在用角色、恐龙、树木和建筑为项目内 Blender 模型。历史规则研究保存在 `docs/research/`，不作为当前原创地图或商店描述。
 
 ## 菜单与野外工程（2026-09-30）
 
@@ -158,7 +158,7 @@ sh scripts/godot.sh --editor
 | 弓箭塔 / 基础建筑 / 化石挖掘场 / 电门 | 5 / 6 / 7 / 8 |
 | 放置 / 连续放置 / 取消 | 左键 / Shift + 左键 / 右键 |
 | 镜头移动 / 缩放 / 回到并持续跟随幸存者 | WASD 或方向键 / 滚轮 / 空格 |
-| 镜头旋转 / 俯仰 | Q、E 或中键拖动；中键上下拖动调整俯仰 |
+| 镜头旋转 / 俯仰 | Q、E 水平旋转；按住中键拖动可自由旋转与俯仰 |
 | 拖动平移 / 跟随幸存者 / 重置镜头 | Shift + 中键 / F / Home |
 | 移动镜头到地图位置 | 左键小地图 |
 | 选中基础建筑后升级实验室 / 停止命令 | R / X |
@@ -174,12 +174,22 @@ sh scripts/godot.sh --editor
 
 ## 场景与数据
 
-- `scenes/main.tscn`：运行入口，引用 `scenes/reference_island.tscn`。
-- `scenes/reference_island.tscn`：按候选 W3E / WPM / DOO 数据烘焙的可编辑场景。128×128 格、16,641 地面顶点、3,680 个已识别树木实例（2,991 个采集格）、410 个已识别岩石实例；树木、岩石坐标来自候选，模型为本项目制作。
-- `scenes/island.tscn`：保留的首轮临时小岛，当前入口不再使用。
+开局面板只提供一张地图：**原始荒岛**（`organic-island-v3`）。地图选择器、命令行启动和新存档都默认使用这一张地图；旧地图入口和旧地图数据已清理，避免地图版本混用。
+
+原始荒岛从已确认的 `data/map_candidates/organic_island_prototype_v1.json` 布局生成：不规则海岸、原始森林、岩脊、浅溪与湿地构成自然探索路线。V3 继续打通林间落脚点和岩谷连接，保留充足木材，并让岩石在树林边缘和据点周围形成可利用的天然防线。出生点会从满足平地、木材和可达条件的区域中随机选择。化石挖掘场可在任意适合建造的平坦地面建造。
+
+```sh
+python3 godot/tools/generate_organic_island.py
+sh scripts/godot.sh --headless --script res://tests/organic_island_map_test.gd
+sh scripts/godot.sh -- --map=organic-island-v3
+```
+
+运行数据在 `data/maps/organic_island_v3.json`，布局与资源指标在 `data/map_candidates/organic_island_v3.json`。专项检查覆盖营地、林间落脚点、真实角色路径、岩谷补给、河道连续性、木材、采伐、随机出生和存档。
+
+- `scenes/main.tscn`：运行入口，引用 `scenes/original_island.tscn`。
+- `scenes/original_island.tscn`：原始荒岛使用的基础场景，地图地形与摆放由 `data/maps/organic_island_v3.json` 提供。
 - `scenes/models/*.tscn`：独立 GLB 的包装场景。角色内的 Skeleton3D 和 AnimationPlayer 来自导入资产；在 Blender 源文件中编辑蒙皮与关键帧。原 `*_animations.tres` 仅保留为历史原型资料。
 - `scenes/art_gallery.tscn`：独立模型和动作预览。
-- `data/terrain.json`：提取后供客户端使用的高度、通行和布置数据。地面拾取通过真实三角网格碰撞，角色沿地表行走。
 - `scripts/worker.gd`：工作命令、施工、携带、返送、采完换树、修理。
 - `scripts/dinosaur_ai.gd`：有限感知、短时噪声、追击记忆、领地游荡、返回与反击；独立于音频播放。
 - `scripts/vision.gd`：共享视野、探索记忆、地形遮挡与场景迷雾材质。

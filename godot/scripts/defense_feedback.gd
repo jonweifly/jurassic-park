@@ -23,7 +23,11 @@ func _process(_dt: float) -> void:
 	if not world.build_mode.is_empty():
 		b = {"id": -1, "kind": world.build_mode, "cell": world.hover_cell, "remaining": 0.0} if preview else {}
 	var show_range: bool = world.started and not world.paused and not b.is_empty() and b.kind in ["tower", "shelter", "gate"] and b.remaining <= 0
-	if preview: show_range = show_range and world.board.inside(world.hover_cell) and not world.hud.covers(get_viewport().get_mouse_position())
+	# Keep the tactical range visible while the player is choosing a plot.  The
+	# HUD consumes clicks over its own controls, but hiding the world preview
+	# there leaves the player without feedback for a plot already under the
+	# cursor (and makes keyboard/controller hover state inconsistent with mouse).
+	if preview: show_range = show_range and world.board.inside(world.hover_cell)
 	range_node.visible = show_range
 	if show_range:
 		var key := "%d:%s:%s:%s" % [b.id, b.kind, b.cell, b.get("refit", "")]

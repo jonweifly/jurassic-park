@@ -2,7 +2,7 @@ extends Control
 ## Presentation-only pointer, target and route feedback. Commands own the simulation.
 const MOVE_PULSE_SECONDS := 0.95
 const ACTION_ICON_SIZE := Vector2(32, 32)
-const LABELS = {"move": "", "select": "左键选中建筑", "wood": "左键砍树", "gold": "左键采金", "build": "左键继续施工", "repair": "左键修理", "attack": "左键攻击", "return": "左键返送资源", "gate": "左键开关电门", "inspect": "左键调查", "field_site": "左键搜寻", "blocked": "无法到达", "heal": "返回帐篷治疗"}
+const LABELS = {"move": "", "select": "左键选中建筑", "wood": "左键砍树", "gold": "左键采金", "build": "左键继续施工", "repair": "右键修理", "attack": "左键攻击", "return": "左键返送资源", "gate": "左键开关电门", "inspect": "左键调查", "field_site": "左键搜寻", "blocked": "无法到达", "heal": "返回帐篷治疗"}
 const COLORS = {"move": Color("a8e6b2"), "wood": Color("bde3a0"), "gold": Color("f2d386"), "attack": Color("ffa594"), "blocked": Color("f5988b")}
 var world: Node
 var icons: Dictionary = {}
@@ -76,7 +76,7 @@ func update_hover(screen: Vector2, point: Vector3) -> void:
 	var target: Dictionary = world.context_at(action_point)
 	world.interaction_targets.hover_target = target
 	cursor_kind = target.kind
-	cursor_text = LABELS[cursor_kind]
+	cursor_text = "右键修理 · 左键选中建筑" if target.get("repairable", false) else LABELS[cursor_kind]
 	if not world.build_mode.is_empty():
 		var error: String = world.placement_error(world.board.cell_at(point))
 		cursor_kind = "build" if error.is_empty() else "blocked"

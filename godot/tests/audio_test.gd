@@ -34,9 +34,17 @@ func run() -> void:
 	var effect_index := AudioServer.get_bus_effect_count(0)
 	AudioServer.add_bus_effect(0, capture)
 	await create_timer(1.3).timeout
-	expect(sound.streams.size() == sound.FILES.size()+sound.ENVIRONMENT_FILES.size(), "All declared WAV assets must load")
-	for key in sound.FILES + sound.ENVIRONMENT_FILES:
+	expect(sound.streams.size() == sound.ALL_FILES.size(), "All declared WAV assets must load")
+	for key in sound.ALL_FILES:
 		expect(sound.streams[key].get_length() > 0.04, "Audio asset must have duration: " + key)
+	var step_variants := [sound.next_variant("step"), sound.next_variant("step"), sound.next_variant("step"), sound.next_variant("step")]
+	expect(step_variants == ["step", "step_2", "step_3", "step"], "Gameplay variants must rotate and wrap")
+	var click_variants := [sound.next_variant("click"), sound.next_variant("click"), sound.next_variant("click")]
+	expect(click_variants == ["click", "click_soft", "click_confirm"], "Interface variants must expose distinct feedback")
+	sound.cooldowns.clear()
+	for voice in sound.voices: voice.stop()
+	sound.play_ui("click")
+	expect(sound.cooldowns.get("click", 0.0) > 0.0 and not sound.cooldowns.has("click_soft"), "Variant playback keeps the logical event cooldown")
 	var ambient_rms := energy()
 	expect(ambient_rms > 0.001, "Start dialog must already produce non-silent ambience through audio mixer")
 	print("START AMBIENCE RMS: ", ambient_rms)

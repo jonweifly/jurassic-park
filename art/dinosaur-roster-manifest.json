@@ -1,7 +1,7 @@
 [
   {
     "name": "small_raptor_v2",
-    "triangles": 6556,
+    "triangles": 24328,
     "meshes": 1,
     "bones": 20,
     "clips": [
@@ -10,12 +10,12 @@
       "idle",
       "walk"
     ],
-    "bytes": 1879180,
-    "runtime_bytes": 400640
+    "bytes": 4525680,
+    "runtime_bytes": 1284584
   },
   {
     "name": "raptor_v2",
-    "triangles": 6556,
+    "triangles": 24328,
     "meshes": 1,
     "bones": 20,
     "clips": [
@@ -24,12 +24,12 @@
       "idle",
       "walk"
     ],
-    "bytes": 1879184,
-    "runtime_bytes": 400644
+    "bytes": 4506984,
+    "runtime_bytes": 1265884
   },
   {
     "name": "young_trex_v2",
-    "triangles": 6372,
+    "triangles": 23640,
     "meshes": 1,
     "bones": 20,
     "clips": [
@@ -38,12 +38,12 @@
       "idle",
       "walk"
     ],
-    "bytes": 1867596,
-    "runtime_bytes": 389056
+    "bytes": 4474420,
+    "runtime_bytes": 1214176
   },
   {
     "name": "trex_v2",
-    "triangles": 6372,
+    "triangles": 23640,
     "meshes": 1,
     "bones": 20,
     "clips": [
@@ -52,12 +52,12 @@
       "idle",
       "walk"
     ],
-    "bytes": 1867600,
-    "runtime_bytes": 389060
+    "bytes": 4461096,
+    "runtime_bytes": 1200836
   },
   {
     "name": "spitter_v2",
-    "triangles": 7090,
+    "triangles": 26236,
     "meshes": 1,
     "bones": 20,
     "clips": [
@@ -66,12 +66,12 @@
       "idle",
       "walk"
     ],
-    "bytes": 1910540,
-    "runtime_bytes": 431996
+    "bytes": 4606560,
+    "runtime_bytes": 1365484
   },
   {
     "name": "elite_raptor_v2",
-    "triangles": 7580,
+    "triangles": 28088,
     "meshes": 1,
     "bones": 20,
     "clips": [
@@ -80,12 +80,12 @@
       "idle",
       "walk"
     ],
-    "bytes": 1935192,
-    "runtime_bytes": 456648
+    "bytes": 4673516,
+    "runtime_bytes": 1432448
   },
   {
     "name": "alpha_trex_v2",
-    "triangles": 7764,
+    "triangles": 28880,
     "meshes": 1,
     "bones": 20,
     "clips": [
@@ -94,7 +94,7 @@
       "idle",
       "walk"
     ],
-    "bytes": 1937376,
-    "runtime_bytes": 458836
+    "bytes": 4701520,
+    "runtime_bytes": 1441228
   }
 ]

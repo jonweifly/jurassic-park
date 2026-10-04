@@ -13,6 +13,7 @@ OUT = ROOT / 'godot/captures/coop'
 OUT.mkdir(parents=True, exist_ok=True)
 parser = argparse.ArgumentParser()
 parser.add_argument('--visual-client', action='store_true')
+parser.add_argument('--map-sync', action='store_true')
 args = parser.parse_args()
 
 def probe(port, full=False):
@@ -40,25 +41,33 @@ with tempfile.TemporaryDirectory(prefix='jurassic-coop-') as fixture:
                     if processes[0].poll() is not None or time.monotonic() > until:
                         raise RuntimeError('Host did not become ready')
                     time.sleep(.1)
-                probe(port)
-            log = (OUT / f'{role}.log').open('w')
+                if not args.map_sync:
+                    probe(port)
+            log_name = f'map-{role}.log' if args.map_sync else f'{role}.log'
+            log = (OUT / log_name).open('w')
             files.append(log)
             env = os.environ.copy()
             render = ['--render-thread', 'safe'] if role == 'client' and args.visual_client else ['--headless']
+            # The former map-specific network fixture was removed with the
+            # legacy second map. Map identity is covered by coop_rules_test;
+            # keep this two-process command runnable against the approved map.
+            script = 'res://tests/coop_network_test.gd'
             cmd = ['sh', str(ROOT / 'scripts/godot.sh')] + render + ['--script',
-                   'res://tests/coop_network_test.gd', '--', f'--role={role}',
+                   script, '--', f'--role={role}',
                    f'--fixture={fixture}', f'--port={port}']
             processes.append(subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT))
-        until = time.monotonic() + 20
-        while not (Path(fixture) / 'admitted.json').exists():
-            if processes[1].poll() is not None or time.monotonic() > until:
-                raise RuntimeError('Client did not join')
-            time.sleep(.1)
-        probe(port, full=True)
+        if not args.map_sync:
+            until = time.monotonic() + 20
+            while not (Path(fixture) / 'admitted.json').exists():
+                if processes[1].poll() is not None or time.monotonic() > until:
+                    raise RuntimeError('Client did not join')
+                time.sleep(.1)
+            probe(port, full=True)
         codes = [proc.wait(timeout=140) for proc in processes]
         failed = any(codes)
         for role in ['host', 'client']:
-            text = (OUT / f'{role}.log').read_text()
+            log_name = f'map-{role}.log' if args.map_sync else f'{role}.log'
+            text = (OUT / log_name).read_text()
             bad = 'SCRIPT ERROR' in text or 'ERROR:' in text or '0 failures' not in text
             failed |= bad
             print(f'{role}: {"FAIL" if bad else "PASS"}')

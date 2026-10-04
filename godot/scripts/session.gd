@@ -8,6 +8,7 @@ var gold: int = 10
 var elapsed: float = 0.0
 var phase: String = "playing"
 var buildings: Array[Dictionary] = []
+var deposit_reserves: Dictionary = {}
 var next_id: int = 1
 var harvest_level: int = 0
 var duration: float = Catalog.SESSION_SECONDS

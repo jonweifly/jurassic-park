@@ -34,11 +34,14 @@ func initialize(content_seed: int = 0) -> void:
 func reserve(id: String, cell: Vector2i) -> void:
 	var number := -100 - Catalog.SITE_ORDER.find(id)
 	world.board.block_building(cell, number)
+	if world.scenery: world.scenery.refresh_buildable_cell(cell)
 	reserved[cell] = number
 
 func clear_visuals() -> void:
 	for cell in reserved:
-		if world.board.structures.get(cell) == reserved[cell]: world.board.remove_building(cell)
+		if world.board.structures.get(cell) == reserved[cell]:
+			world.board.remove_building(cell)
+			if world.scenery: world.scenery.refresh_buildable_cell(cell)
 	reserved.clear()
 	for visual in visuals.values():
 		visual.hide()

@@ -1,6 +1,7 @@
 extends SceneTree
 const Weather = preload("res://scripts/weather.gd")
 const Save = preload("res://scripts/save_store.gd")
+const Preferences = preload("res://scripts/preferences.gd")
 var checks := 0
 var failures := 0
 func _initialize() -> void: call_deferred("run")
@@ -9,8 +10,17 @@ func expect(value: bool, message: String) -> void:
 	if not value:
 		failures += 1
 		push_error(message)
+
+func color_brightness(color: Color) -> float:
+	return color.r + color.g + color.b
+
+func color_close(a: Color, b: Color, epsilon: float = 0.0001) -> bool:
+	return absf(a.r-b.r) < epsilon and absf(a.g-b.g) < epsilon and absf(a.b-b.b) < epsilon
 func fixture() -> Node:
+	Save.directory = "user://environment_fixture"
+	Preferences.file_path = "user://environment_fixture/preferences.cfg"
 	var world = load("res://scenes/main.tscn").instantiate()
+	world.persistence_enabled = false
 	root.add_child(world)
 	world.set_process(false)
 	world.set_physics_process(false)
@@ -33,6 +43,42 @@ func run() -> void:
 	var sight: Dictionary = world.vision.visible_cells.duplicate()
 	var stocks: Dictionary = Save.snapshot(world).trees
 	var families: Dictionary = world.scenery.variation.counts
+	# Sky presentation is derived from the saved day phase and weather preset.
+	# Clear and storm palettes must both become darker at night, and repeated
+	# lighting updates must recompute from constants instead of accumulating.
+	world.weather.preview_kind = 0
+	world.session.elapsed = 0.0
+	world.update_lighting()
+	var clear_day_top: Color = world.sky_material.sky_top_color
+	var clear_day_horizon: Color = world.sky_material.sky_horizon_color
+	var clear_day_sun: float = world.sun.light_energy
+	world.update_lighting()
+	expect(color_close(clear_day_top,world.sky_material.sky_top_color) and color_close(clear_day_horizon,world.sky_material.sky_horizon_color) and is_equal_approx(clear_day_sun,world.sun.light_energy),"Repeated clear daylight updates do not accumulate sky or light changes")
+	world.session.elapsed = world.Catalog.DAY_SECONDS * 0.5
+	world.update_lighting()
+	var clear_night_top: Color = world.sky_material.sky_top_color
+	expect(color_brightness(clear_night_top) < color_brightness(clear_day_top),"Clear night sky is darker than clear daylight")
+	world.weather.preview_kind = 3
+	world.session.elapsed = 0.0
+	world.update_lighting()
+	var storm_day_top: Color = world.sky_material.sky_top_color
+	var storm_day_horizon: Color = world.sky_material.sky_horizon_color
+	var storm_day_fog: float = world.environment.fog_density
+	var storm_day_height_density: float = world.environment.fog_height_density
+	world.update_lighting()
+	expect(color_close(storm_day_top,world.sky_material.sky_top_color) and color_close(storm_day_horizon,world.sky_material.sky_horizon_color) and is_equal_approx(storm_day_fog,world.environment.fog_density),"Repeated storm updates do not accumulate sky or fog changes")
+	world.session.elapsed = world.Catalog.DAY_SECONDS * 0.5
+	world.update_lighting()
+	var storm_night_top: Color = world.sky_material.sky_top_color
+	expect(color_brightness(storm_night_top) < color_brightness(storm_day_top),"Storm night sky is darker than storm daylight")
+	var fog_epsilon := 0.00001
+	var fog_ok: bool = world.environment.fog_density >= 0.0007-fog_epsilon and world.environment.fog_density <= 0.0027+fog_epsilon
+	fog_ok = fog_ok and world.environment.fog_height >= 1.0-fog_epsilon and world.environment.fog_height <= 3.5+fog_epsilon
+	fog_ok = fog_ok and world.environment.fog_height_density >= 0.010-fog_epsilon and world.environment.fog_height_density <= 0.042+fog_epsilon
+	fog_ok = fog_ok and world.environment.fog_sky_affect >= 0.18-fog_epsilon and world.environment.fog_sky_affect <= 0.38+fog_epsilon
+	expect(fog_ok,"Rain fog values stay within the intended readable range: density=%f height=%f height_density=%f sky_affect=%f" % [world.environment.fog_density,world.environment.fog_height,world.environment.fog_height_density,world.environment.fog_sky_affect])
+	expect(storm_day_height_density > 0.010,"Storm weather raises low height haze above clear weather")
+	world.weather.preview_kind = -1
 	for family in world.scenery.variation.FAMILIES:
 		expect(families.get(family,0)>10,"Independent tree family is present in playable map: "+family)
 		var high: Node3D = load("res://assets/models/%s.glb" % family).instantiate()
@@ -55,6 +101,8 @@ func run() -> void:
 		world.update_lighting()
 		world.update_camera(0)
 		expect(world.scenery.wind_materials.all(func(m):return is_equal_approx(m.get_shader_parameter("weather_clock"),float(time))),"Foliage and fog overlays use the same saved simulation clock")
+		if world.weather.rain > .5:
+			expect(world.scenery.foliage_cache.values().all(func(m):return is_equal_approx(float(m.get_shader_parameter("wetness")),world.weather.wetness)),"Rain drives wet canopy material response")
 		expect(world.rng.state == rng_state and world.board.revision == revision,"Weather never consumes combat RNG or changes navigation")
 		expect(world.vision.visible_cells == sight and Save.snapshot(world).trees == stocks,"Weather preserves enemy visibility and resource stocks")
 	world.paused = true

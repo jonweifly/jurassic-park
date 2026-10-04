@@ -38,9 +38,11 @@ func run() -> void:
 				w.camera_rig.target_yaw = angle
 				w.update_camera(0)
 				var point: Vector3 = w.hero.position
-				var hit: Vector3 = w.ground_at(w.camera.unproject_position(point))
-				expect(hit.distance_to(point) < 0.15, "Both camera lenses must pick actual terrain across zoom and rotation")
+				var screen: Vector2 = w.camera.unproject_position(point)
+				var hit: Vector3 = w.ground_at(screen)
+				expect(hit.distance_to(point) < 0.15, "Terrain pick failed: perspective=%s span=%.1f yaw=%.1f expected=%s hit=%s distance=%.3f" % [perspective, span, angle, point, hit, hit.distance_to(point)])
 				expect(w.camera.projection == (Camera3D.PROJECTION_PERSPECTIVE if perspective else Camera3D.PROJECTION_ORTHOGONAL), "Projection follows the player's preference")
+		expect(w.ground_at(Vector2(-20000, -20000)) == Vector3(10000, 0, 10000), "Off-island rays remain misses instead of creating fictitious ground commands")
 	w.preferences.values.perspective = true
 	w.camera_rig.reset()
 	w.update_camera(0)
@@ -101,6 +103,25 @@ func run() -> void:
 	expect(w.encounter.dust.is_empty() and w.camera_rig.impact_strength == 0, "A guest's room pause prevents host particles and camera motion")
 	w.coop.guest_paused = false
 	enemy.set_meta("ai_target_kind", "building")
+	# The co-op actions occupy the center top edge. Local encounter presentation
+	# must use their actual bounds instead of covering either action.
+	w.hud.pause_panel.hide()
+	w.coop.ui.refresh()
+	w.encounter.scan()
+	w.encounter.event_cooldown = 0.0
+	w.encounter.show_event("协作接敌", "两名幸存者都应能看到房间和救援操作。")
+	w.encounter.layout_messages()
+	var encounter_origin: Vector2 = w.encounter.get_global_rect().position
+	var warning_rect: Rect2 = Rect2(encounter_origin + w.encounter.banner_rect.position, w.encounter.banner_rect.size)
+	expect(w.coop.ui.room_button.visible and not warning_rect.intersects(w.coop.ui.room_button.get_global_rect()), "Encounter warning stays below the visible co-op room control")
+	expect(w.encounter.event_title.get_global_rect().position.y >= warning_rect.end.y + 8.0, "Encounter event title stays below the warning row")
+	w.coop.make_pawn(2)
+	var downed_teammate: Node3D = w.coop.pawns[2]
+	downed_teammate.health = 0.0
+	w.coop.ui.refresh()
+	w.encounter.layout_messages()
+	warning_rect = Rect2(encounter_origin + w.encounter.banner_rect.position, w.encounter.banner_rect.size)
+	expect(w.coop.ui.revive_button.visible and not warning_rect.intersects(w.coop.ui.room_button.get_global_rect()) and not warning_rect.intersects(w.coop.ui.revive_button.get_global_rect()), "Encounter warning clears both co-op actions when a teammate needs revival")
 	var packet: Dictionary = w.coop.replication.actor_packet()
 	expect(packet.dinosaurs[enemy.get_meta("save_id")].target_kind == "building", "Replicated dinosaurs include the engagement state required by the guest warning")
 	w.coop.hosting = false

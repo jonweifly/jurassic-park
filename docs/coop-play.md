@@ -48,7 +48,7 @@
 python3 scripts/package-coop.py
 ```
 
-输出 `godot/builds/JurassicCamp-Coop-Source.zip`。此包只包含运行项目和说明，不包含 Git、个人配置、存档、建模工具或测试截图。
+输出 `godot/builds/LostIsle-Coop-Source-Preview.zip`。此包只供内部试玩，包含运行项目、说明和[发行前审计](release/asset-license-audit.md)，不包含 Git、个人配置、存档、旧参考地图、建模工具或测试截图。跨设备兼容与素材权利核查完成前，不要将此包直接上架。
 
 ## 当前验证边界
 

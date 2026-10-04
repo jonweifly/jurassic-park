@@ -111,7 +111,10 @@ func run() -> void:
 	var found := false
 	for cell in world.trees:
 		var target: Vector3 = world.board.point(cell)
-		var route: PackedVector3Array = world.board.route(world.hero.position,target,true)
+		# A generic adjacent route may legitimately end at the current cell when
+		# the tree is enclosed by terrain.  Use the worker's real cardinal
+		# contact route so this fixture only selects trees the player can harvest.
+		var route: PackedVector3Array = world.worker.wood_route(target)
 		if route.is_empty() or route.size() > 8: continue
 		world.hero.position = route[route.size()-1]
 		world.hero.route.clear()

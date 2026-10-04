@@ -2,6 +2,7 @@ extends RefCounted
 const SIDE := 128
 const Surface = preload("res://scripts/terrain_surface.gd")
 const Opening = preload("res://scripts/opening_terrain.gd")
+const MapCatalog = preload("res://scripts/map_catalog.gd")
 var surface_heights := PackedFloat32Array()
 var water_cells := PackedFloat32Array()
 var shore_field := PackedFloat32Array()
@@ -11,19 +12,87 @@ var water: Array = []
 var walk: Array = []
 var build: Array = []
 var placements: Array = []
+var spawn_points: Array = []
+var extraction_sites: Array = []
+var gold_zones: Array = []
+var free_fossil_placement := false
+var preserve_source_surface := false
+var authored_surface := PackedFloat32Array()
+var surface_water_levels := PackedFloat32Array()
+var authored_shore := PackedFloat32Array()
 
-func _init() -> void:
-	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/terrain.json"))
+func _init(map_id: String = "") -> void:
+	var selected := map_id if not map_id.is_empty() else MapCatalog.selected_id
+	var definition := MapCatalog.definition(selected)
+	var path := str(definition.get("source", ""))
+	if path.is_empty(): path = "res://data/maps/" + str(definition.file)
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	heights = data.heights
 	tiles = data.tiles
 	water = data.water
 	walk = data.walk
 	build = data.build
 	placements = data.placements
-	Opening.apply(self)
-	rebuild_surface(true)
+	spawn_points = data.get("spawn_points", [])
+	extraction_sites = data.get("extraction_sites", [])
+	gold_zones = data.get("gold_zones", [])
+	free_fossil_placement = bool(data.get("free_fossil_placement", definition.get("free_fossil_placement", false)))
+	authored_surface = PackedFloat32Array(data.get("surface_heights", []))
+	surface_water_levels = PackedFloat32Array(data.get("surface_water_levels", []))
+	authored_shore = PackedFloat32Array(data.get("surface_shore_field", []))
+	preserve_source_surface = bool(definition.get("preserve_source_surface", false))
+	var opening_overlay: bool = definition.get("opening_overlay", data.get("opening_overlay", true))
+	if opening_overlay: Opening.apply(self)
+	rebuild_surface(opening_overlay)
+
+func gold_zone_at(position: Vector3) -> Dictionary:
+	for zone in gold_zones:
+		var coords: Array = zone.world
+		if Vector2(position.x - float(coords[0]), position.z - float(coords[1])).length() <= float(zone.radius): return zone
+	return {}
 
 func rebuild_surface(authored_opening: bool = false) -> void:
+	if authored_surface.size() == 257 * 257 and surface_water_levels.size() == 257 * 257 and authored_shore.size() == 257 * 257:
+		# Authored river banks use the exact same fine grid for picking and water.
+		surface_heights = authored_surface.duplicate()
+		# Keep the authored one-metre river profile on blocked ground, while
+		# preserving the original coarse terrain exactly anywhere a survivor can
+		# walk or build.  The map masks are two-metre cells, so patch every fine
+		# vertex touching a protected cell with the same bilinear source height.
+		for y in range(257):
+			for x in range(257):
+				var cell_x := floori(float(x) * 0.5)
+				var cell_y := floori(float(y) * 0.5)
+				var protected := false
+				for dy in [-1, 0]:
+					for dx in [-1, 0]:
+						var cx := clampi(cell_x + dx, 0, 127)
+						var cy := clampi(cell_y + dy, 0, 127)
+						if walk[cy * 128 + cx] or build[cy * 128 + cx]: protected = true
+				if protected:
+					var fx := float(x) * 0.5
+					var fz := float(y) * 0.5
+					var ix := mini(floori(fx), 127)
+					var iz := mini(floori(fz), 127)
+					var u := fx - ix
+					var v := fz - iz
+					var a: float = heights[iz * 129 + ix]
+					var b: float = heights[iz * 129 + ix + 1]
+					var c: float = heights[(iz + 1) * 129 + ix]
+					var d: float = heights[(iz + 1) * 129 + ix + 1]
+					surface_heights[y * 257 + x] = a + (b - a) * u + (c - a) * v if u + v <= 1.0 else d + (c - d) * (1.0 - u) + (b - d) * (1.0 - v)
+				else:
+					# Blocked banks can carry a subtle continuous bend between the
+					# authored river samples. It breaks up the old two-metre grid while
+					# remaining below the bounded relief used by the map contract.
+					var px := float(x) - 128.0
+					var pz := float(y) - 128.0
+					surface_heights[y * 257 + x] += (sin(px * 0.17 + pz * 0.11) + sin(pz * 0.23 - px * 0.09)) * 0.11
+		shore_field = authored_shore.duplicate()
+		water_cells.resize(128 * 128)
+		for y in range(128):
+			for x in range(128): water_cells[y * 128 + x] = surface_water_levels[(y * 2 + 1) * 257 + x * 2 + 1]
+		return
 	surface_heights = Surface.prepare(self,authored_opening)
 	water_cells.resize(128*128)
 	var wet := PackedFloat32Array()
@@ -93,13 +162,25 @@ func source_height_at(x: float, z: float) -> float:
 	var b: float = heights[iy * 129 + ix + 1]
 	var c: float = heights[(iy + 1) * 129 + ix]
 	var d: float = heights[(iy + 1) * 129 + ix + 1]
-	# Match the triangles emitted by reference_island.gd, including slopes.
+	# Match the triangles emitted by the island bake, including slopes.
 	var u := fx - ix
 	var v := fy - iy
 	if u + v <= 1: return a + (b - a) * u + (c - a) * v
 	return d + (c - d) * (1 - u) + (b - d) * (1 - v)
 
 func water_level_at(x: float, z: float) -> float:
+	if not surface_water_levels.is_empty():
+		var fx := clampf(x + 128, 0, 255.9999)
+		var fz := clampf(z + 128, 0, 255.9999)
+		var ix := floori(fx)
+		var iz := floori(fz)
+		var u := fx - ix
+		var v := fz - iz
+		var a := surface_water_levels[iz * 257 + ix]
+		var b := surface_water_levels[iz * 257 + ix + 1]
+		var c := surface_water_levels[(iz + 1) * 257 + ix]
+		var d := surface_water_levels[(iz + 1) * 257 + ix + 1]
+		return a + (b - a) * u + (c - a) * v if u + v <= 1 else d + (c - d) * (1 - u) + (b - d) * (1 - v)
 	var cell_x := clampi(floori(x / 2.0 + 64.0), 0, 127)
 	var cell_z := clampi(floori(z / 2.0 + 64.0), 0, 127)
 	return water_cells[cell_z * 128 + cell_x]

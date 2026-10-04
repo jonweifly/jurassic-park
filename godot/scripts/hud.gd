@@ -5,6 +5,7 @@ const Catalog = preload("res://scripts/catalog.gd")
 const Session = preload("res://scripts/session.gd")
 const ExpeditionPanel = preload("res://scripts/expedition_panel.gd")
 const Features = preload("res://scripts/feature_policy.gd")
+const MapCatalog = preload("res://scripts/map_catalog.gd")
 const Mini = preload("res://scripts/minimap.gd")
 const KillStatsPanel = preload("res://scripts/kill_stats_panel.gd")
 var kill_stats: RefCounted
@@ -14,6 +15,8 @@ var content_seed_input: LineEdit
 var profession_select: OptionButton
 var duration_select: OptionButton
 var difficulty_select: OptionButton
+var map_select: OptionButton
+var map_hint: Label
 var standard_start_button: Button
 var preferences_panel: RefCounted
 var guide_panel: RefCounted
@@ -25,6 +28,9 @@ var world: Node
 var root: Control
 var resource_label: Label
 var clock_label: Label
+var title_plate: PanelContainer
+var title_label: Label
+var title_status: Label
 var status_label: Label
 var selection_label: Label
 var detail_label: Label
@@ -44,11 +50,18 @@ var research_button: Button
 var demolish_button: Button
 var bottom: PanelContainer
 var start_panel: PanelContainer
+var start_title: Label
 var notification_time := 0.0
+var subtitle_time := 0.0
+var subtitle_plate: PanelContainer
+var subtitle_label: Label
 var font: SystemFont
 var sound_panel: PanelContainer
 var settings_button: Button
 var quest_box: PanelContainer
+var quest_details: VBoxContainer
+var quest_toggle: Button
+var rescue_clock: Label
 var camera_panel: PanelContainer
 var follow_button: Button
 var tech_panel: PanelContainer
@@ -93,18 +106,19 @@ func _ready() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_theme_font_override("font", font)
-	root.add_theme_color_override("font_color", Color("e7e4cc"))
+	root.add_theme_color_override("font_color", Color("eef0d9"))
 	root.theme = preload("res://scripts/ui_theme.gd").make(font)
 	add_child(root)
+	make_title_plate()
 	var status_line := HBoxContainer.new()
 	status_line.add_theme_constant_override("separation", 14)
-	resource_label = label("", 16)
+	resource_label = label("", 15, Color("e2bd70"))
 	resource_label.custom_minimum_size.x = 300
 	resource_label.size_flags_horizontal = Control.SIZE_FILL
 	resource_label.clip_text = true
 	resource_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	status_line.add_child(resource_label)
-	clock_label = label("", 14)
+	clock_label = label("", 13, Color("9bd0c6"))
 	clock_label.custom_minimum_size.x = 150
 	clock_label.size_flags_horizontal = Control.SIZE_FILL
 	status_line.add_child(clock_label)
@@ -137,41 +151,66 @@ func _ready() -> void:
 	kill_stats_button.pressed.connect(func(): kill_stats.open())
 	action_row.add_child(kill_stats_button)
 	for action_button in [tech_button, heal_button, eat_button, cook_button, settings_button]:
+		compact_button(action_button)
 		action_button.custom_minimum_size.x = 52
+	compact_button(pause)
 	pause.custom_minimum_size.x = 72
-	quest_box = panel(Color(0.05, 0.10, 0.08, 0.86))
+	compact_button(kill_stats_button)
+	quest_box = panel(Color(0.035, 0.075, 0.061, 0.92))
 	root.add_child(quest_box)
 	quest_box.position = Vector2(18, 18)
-	quest_box.custom_minimum_size = Vector2(260, 104)
-	quest_box.tooltip_text = "营地目标与供电状态"
+	quest_box.custom_minimum_size.x = 260
+	(quest_box.get_theme_stylebox("panel") as StyleBoxFlat).set_content_margin_all(9)
 	var quest_column := VBoxContainer.new()
-	quest_column.add_theme_constant_override("separation", 4)
+	quest_column.add_theme_constant_override("separation", 3)
 	quest_box.add_child(quest_column)
-	quest_column.add_child(label("当前目标", 13, Color("d1b677")))
-	objective = label("", 14)
+	var quest_header := HBoxContainer.new()
+	quest_header.add_theme_constant_override("separation", 3)
+	quest_column.add_child(quest_header)
+	rescue_clock = label("", 11, Color("d1b677"))
+	rescue_clock.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quest_header.add_child(rescue_clock)
+	camp_view_button = icon_button("营地", "camp")
+	compact_button(camp_view_button)
+	camp_view_button.custom_minimum_size.x = 80
+	camp_view_button.pressed.connect(world.outfitting.view_camp)
+	camp_view_button.tooltip_text = "查看营地；空格回到人物，不中断当前命令。"
+	quest_header.add_child(camp_view_button)
+	quest_toggle = button("⌄")
+	compact_button(quest_toggle)
+	quest_toggle.custom_minimum_size.x = 28
+	quest_toggle.toggle_mode = true
+	quest_toggle.tooltip_text = "展开野外态势与任务信息"
+	quest_header.add_child(quest_toggle)
+	objective = label("", 12)
 	objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	objective.custom_minimum_size.x = 250
+	objective.custom_minimum_size.x = 244
 	quest_column.add_child(objective)
 	status_label = label("", 11, Color("a6b59e"))
 	quest_column.add_child(status_label)
+	quest_details = VBoxContainer.new()
+	quest_details.add_theme_constant_override("separation", 4)
+	quest_details.hide()
+	quest_column.add_child(quest_details)
+	quest_toggle.toggled.connect(func(expanded: bool):
+		quest_details.visible = expanded
+		quest_toggle.text = "⌃" if expanded else "⌄"
+		quest_toggle.tooltip_text = "收起野外态势与任务信息" if expanded else "展开野外态势与任务信息"
+		quest_box.reset_size())
 	expedition_summary = label("", 11, Color("d5c490"))
 	expedition_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	expedition_summary.custom_minimum_size.x = 250
 	# Exploration, contracts and radio stay available from the journal without
 	# permanently occupying the playfield with secondary text.
 	expedition_summary.visible = false
-	quest_column.add_child(expedition_summary)
+	quest_details.add_child(expedition_summary)
 	journal_button = icon_button("探索 / 任务  L", "journal")
 	journal_button.pressed.connect(func(): expedition_panel.open())
-	quest_column.add_child(journal_button)
-	camp_view_button = icon_button("查看营地", "camp")
-	camp_view_button.pressed.connect(world.outfitting.view_camp)
-	camp_view_button.tooltip_text = "只切换镜头；空格回到人物，不中断当前命令。"
-	quest_column.add_child(camp_view_button)
+	quest_details.add_child(journal_button)
 	field_notice = label("", 12, Color("d6be88"))
 	field_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	field_notice.custom_minimum_size.x = 250
-	quest_column.add_child(field_notice)
+	field_notice.custom_minimum_size.x = 244
+	quest_details.add_child(field_notice)
 	boarding_bar = ProgressBar.new()
 	boarding_bar.custom_minimum_size.y = 8
 	boarding_bar.max_value = Catalog.BOARDING_SECONDS
@@ -185,7 +224,7 @@ func _ready() -> void:
 	extraction_button.hide()
 	quest_column.add_child(extraction_button)
 	tip = label("先建帐篷；木材送回后建营火、化石挖掘场，再发展电力和防线。", 16)
-	tip.add_theme_color_override("font_outline_color", Color(0.04, 0.08, 0.05, 0.95))
+	tip.add_theme_color_override("font_outline_color", Color(0.02, 0.05, 0.035, 0.95))
 	tip.add_theme_constant_override("outline_size", 5)
 	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -193,7 +232,23 @@ func _ready() -> void:
 	tip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	tip.offset_top = -247
 	tip.offset_bottom = -220
-	bottom = panel(Color(0.045, 0.085, 0.068, 0.97))
+	subtitle_plate = panel(Color(0.02, 0.045, 0.035, 0.88))
+	subtitle_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(subtitle_plate)
+	subtitle_plate.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	subtitle_plate.offset_left = 250
+	subtitle_plate.offset_right = -250
+	subtitle_plate.offset_top = -288
+	subtitle_plate.offset_bottom = -250
+	subtitle_plate.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	(subtitle_plate.get_theme_stylebox("panel") as StyleBoxFlat).set_content_margin_all(6)
+	subtitle_label = label("", 14, Color("e3d5aa"))
+	subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	subtitle_plate.add_child(subtitle_label)
+	subtitle_plate.hide()
+	bottom = panel(Color(0.035, 0.075, 0.061, 0.97))
 	root.add_child(bottom)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	# Wrapped status/building text may raise the minimum height on narrow windows.
@@ -205,7 +260,7 @@ func _ready() -> void:
 	# building labels on short windows; it remains close to the original height.
 	# Content now drives a shorter panel; the right building grid no longer
 	# reserves the old tall column beneath its last row.
-	bottom.offset_top = -202
+	bottom.offset_top = -204
 	bottom.offset_bottom = -6
 	(bottom.get_theme_stylebox("panel") as StyleBoxFlat).set_content_margin_all(8)
 	var columns := HBoxContainer.new()
@@ -225,6 +280,7 @@ func _ready() -> void:
 	left.add_child(minimap)
 	var info := VBoxContainer.new()
 	info.custom_minimum_size.x = 140
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_child(info)
 	info.add_child(label("选中单位", 11, Color("82998e")))
 	selection_label = label("幸存者", 19, Color("dbc690"))
@@ -246,6 +302,7 @@ func _ready() -> void:
 	detail_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	info.add_child(detail_label)
 	controls_hint = label("", 11, Color("879d85"))
+	controls_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(controls_hint)
 	columns.add_child(section_divider())
 	var middle := VBoxContainer.new()
@@ -273,8 +330,10 @@ func _ready() -> void:
 		var selected: Dictionary = world.selected_building()
 		if not world.paused and not selected.is_empty(): world.set_tower_priority(selected.id,index))
 	priority_button.tooltip_text = "设置选中箭塔的目标优先级；没有对应目标时攻击最近的恐龙。集火标记优先。"
+	compact_button(priority_button)
 	tactics.add_child(priority_button)
 	focus_button = icon_button("集火标记", "focus")
+	compact_button(focus_button)
 	focus_button.tooltip_text = "点击后在场景中左键选择恐龙；不改变人物命令。右键或 Esc 取消选择。"
 	focus_button.pressed.connect(func():
 		if world.paused: return
@@ -282,15 +341,18 @@ func _ready() -> void:
 		world.defense.marking = not world.defense.marking)
 	tactics.add_child(focus_button)
 	clear_focus_button = icon_button("取消集火", "clear")
+	compact_button(clear_focus_button)
 	clear_focus_button.pressed.connect(func():
 		if world.paused: return
 		world.clear_focus()
 		world.defense.marking = false)
 	tactics.add_child(clear_focus_button)
 	outfit_button = icon_button("装备 / 探索  L", "outfit")
+	compact_button(outfit_button)
 	outfit_button.pressed.connect(func(): outfit_panel.open())
 	tactics.add_child(outfit_button)
 	kit_button = icon_button("急救包  J", "heal")
+	compact_button(kit_button)
 	kit_button.pressed.connect(world.use_medkit)
 	tactics.add_child(kit_button)
 	columns.add_child(middle)
@@ -316,11 +378,13 @@ func _ready() -> void:
 	command_head.add_child(repair_button)
 	for option in ["brace"]:
 		var refit_button := icon_button(Catalog.REFITS[option].name, "brace")
+		compact_button(refit_button)
 		refit_button.pressed.connect(world.refit_selected.bind(option))
 		refit_button.visible = false
 		refit_buttons[option] = refit_button
 		tactics.add_child(refit_button)
 	reinforce_button = icon_button("加固箭塔", "brace")
+	compact_button(reinforce_button)
 	reinforce_button.pressed.connect(world.reinforce_selected)
 	reinforce_button.hide()
 	tactics.add_child(reinforce_button)
@@ -405,13 +469,15 @@ func _ready() -> void:
 	refresh_save_info()
 
 func make_camera_panel() -> void:
-	camera_panel = panel(Color(0.05,0.10,0.08,0.88))
+	camera_panel = panel(Color(0.035,0.075,0.061,0.78))
 	root.add_child(camera_panel)
 	camera_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	camera_panel.offset_left = -294
-	camera_panel.offset_right = -18
-	camera_panel.offset_top = 18
+	camera_panel.offset_left = -210
+	camera_panel.offset_right = -12
+	camera_panel.offset_top = 12
+	(camera_panel.get_theme_stylebox("panel") as StyleBoxFlat).set_content_margin_all(4)
 	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 3)
 	camera_panel.add_child(row)
 	var center := button("归位")
 	center.tooltip_text = "空格：回到并持续跟随幸存者；Home：重置镜头"
@@ -424,9 +490,13 @@ func make_camera_panel() -> void:
 	row.add_child(follow_button)
 	for sign_value in [-1,1]:
 		var rotate := button("↶" if sign_value < 0 else "↷")
-		rotate.tooltip_text = "Q / E：旋转；中键拖动：旋转与俯仰；Shift + 中键：平移；滚轮：缩放"
+		rotate.tooltip_text = "Q / E：水平旋转；中键拖动：旋转与俯仰；Shift + 中键：平移；滚轮：缩放"
 		rotate.pressed.connect(func(): world.camera_rig.target_yaw += sign_value * PI / 4)
 		row.add_child(rotate)
+	for control in row.get_children():
+		compact_button(control)
+		control.custom_minimum_size.x = 26
+	follow_button.custom_minimum_size.x = 62
 
 func make_sound_panel() -> void:
 	sound_panel = panel()
@@ -480,17 +550,36 @@ func make_start() -> void:
 	start_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	start_panel.offset_left = -265
 	start_panel.offset_right = 265
-	start_panel.offset_top = -260
-	start_panel.offset_bottom = 260
+	start_panel.offset_top = -300
+	start_panel.offset_bottom = 300
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 12)
 	start_panel.add_child(col)
-	var title := label("进入侏罗纪公园", 30, Color("d8c38d"))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(title)
+	start_title = label("进入失落岛屿", 30, Color("d8c38d"))
+	start_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(start_title)
 	var instructions := label("建造营地，抵御恐龙，等待救援。\n直升机抵达后，5 分钟内完成撤离。", 16)
 	instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(instructions)
+	var map_row := HBoxContainer.new()
+	map_row.add_theme_constant_override("separation", 10)
+	col.add_child(map_row)
+	map_row.add_child(label("行动地图", 14))
+	map_select = OptionButton.new()
+	map_select.custom_minimum_size = Vector2(360, 40)
+	map_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map_select.add_theme_font_override("font", font)
+	for definition in MapCatalog.MAPS:
+		map_select.add_item("%s  ·  %s" % [definition.name, definition.subtitle])
+		map_select.set_item_metadata(map_select.item_count - 1, definition.id)
+	map_select.item_selected.connect(func(index): update_map_hint(str(map_select.get_item_metadata(index))))
+	map_row.add_child(map_select)
+	map_hint = label("", 12, Color("a6b59e"))
+	map_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(map_hint)
+	for index in range(MapCatalog.MAPS.size()):
+		if MapCatalog.MAPS[index].id == MapCatalog.selected_id: map_select.select(index)
+	update_map_hint(MapCatalog.selected_id)
 	var seed_row := HBoxContainer.new()
 	col.add_child(seed_row)
 	seed_row.add_child(label("探索编号", 14))
@@ -553,18 +642,44 @@ func make_start() -> void:
 	add_help_settings(col)
 	load("res://scripts/coop_panel.gd").new(self,col)
 
+func make_title_plate() -> void:
+	title_plate = panel(Color(0.025, 0.055, 0.045, 0.9))
+	title_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(title_plate)
+	title_plate.anchor_left = 0.5
+	title_plate.anchor_right = 0.5
+	title_plate.anchor_top = 0.0
+	title_plate.anchor_bottom = 0.0
+	title_plate.offset_left = -180
+	title_plate.offset_right = 180
+	title_plate.offset_top = 12
+	title_plate.offset_bottom = 62
+	var column := VBoxContainer.new()
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.add_theme_constant_override("separation", 1)
+	title_plate.add_child(column)
+	title_label = label("失落岛屿：生存营地", 18, Color("e2bd70"))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(title_label)
+	title_status = label("LOST ISLE  /  FIELD OPERATIONS", 9, Color("91b6a8"))
+	title_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_status.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	title_status.add_theme_constant_override("shadow_offset_x", 1)
+	title_status.add_theme_constant_override("shadow_offset_y", 1)
+	column.add_child(title_status)
+
 func panel(color: Color = Color(0.055, 0.10, 0.082, 0.96)) -> PanelContainer:
 	var p := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
-	style.border_color = Color("526357")
+	style.border_color = Color("5f765f")
 	style.set_border_width_all(1)
 	style.border_width_top = 2
-	style.set_corner_radius_all(5)
-	style.shadow_color = Color(0, 0, 0, .28)
-	style.shadow_size = 5
-	style.shadow_offset = Vector2(0, 2)
-	style.set_content_margin_all(13)
+	style.set_corner_radius_all(6)
+	style.shadow_color = Color(0, 0, 0, .36)
+	style.shadow_size = 9
+	style.shadow_offset = Vector2(0, 3)
+	style.set_content_margin_all(12)
 	p.add_theme_stylebox_override("panel", style)
 	return p
 
@@ -592,18 +707,22 @@ func button(text: String) -> Button:
 	b.pressed.connect(func(): world.sound.play_ui("click"))
 	b.add_theme_font_override("font", font)
 	b.add_theme_font_size_override("font_size", 13)
-	b.add_theme_color_override("font_color", Color("e2dfc5"))
+	b.add_theme_color_override("font_color", Color("eef0d9"))
+	b.add_theme_color_override("font_hover_color", Color("fff1c7"))
+	b.add_theme_color_override("font_pressed_color", Color("e2bd70"))
 	b.focus_mode = Control.FOCUS_NONE
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color("23392f") if state == "normal" else Color("354d3e")
-		if state == "pressed": style.bg_color = Color("172b24")
-		if state == "disabled": style.bg_color = Color("14241e")
-		style.border_color = Color("b5a477") if state == "hover" else Color("475e4e")
+		style.bg_color = Color("1c3429") if state == "normal" else Color("294437")
+		if state == "pressed": style.bg_color = Color("10231b")
+		if state == "disabled": style.bg_color = Color("101b16")
+		style.border_color = Color("d8b66d") if state == "hover" else Color("526b58")
 		style.set_border_width_all(1)
 		style.border_width_top = 2 if state != "pressed" else 1
-		style.set_corner_radius_all(3)
-		style.set_content_margin_all(7)
+		style.set_corner_radius_all(5)
+		style.set_content_margin_all(8)
+		style.shadow_color = Color(0, 0, 0, 0.2)
+		style.shadow_size = 3 if state != "pressed" else 0
 		b.add_theme_stylebox_override(state, style)
 	return b
 
@@ -613,6 +732,20 @@ func icon_button(text: String, icon_name: String) -> Button:
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.add_theme_constant_override("h_separation", 5)
 	return b
+
+func compact_button(b: Button) -> void:
+	# Edge controls retain real pointer targets without the full command-card padding.
+	b.add_theme_font_size_override("font_size", 12)
+	b.custom_minimum_size.y = 28
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		var style := b.get_theme_stylebox(state).duplicate() as StyleBoxFlat
+		style.content_margin_left = 6
+		style.content_margin_right = 6
+		style.content_margin_top = 3
+		style.content_margin_bottom = 3
+		style.border_width_top = 1
+		if state == "normal": style.bg_color = Color(0.12, 0.21, 0.17, 0.66)
+		b.add_theme_stylebox_override(state, style)
 
 func make_pause() -> void:
 	pause_panel = panel()
@@ -660,6 +793,11 @@ func make_pause() -> void:
 	pause_panel.hide()
 
 func refresh(dt: float) -> void:
+	if not world.presentation_paused(): subtitle_time = maxf(0.0, subtitle_time - dt)
+	if subtitle_plate:
+		subtitle_plate.visible = world.started and not world.presentation_paused() and subtitle_time > 0.0
+		if subtitle_plate.visible:
+			subtitle_plate.modulate = Color(1, 1, 1, minf(1.0, subtitle_time / 0.45))
 	preferences_panel.update()
 	if outfit_panel.panel.visible: outfit_panel.refresh()
 	outfit_button.disabled = not world.started
@@ -669,7 +807,8 @@ func refresh(dt: float) -> void:
 	kit_button.disabled = world.paused or not world.started or gear.kits <= 0 or gear.cooldown > 0 or world.hero.health >= world.hero.max_health
 	kit_button.tooltip_text = "恢复 50 生命；冷却 %.0f 秒" % ceilf(gear.cooldown)
 	camp_view_button.visible = world.started
-	camp_view_button.text = "营地受袭！点击查看" if not world.outfitting.recent_hits.is_empty() else "查看营地"
+	camp_view_button.text = "受袭！" if not world.outfitting.recent_hits.is_empty() else "营地"
+	camp_view_button.tooltip_text = ("营地受袭！点击查看受损建筑" if not world.outfitting.recent_hits.is_empty() else "查看营地") + "；空格回到人物，不中断当前命令。"
 	camp_view_button.modulate = Color("f1ac8b") if not world.outfitting.recent_hits.is_empty() else Color.WHITE
 	field_notice.visible = world.started
 	field_notice.text = world.director.field_window()
@@ -679,23 +818,31 @@ func refresh(dt: float) -> void:
 	expedition_summary.text = world.adventure.summary()
 	if follow_button:
 		follow_button.set_pressed_no_signal(world.camera_rig.following)
-		follow_button.text = "跟随中" if world.camera_rig.following else "自由视角"
+		follow_button.text = "跟随" if world.camera_rig.following else "自由"
 	var s = world.session
 	settings_button.text = "设置  " + world.preferences.key_name("settings")
-	resource_label.text = "木材 %d   黄金 %d   电力 %d/%d" % [s.wood, s.gold, s.demand(), s.supply()]
-	clock_label.text = "%s·%s  %02d:%02d" % ["夜" if world.night else "昼", world.weather.NAMES[world.weather.kind], int(s.elapsed) / 60, int(s.elapsed) % 60]
+	resource_label.text = "木材 %d   ·   黄金 %d   ·   电力 %d / %d" % [s.wood, s.gold, s.demand(), s.supply()]
+	clock_label.text = "%s  ·  %s   %02d:%02d" % ["夜" if world.night else "昼", world.weather.NAMES[world.weather.kind], int(s.elapsed) / 60, int(s.elapsed) % 60]
+	if title_status:
+		title_status.text = "LOST ISLE  /  %s  /  %s" % ["NIGHT WATCH" if world.night else "DAY WATCH", world.weather.NAMES[world.weather.kind]]
 	var left := maxi(0, int(s.duration - s.elapsed))
-	objective.text = "坚守营地，等待撤离\n救援倒计时  %02d:%02d" % [left / 60, left % 60]
 	var next_step: String = world.director.objective()
-	objective.text = "%s\n救援倒计时  %02d:%02d" % [next_step, left / 60, left % 60]
-	if s.phase == "evacuate": objective.text = "前往北侧 H 停机坪撤离\n剩余登机时间 %d 秒" % maxi(0, int(Catalog.EVACUATION_SECONDS - s.evacuation_elapsed))
+	rescue_clock.text = "救援  %02d:%02d" % [left / 60, left % 60]
+	rescue_clock.tooltip_text = "救援抵达倒计时"
+	objective.text = next_step
 	if s.phase == "evacuate":
+		rescue_clock.text = "撤离剩余  %02d:%02d" % [maxi(0, int(Catalog.EVACUATION_SECONDS - s.evacuation_elapsed)) / 60, maxi(0, int(Catalog.EVACUATION_SECONDS - s.evacuation_elapsed)) % 60]
+		rescue_clock.tooltip_text = "救援已抵达，请在倒计时结束前登机"
 		objective.text += "\n" + world.extraction_feedback.status()
 		if s.mode in ["standard", "hard"]: objective.text += "\n登机 %.1f / %.0f 秒" % [s.boarding_progress, Catalog.BOARDING_SECONDS]
+	rescue_clock.add_theme_color_override("font_color", Color("edb687") if s.phase == "evacuate" or left <= 120 else Color("d1b677"))
 	extraction_button.visible = world.extraction_feedback.available()
 	extraction_button.disabled = world.paused
 	boarding_bar.visible = s.phase == "evacuate" and s.mode in ["standard", "hard"]
 	boarding_bar.value = s.boarding_progress
+	# Containers remember their previous extent; actively release that space after
+	# an expanded briefing or extraction state becomes shorter again.
+	quest_box.reset_size()
 	status_label.text = "%s · %s · 击退 %d\n%s" % [s.stage_name(), world.Regions.NAMES[world.Regions.at(world.hero.position)], s.kills, "断电：防御与研究停止" if s.demand() > s.supply() else "营地供电正常"]
 	var b: Dictionary = world.selected_building()
 	if b.is_empty():
@@ -783,13 +930,26 @@ func refresh(dt: float) -> void:
 	if camera_panel: camera_panel.visible = not outfit_panel.panel.visible and not kill_stats.panel.visible and not start_panel.visible and not pause_panel.visible and not tech_panel.visible and not load_panel.visible and not expedition_panel.panel.visible and not preferences_panel.panel.visible and not guide_panel.panel.visible
 	modal_shade.visible = outfit_panel.panel.visible or kill_stats.panel.visible or confirmation.visible or start_panel.visible or pause_panel.visible or tech_panel.visible or load_panel.visible or expedition_panel.panel.visible or preferences_panel.panel.visible or guide_panel.panel.visible
 	resume_button.visible = not s.phase in ["won", "lost"]
-	pause_title.text = "成功撤离侏罗纪公园" if s.phase == "won" else (("幸存者已阵亡" if world.hero.health <= 0 else "未能及时撤离") if s.phase == "lost" else "营地已暂停")
+	pause_title.text = "成功撤离失落岛屿" if s.phase == "won" else (("幸存者已阵亡" if world.hero.health <= 0 else "未能及时撤离") if s.phase == "lost" else "营地已暂停")
 	if world.coop.ui: world.coop.ui.refresh()
 
 func toast(message: String) -> void:
 	if world.coop and world.coop.forward_notice(message): return
 	tip.text = message
 	notification_time = 4.0
+
+func clear_subtitle() -> void:
+	subtitle_time = 0.0
+	if subtitle_plate: subtitle_plate.hide()
+
+func show_subtitle(message: String, duration: float = 4.0, priority: bool = false) -> bool:
+	if message.is_empty() or (subtitle_time > 0.0 and not priority): return false
+	subtitle_time = maxf(1.2, duration)
+	if subtitle_label:
+		subtitle_label.text = message
+		subtitle_plate.modulate = Color.WHITE
+		subtitle_plate.show()
+	return true
 
 func covers(screen: Vector2) -> bool:
 	if world.coop.ui:
@@ -1013,12 +1173,13 @@ func refresh_key_hints() -> void:
 	research_button.text = "升级实验室  " + keys.key_name("upgrade")
 	save_button.text = "保存游戏  " + keys.key_name("save")
 	load_button.text = "选择存档  " + keys.key_name("load")
-	controls_hint.text = "左键使用工具 · 右键移动 · %s 归位 · %s 手册 · %s 设置" % [keys.key_name("center"), keys.key_name("guide"), keys.key_name("settings")]
-	start_hint.text = "左键使用工具 · 右键移动 · %s 跟随角色 · %s 生存手册" % [keys.key_name("center"), keys.key_name("guide")]
+	controls_hint.text = "右键指令 · %s 归位\n%s 手册 · %s 设置" % [keys.key_name("center"), keys.key_name("guide"), keys.key_name("settings")]
+	controls_hint.tooltip_text = "左键使用工具/选中 · 右键移动/修理 · %s 归位 · %s 手册 · %s 设置" % [keys.key_name("center"), keys.key_name("guide"), keys.key_name("settings")]
+	start_hint.text = "左键使用工具/选中 · 右键移动/修理 · %s 跟随角色 · %s 生存手册" % [keys.key_name("center"), keys.key_name("guide")]
 	follow_button.tooltip_text = "%s：切换跟随；镜头平移键或方向键可退出跟随" % keys.key_name("follow")
 	camera_panel.get_child(0).get_child(0).tooltip_text = "%s：回到并持续跟随角色；%s：重置镜头" % [keys.key_name("center"), keys.key_name("reset_camera")]
 	for index in [2, 3]:
-		camera_panel.get_child(0).get_child(index).tooltip_text = "%s / %s：旋转；中键拖动：旋转与俯仰；Shift + 中键：平移；滚轮：缩放" % [keys.key_name("rotate_left"), keys.key_name("rotate_right")]
+		camera_panel.get_child(0).get_child(index).tooltip_text = "%s / %s：水平旋转；中键拖动：旋转与俯仰；Shift + 中键：平移；滚轮：缩放" % [keys.key_name("rotate_left"), keys.key_name("rotate_right")]
 	for i in range(Catalog.ORDER.size()):
 		var kind: String = Catalog.ORDER[i]
 		var spec: Dictionary = Catalog.BUILDINGS[kind]
@@ -1037,7 +1198,20 @@ func start_selected_session(duration: float, mode: String) -> void:
 	var profession := "explorer"
 	if profession_select and profession_select.selected >= 0:
 		profession = str(profession_select.get_item_metadata(profession_select.selected))
+	var map_id := MapCatalog.selected_id
+	if map_select and map_select.selected >= 0: map_id = str(map_select.get_item_metadata(map_select.selected))
+	if map_id != world.map_id:
+		MapCatalog.selected_id = map_id
+		MapCatalog.pending_start = {"duration": duration, "mode": mode, "seed": seed_value, "profession": profession}
+		get_tree().reload_current_scene()
+		return
 	world.start_session(duration, mode, seed_value, profession)
+
+func update_map_hint(id: String) -> void:
+	var definition := MapCatalog.definition(id)
+	if start_title: start_title.text = "进入" + str(definition.name)
+	if map_hint:
+		map_hint.text = "地图说明：" + str(definition.subtitle)
 
 func selected_duration() -> float:
 	return float(duration_select.get_selected_id()) * 60.0

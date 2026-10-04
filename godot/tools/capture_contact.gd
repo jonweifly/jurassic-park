@@ -13,6 +13,10 @@ func shot(title: String) -> void:
 		world.hud.refresh(0)
 		await process_frame
 	RenderingServer.force_draw(false)
+	if world.hero.animation_state in ["chop", "mine", "build"]:
+		var contact: RefCounted = world.hero.visual.contact
+		var prop: Node3D = world.hero.visual.axe if world.hero.animation_state == "chop" else (world.hero.visual.pickaxe if world.hero.animation_state == "mine" else world.hero.visual.hammer)
+		print("RENDERED CONTACT ", title, " tip=", world.hero.visual.work_tip(), " tool=", prop.global_transform, " hand=", contact.skeleton.to_global(contact.pose("handR").origin))
 	var result := root.get_texture().get_image().save_png(folder.path_join(title + ".png"))
 	print("CONTACT SCREENSHOT ", title, " result=", result)
 

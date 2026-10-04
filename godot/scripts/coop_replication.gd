@@ -24,7 +24,7 @@ func world_packet(full: bool = false) -> Dictionary:
 	tree_stocks = trees
 	var fields: Array = Save.SESSION_FIELDS.duplicate()
 	fields.erase("adventure")
-	return {"full":full,"session":Save.fields(world.session,fields+["kills_by_species", "outfitting"]),"trees":changes,
+	return {"full":full,"map_id":world.map_id,"session":Save.fields(world.session,fields+["kills_by_species", "outfitting", "deposit_reserves"]),"trees":changes,
 		"explored":world.vision.explored.keys(),"focus":world.defense.focus_uid,"players":actor_packet()}
 
 func pawn_packet(pawn: Node3D) -> Dictionary:
@@ -55,6 +55,10 @@ func actor_packet() -> Dictionary:
 		"evacuation":world.session.evacuation_elapsed,"paused":net.room_paused(),"phase":world.session.phase,"boarding":world.session.boarding_progress}
 
 func apply_world(data: Dictionary) -> void:
+	# Never apply terrain-dependent state to a client that has not loaded the
+	# authoritative map. The welcome path reloads mismatched maps first; this
+	# guard also protects later packets during a reconnect race.
+	if str(data.get("map_id", "")) != world.map_id: return
 	for cell in world.trees.keys():
 		if (data.full and not data.trees.has(cell)) or data.trees.get(cell,1) <= 0: world.clear_tree(cell)
 	for cell in data.trees:
@@ -66,7 +70,9 @@ func apply_world(data: Dictionary) -> void:
 		if b.hp > 0: wanted[b.id] = b
 	for id in world.visuals.keys():
 		if not wanted.has(id) or current.get(id,{}).get("kind") != wanted[id].kind:
-			if current.has(id): world.board.remove_building(current[id].cell)
+			if current.has(id):
+				world.board.remove_building(current[id].cell)
+				if world.scenery: world.scenery.refresh_buildable_cell(current[id].cell)
 			world.visuals[id].free()
 			world.visuals.erase(id)
 	for key in data.session:
@@ -78,7 +84,9 @@ func apply_world(data: Dictionary) -> void:
 			world.encounter.building_hit(b, float(current[b.id].hp) - float(b.hp))
 		var blocked: bool = not b.get("open",false)
 		if blocked and world.board.structures.get(b.cell,-1) != b.id: world.board.block_building(b.cell,b.id)
-		elif not blocked and world.board.structures.has(b.cell): world.board.remove_building(b.cell)
+		elif not blocked and world.board.structures.has(b.cell):
+			world.board.remove_building(b.cell)
+			if world.scenery: world.scenery.refresh_buildable_cell(b.cell)
 		if not world.visuals.has(b.id): world.create_building_visual(b)
 		world.scenery.update_building(world.visuals[b.id],b)
 		if b.kind=="gate": world.visuals[b.id].get_node("Model/Leaf").rotation.y = -PI*.48 if b.get("open",false) else 0.0

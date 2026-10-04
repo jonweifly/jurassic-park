@@ -6,6 +6,7 @@ var layout: RefCounted
 const CELL := 2.0
 var grid := AStarGrid2D.new()
 var terrain: Dictionary = {}
+var released_terrain: Dictionary = {}
 var structures: Dictionary = {}
 var revision: int = 0
 var clearance_grids := {}
@@ -80,9 +81,20 @@ func inside(c: Vector2i) -> bool:
 
 func block_terrain(c: Vector2i, blocked: bool = true) -> void:
 	if not inside(c): return
-	if blocked: terrain[c] = true
+	if blocked:
+		released_terrain.erase(c)
+		terrain[c] = true
 	elif not layout or layout.walk[c.y * SIDE + c.x]: terrain.erase(c)
 	grid.set_point_solid(c, terrain.has(c) or structures.has(c))
+	revision += 1
+
+func release_terrain(c: Vector2i) -> void:
+	# Authored forest cells start with walk=0 so tools see the real opening
+	# topology. Harvesting is the explicit runtime transition that releases one.
+	if not inside(c): return
+	terrain.erase(c)
+	released_terrain[c] = true
+	grid.set_point_solid(c, structures.has(c))
 	revision += 1
 
 func block_building(c: Vector2i, id: int) -> void:
@@ -151,14 +163,14 @@ func route(from: Vector3, to: Vector3, adjacent: bool = false, radius: float = 0
 				result.append(approach)
 	return result
 
-func load_layout() -> void:
-	layout = TerrainData.new()
+func load_layout(map_id: String = "") -> void:
+	layout = TerrainData.new(map_id)
 	for y in range(SIDE):
 		for x in range(SIDE):
 			if not layout.walk[y * SIDE + x]: block_terrain(Vector2i(x, y))
 
 func can_build(c: Vector2i) -> bool:
-	return is_open(c) and (not layout or layout.build[c.y * SIDE + c.x])
+	return is_open(c) and (not layout or layout.build[c.y * SIDE + c.x] or released_terrain.has(c))
 
 static func species_radius(species: String) -> float:
 	return Dinosaurs.spec(species).radius

@@ -45,7 +45,7 @@ func run() -> void:
 	root.add_child(world)
 	var scenery := SceneryStub.new()
 	scenery.world = world
-	for kind in ["tent", "fire", "fossil", "tower", "lab", "laboratory"]:
+	for kind in ["tent", "fire", "fossil", "tower", "generator", "shelter", "gate", "lab", "laboratory"]:
 		var building := Node3D.new()
 		world.add_child(building)
 		Detail.prepare(scenery, building, kind)
@@ -57,12 +57,23 @@ func run() -> void:
 		expect(structure.mesh.get_surface_count() == 1, "Static building accents share one draw surface: " + kind)
 		var aabb := structure.mesh.get_aabb()
 		expect(aabb.position.x >= -1.0 and aabb.end.x <= 1.0 and aabb.position.z >= -1.0 and aabb.end.z <= 1.0, "Detail fits the existing construction footprint: " + kind)
+		var joinery: MeshInstance3D = detail.get_node("Joinery")
+		expect(joinery.mesh.get_surface_count() == 1 and joinery.mesh.surface_get_array_index_len(0) < 9000, "Close details have one surface and a bounded triangle budget: " + kind)
+		var near_aabb := joinery.mesh.get_aabb()
+		expect(near_aabb.position.x >= -1.0 and near_aabb.end.x <= 1.0 and near_aabb.position.z >= -1.0 and near_aabb.end.z <= 1.0, "Joinery stays inside the existing footprint: " + kind)
+		expect(joinery.visibility_range_end == 38.0 and detail.find_children("*", "CollisionObject3D", true, false).is_empty(), "Close details cull with distance and never block units: " + kind)
 		var b := {"kind": kind, "hp": Detail.Catalog.BUILDINGS[kind].hp, "remaining": 5.0}
 		Detail.update(scenery, building, b)
 		expect(not detail.visible, "Unfinished buildings do not show complete mechanisms: " + kind)
 		b.remaining = 0
 		Detail.update(scenery, building, b)
 		expect(detail.visible and detail.get_child_count() == count, "Updates reuse existing detail nodes: " + kind)
+		world.preferences.values.quality = 0
+		Detail.update(scenery, building, b)
+		expect(not joinery.visible and structure.visible, "Low quality retains silhouette and hides close detail: " + kind)
+		world.preferences.values.quality = 2
+		Detail.update(scenery, building, b)
+		expect(joinery.visible, "High quality restores close detail without rebuilding: " + kind)
 		if kind in ["tent", "tower", "lab", "laboratory"]:
 			b.hp = 5
 			Detail.update(scenery, building, b)
@@ -75,11 +86,14 @@ func run() -> void:
 			world.session.electricity = 0
 			Detail.update(scenery, building, b)
 			expect(detail.get_meta("lamp_state") == (1 if kind == "tent" else 0), "Lamp distinguishes shelter from powered machinery: " + kind)
+			var lamp_light: OmniLight3D = detail.get_node("LampLight")
+			expect(lamp_light.visible == (kind == "tent") and (kind == "tent" or is_zero_approx(lamp_light.light_energy)), "Unpowered machinery never leaves an invisible lamp illuminating the ground: " + kind)
 			world.session.electricity = 10
 		if kind == "tower":
 			b.refit = "heavy"
 			Detail.update(scenery, building, b)
 			expect(not structure.visible, "Specialist tower does not inherit conflicting base supports")
+			expect(not joinery.visible, "Specialist tower does not inherit conflicting ladders")
 		if kind == "fossil":
 			var miner := MinerStub.new()
 			world.add_child(miner)
@@ -106,6 +120,40 @@ func run() -> void:
 			Detail.update(scenery, building, b)
 			expect(is_equal_approx(yaw, fan.rotation.y), "Unpowered laboratory fan stops")
 			world.session.electricity = 10
+		if kind == "generator":
+			var wheel: Node3D = detail.get_node("Flywheel")
+			var wheel_rotation := wheel.rotation.x
+			scenery.clock += .1
+			Detail.update(scenery, building, b)
+			expect(not is_equal_approx(wheel_rotation, wheel.rotation.x), "Healthy generator flywheel turns")
+			world.session.electricity = 0
+			wheel_rotation = wheel.rotation.x
+			scenery.clock += .1
+			Detail.update(scenery, building, b)
+			expect(not is_equal_approx(wheel_rotation, wheel.rotation.x), "Generator keeps running when camp demand exceeds supply")
+			b.hp = 0
+			var stopped_rotation := wheel.rotation.x
+			scenery.clock += .1
+			Detail.update(scenery, building, b)
+			expect(is_equal_approx(stopped_rotation, wheel.rotation.x), "Destroyed generator flywheel stops")
+			world.session.electricity = 10
+		if kind in ["shelter", "gate"]:
+			expect(detail.has_node("PowerBeacon") and detail.find_children("PowerBeacon*", "MeshInstance3D", true, false).size() == 2, "Powered barrier has two readable beacons: " + kind)
+			Detail.update(scenery, building, b)
+			expect(detail.get_node("PowerBeacon").visible, "Powered barrier beacon is visible: " + kind)
+			world.session.electricity = 0
+			Detail.update(scenery, building, b)
+			expect(not detail.get_node("PowerBeacon").visible, "Unpowered barrier beacon is dark: " + kind)
+			world.session.electricity = 10
+			if kind == "gate":
+				var passage_clear := true
+				for mesh_node in [structure, joinery]:
+					for vertex in mesh_node.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+						if absf(vertex.x) < .5: passage_clear = false
+				expect(passage_clear, "Fixed gate accents stay on the posts and leave the center passage clear")
+				b.open = true
+				Detail.update(scenery, building, b)
+				expect(not detail.get_node("PowerBeacon").visible, "Open gate stops its power beacon: " + kind)
 		building.free()
 	var tower := Node3D.new()
 	var model: Node3D = load("res://assets/models/tower.glb").instantiate()

@@ -1,13 +1,16 @@
 extends Node
 ## Two-player ENet room. Only this node exposes RPCs; clients send bounded intents.
-const PROTOCOL := "jp-coop-3"
+const PROTOCOL := "jp-coop-4"
 const DEFAULT_PORT := 24565
 const Actor = preload("res://scripts/coop_actor.gd")
 const Replication = preload("res://scripts/coop_replication.gd")
 const Save = preload("res://scripts/save_store.gd")
+const MapCatalog = preload("res://scripts/map_catalog.gd")
 const SAVE_PATH := "user://coop/latest.jpc"
 static var save_path := SAVE_PATH
 static var reconnect_token := ""
+static var pending_rejoin: Dictionary = {}
+static var pending_resume: Dictionary = {}
 var world: Node
 var active := false
 var hosting := false
@@ -23,6 +26,7 @@ var guest_peer := 0
 var guest_token := ""
 var room_password := ""
 var port := DEFAULT_PORT
+var remote_address := ""
 var status := "局域网或虚拟局域网 · 双人合作"
 var server_paused := false
 var guest_paused := false
@@ -48,12 +52,58 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_failed)
 	multiplayer.server_disconnected.connect(_server_left)
 	replication=Replication.new(world,self)
+	if not pending_rejoin.is_empty(): call_deferred("_resume_pending_rejoin")
+	if not pending_resume.is_empty(): call_deferred("_resume_pending_host")
+
+func _map_forced_elsewhere(id: String) -> bool:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--map=") and MapCatalog.is_valid(arg.trim_prefix("--map=")) and arg.trim_prefix("--map=") != id:
+			return true
+	return false
+
+func _resume_pending_host() -> void:
+	var config: Dictionary = pending_resume.duplicate(true)
+	pending_resume = {}
+	if config.is_empty() or world.started: return
+	var result := host(str(config.get("mode", "standard")), int(config.get("port", DEFAULT_PORT)), str(config.get("password", "")), true, float(config.get("duration", 1500.0)))
+	if not result.is_empty():
+		status = result
+		if world.hud: world.hud.toast(result)
+
+func _reload_for_saved_map() -> void:
+	if pending_resume.is_empty(): return
+	var error := get_tree().reload_current_scene()
+	if error != OK:
+		pending_resume = {}
+		MapCatalog.selected_id = world.map_id
+		status = "无法载入合作存档地图，请返回菜单后重试。"
+
+func _resume_pending_rejoin() -> void:
+	var config: Dictionary = pending_rejoin.duplicate(true)
+	pending_rejoin = {}
+	if config.is_empty(): return
+	# Give the previous ENet peer a frame to observe the disconnect on the host
+	# before the same reconnect token is presented again.
+	await get_tree().create_timer(0.25).timeout
+	if world.started or active or connecting: return
+	var result := join(str(config.get("address", "")), int(config.get("port", DEFAULT_PORT)), str(config.get("password", "")))
+	if not result.is_empty():
+		status = result
+		if world.hud: world.hud.toast(result)
 
 func host(mode: String = "standard", selected_port: int = DEFAULT_PORT, password: String = "", resume: bool = false, duration: float = 1500.0) -> String:
 	if active or connecting or world.started: return "请先返回开始界面再创建合作局。"
 	if selected_port<1024 or selected_port>65535 or mode not in ["standard","hard"] or password.length()>64 or duration not in [1500.0,2700.0,3600.0,4800.0]: return "房间设置无效。"
 	var saved := read_save() if resume else {}
 	if resume and saved.has("error"): return saved.error
+	if resume:
+		var saved_map := str(saved.world.get("map", ""))
+		if saved_map != world.map_id:
+			if _map_forced_elsewhere(saved_map): return "启动参数固定了其他地图，无法载入合作存档地图。"
+			pending_resume = {"mode": mode, "port": selected_port, "password": password, "duration": duration}
+			MapCatalog.selected_id = saved_map
+			call_deferred("_reload_for_saved_map")
+			return ""
 	var peer := ENetMultiplayerPeer.new()
 	var error := peer.create_server(selected_port,4,3)
 	if error != OK: return "无法创建房间，端口可能已被占用。"
@@ -99,6 +149,7 @@ func join(address: String, selected_port: int = DEFAULT_PORT, password: String =
 	if error != OK: return "连接创建失败，请检查地址。"
 	if reconnect_token.is_empty(): reconnect_token=Crypto.new().generate_random_bytes(24).hex_encode()
 	multiplayer.multiplayer_peer=peer
+	remote_address=address
 	room_password=password
 	port=selected_port
 	connecting=true
@@ -146,6 +197,24 @@ func _rejected(message: String) -> void:
 @rpc("authority","call_remote","reliable",0)
 func _welcome(data: Dictionary) -> void:
 	if not connecting: return
+	var host_map := str(data.get("map_id", ""))
+	if not MapCatalog.is_valid(host_map):
+		status = "房主地图版本不兼容，请使用相同版本。"
+		close_transport()
+		return
+	if host_map != world.map_id:
+		if _map_forced_elsewhere(host_map):
+			status = "启动参数固定了其他地图，无法载入房主地图。"
+			close_transport()
+			return
+		# The board, tree registrations and terrain collision are created during
+		# the scene's _ready. Keep the connection details, load the host map, then
+		# reconnect so apply_world never mixes two map layouts.
+		pending_rejoin = {"address": remote_address, "port": port, "password": room_password, "map_id": host_map}
+		MapCatalog.selected_id = host_map
+		close_transport()
+		call_deferred("_reload_for_map")
+		return
 	active=true
 	hosting=false
 	connecting=false
@@ -165,6 +234,14 @@ func _welcome(data: Dictionary) -> void:
 	world.camera_rig.center(true)
 	status="已加入 · 双人合作"
 	if ui: ui.panel.hide()
+
+func _reload_for_map() -> void:
+	if pending_rejoin.is_empty(): return
+	var error := get_tree().reload_current_scene()
+	if error != OK:
+		pending_rejoin = {}
+		MapCatalog.selected_id = world.map_id
+		status = "无法载入房主地图，请返回菜单后重试。"
 
 func make_pawn(slot: int) -> void:
 	var pawn: Node3D = world.SurvivorScene.instantiate()
@@ -469,7 +546,7 @@ static func read_save() -> Dictionary:
 	if file.get_length()>4194304: return {"error":"合作存档无效。"}
 	var data: Variant = bytes_to_var(file.get_buffer(file.get_length()))
 	# Live peers require the current protocol; older local saves can still migrate.
-	if not data is Dictionary or data.get("protocol") not in ["jp-coop-1", "jp-coop-2", PROTOCOL] or not data.get("world") is Dictionary or not Save.safe_data(data): return {"error":"合作存档版本或数据无效。"}
+	if not data is Dictionary or data.get("protocol") not in ["jp-coop-1", "jp-coop-2", "jp-coop-3", PROTOCOL] or not data.get("world") is Dictionary or not Save.safe_data(data): return {"error":"合作存档版本或数据无效。"}
 	if not Save.validate(data.world).is_empty(): return {"error":"合作存档校验失败。"}
 	if data.has("partner"):
 		var pawn = load("res://scripts/pawn.gd").new()

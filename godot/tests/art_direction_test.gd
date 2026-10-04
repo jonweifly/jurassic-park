@@ -63,9 +63,17 @@ func run() -> void:
 	world.preferences.values.quality = 0
 	world.preferences.apply(world,false)
 	expect(not world.visuals[ids[0]].get_node("CampDressing").visible, "Low detail applies immediately while paused")
+	expect(not world.visuals[ids[0]].get_node("CampDetail/Joinery").visible and not world.visuals[ids[0]].get_node("CampDetail/LampLight").visible, "Paused low quality also hides close joinery and the local lamp light")
 	world.preferences.values.quality = 2
 	world.preferences.apply(world,false)
 	expect(world.visuals[ids[0]].get_node("CampDressing").visible, "High detail restores immediately while paused")
+	expect(world.visuals[ids[0]].get_node("CampDetail/Joinery").visible and world.visuals[ids[0]].get_node("CampDetail/LampLight").visible, "Paused high quality restores close joinery and local lamp light")
+	var specialist: Dictionary = world.session.building(ids[2])
+	specialist.refit = "heavy"
+	world.preferences.apply(world, false)
+	expect(not world.visuals[ids[2]].get_node("CampDressing").visible and not world.visuals[ids[2]].get_node("CampDetail/Joinery").visible, "Paused quality changes preserve the specialist tower's replacement silhouette")
+	specialist.refit = ""
+	world.preferences.apply(world, false)
 	var unfinished: Dictionary = world.session.building(ids[1])
 	unfinished.remaining = 2.0
 	world.preferences.apply(world,false)

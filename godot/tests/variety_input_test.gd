@@ -30,6 +30,25 @@ func press(code: int) -> void:
 		event.pressed = down
 		root.push_input(event, true)
 
+func release_world(instance: Node) -> void:
+	# This fixture intentionally creates two worlds in one renderer process.
+	# Detach generated shader uniforms before freeing each world so the
+	# compatibility backend can retire its transient masks before shutdown.
+	if instance.has_node("Island"):
+		var island: Node = instance.get_node("Island")
+		var ground: Node = island.get_node_or_null("IslandGround")
+		if not ground: ground = island.get_node_or_null("ReferenceGround")
+		if ground: ground.material_override = null
+		var water: Node = island.get_node_or_null("Water")
+		if water: water.material_override = null
+	if instance.scenery:
+		instance.scenery.ground_palette = null
+		instance.scenery.ground = null
+		instance.scenery.water = null
+		instance.scenery.world = null
+	instance.scenery = null
+	instance.queue_free()
+
 func run() -> void:
 	Save.directory = "user://variety_input_fixture"
 	world = load("res://scenes/main.tscn").instantiate()
@@ -79,13 +98,17 @@ func run() -> void:
 	panel.select_site("relay" if world.session.adventure.run.active == "signal" else "cache")
 	click(panel.go_button)
 	expect(not world.paused and not panel.panel.visible, "Explicit travel from a previously paused journal resumes play")
-	world.free()
+	release_world(world)
+	await process_frame
 	world = load("res://scenes/main.tscn").instantiate()
 	root.add_child(world)
 	world.set_process(false)
 	world.set_physics_process(false)
 	world.hud.start_selected_session(2700, "classic")
 	expect(world.started and world.session.mode == "classic" and world.session.adventure.run.seed > 0 and world.session.adventure.run.plan.size() == 8, "Blank seed starts long mode with a valid random content plan")
-	world.free()
+	release_world(world)
+	# Let queued canvas/texture owners release before the headless renderer
+	# reports its shutdown leak summary.
+	for _frame in range(8): await process_frame
 	print("VARIETY INPUT: ", checks, " checks, ", failures, " failures")
 	quit(0 if failures == 0 else 1)

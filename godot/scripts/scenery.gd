@@ -8,6 +8,7 @@ const FlameShader = preload("res://shaders/flame.gdshader")
 const GroundShader = preload("res://shaders/ground.gdshader")
 const FoliageShader = preload("res://shaders/foliage.gdshader")
 const FoliageFog = preload("res://shaders/foliage_fog.gdshader")
+const GroundMarkShader = preload("res://shaders/ground_mark.gdshader")
 const WaterShader = preload("res://shaders/water.gdshader")
 const WaterSurface = preload("res://scripts/water_surface.gd")
 const ForestRenderer = preload("res://scripts/forest_renderer.gd")
@@ -20,6 +21,9 @@ const GroundPalette = preload("res://scripts/ground_palette.gd")
 var ground_palette: RefCounted
 var variation: RefCounted
 var ground: ShaderMaterial
+var buildable_image: Image
+var buildable_texture: ImageTexture
+var buildable_dirty := false
 var water: ShaderMaterial
 var wind_materials: Array[ShaderMaterial] = []
 var obstructions: RefCounted
@@ -31,6 +35,12 @@ var forest: RefCounted
 var terrain_relief: RefCounted
 var cinematic_enabled := false
 var particles_paused := false
+var footprint_root: Node3D
+var footprint_multi: MultiMesh
+var footprint_marks: Array[Dictionary] = []
+var footprint_cursor := 0
+var footprint_last := Vector3.INF
+var footprint_side := -1.0
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
@@ -40,15 +50,18 @@ func _init(owner_world: Node) -> void:
 	leaf_fog.set_shader_parameter("canopy_cutout",true)
 	if not world.has_node("Island"): return
 	var island: Node = world.get_node("Island")
-	if island.has_node("ReferenceGround"):
-		var ground_node: MeshInstance3D = island.get_node("ReferenceGround")
+	var ground_node: MeshInstance3D = island.get_node_or_null("IslandGround")
+	if not ground_node: ground_node = island.get_node_or_null("ReferenceGround")
+	var tree_root: Node = island.get_node_or_null("IslandTrees")
+	if not tree_root: tree_root = island.get_node_or_null("TreesFromMap")
+	if ground_node:
 		ground_node.mesh = TerrainSurface.build(world.board.layout)
 		# Picking and the rendered bank share the same tessellation. Walkable
 		# cells are pinned by TerrainSurface, including existing building plots.
 		for child in ground_node.get_children():
 			if child is StaticBody3D: child.free()
 		ground_node.create_trimesh_collision()
-		for cluster in island.get_node("TreesFromMap").get_children():
+		for cluster in tree_root.get_children():
 			if cluster.has_meta("harvest_tree"):
 				for part in cluster.get_children():
 					if part is Node3D: part.global_position.y = world.board.layout.height_at(part.global_position.x,part.global_position.z)
@@ -58,6 +71,10 @@ func _init(owner_world: Node) -> void:
 		ground.shader = GroundShader
 		var water_levels := Image.create_from_data(128,128,false,Image.FORMAT_RF,world.board.layout.water_cells.to_byte_array())
 		ground.set_shader_parameter("water_levels",ImageTexture.create_from_image(water_levels))
+		if not world.board.layout.surface_water_levels.is_empty():
+			var river_levels := Image.create_from_data(257,257,false,Image.FORMAT_RF,world.board.layout.surface_water_levels.to_byte_array())
+			ground.set_shader_parameter("continuous_water_levels",ImageTexture.create_from_image(river_levels))
+			ground.set_shader_parameter("has_continuous_water",true)
 		ground.set_shader_parameter("detail_map",load("res://assets/materials/ground_detail.png"))
 		ground_palette = GroundPalette.new(world)
 		ground.set_shader_parameter("usage_map",ground_palette.texture)
@@ -65,11 +82,12 @@ func _init(owner_world: Node) -> void:
 		ground.set_shader_parameter("forest_map",load("res://assets/materials/forest_floor.png"))
 		for surface in ["turf", "soil", "litter", "rock"]:
 			ground.set_shader_parameter(surface + "_surface", load("res://assets/materials/terrain/%s.png" % surface))
-		var mask := Image.create(128,128,false,Image.FORMAT_R8)
+		buildable_image = Image.create(128,128,false,Image.FORMAT_R8)
 		for y in range(128):
-			for x in range(128): mask.set_pixel(x,y,Color(1 if world.board.layout.build[y*128+x] else 0,0,0))
-		ground.set_shader_parameter("buildable_map",ImageTexture.create_from_image(mask))
-		island.get_node("ReferenceGround").material_override = ground
+			for x in range(128): buildable_image.set_pixel(x,y,Color(1 if world.board.layout.build[y*128+x] else 0,0,0))
+		buildable_texture = ImageTexture.create_from_image(buildable_image)
+		ground.set_shader_parameter("buildable_map",buildable_texture)
+		ground_node.material_override = ground
 	if island.has_node("Water"):
 		island.get_node("Water").mesh = WaterSurface.build(world.board.layout)
 		water = ShaderMaterial.new()
@@ -100,12 +118,16 @@ func update_view(dt: float = 0.0) -> void:
 			for particle in building.find_children("*", "CPUParticles3D", true, false):
 				particle.speed_scale = 0.0 if particles_paused else 1.0
 	obstructions.update(dt)
+	update_footprints(dt)
 	if ground_palette: ground_palette.update()
 	if world.weather:
 		for mat in wind_materials:
 			mat.set_shader_parameter("weather_clock",world.weather.clock)
 			mat.set_shader_parameter("wind_power",world.weather.wind)
 			mat.set_shader_parameter("wind_direction",world.weather.direction)
+			mat.set_shader_parameter("rain_power",world.weather.rain)
+			if mat.shader == FoliageShader:
+				mat.set_shader_parameter("wetness",world.weather.wetness)
 		if ground:
 			ground.set_shader_parameter("wetness",world.weather.wetness)
 			ground.set_shader_parameter("build_preview",not world.build_mode.is_empty() and not world.paused)
@@ -113,6 +135,9 @@ func update_view(dt: float = 0.0) -> void:
 		if water:
 			water.set_shader_parameter("weather_clock",world.weather.clock)
 			water.set_shader_parameter("wind_power",world.weather.wind)
+	if buildable_dirty and buildable_texture:
+		buildable_texture.update(buildable_image)
+		buildable_dirty = false
 	if forest: forest.update_lod(world.camera_rig.focus,world.camera.size)
 	var enabled := 1.0 if world.hero.health > 0 and "--no-canopy-cutout" not in OS.get_cmdline_user_args() else 0.0
 	for mat in foliage_cache.values() + [leaf_fog]:
@@ -120,6 +145,12 @@ func update_view(dt: float = 0.0) -> void:
 		mat.set_shader_parameter("camera_axis",world.camera.global_basis.z.normalized())
 		mat.set_shader_parameter("camera_world_position",world.camera.global_position)
 		mat.set_shader_parameter("cutout_enabled",enabled)
+
+func refresh_buildable_cell(cell: Vector2i) -> void:
+	if buildable_image == null or not Rect2i(0, 0, 128, 128).has_point(cell): return
+	var allowed: bool = world.board.can_build(cell)
+	buildable_image.set_pixel(cell.x, cell.y, Color(1 if allowed else 0, 0, 0))
+	buildable_dirty = true
 
 func make_foliage_fog(strength: float) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
@@ -206,7 +237,8 @@ func add_ground_cover(island: Node) -> void:
 		mm.instance_count = chunks[key].size()
 		var center := Vector3((key.x+0.5)*24,0,(key.y+0.5)*24)
 		for i in range(mm.instance_count):
-			var at: Transform3D = chunks[key][i]
+			var source_at: Transform3D = chunks[key][i]
+			var at := Transform3D(surface_basis(source_at.origin, source_at.basis.get_euler().y, source_at.basis.get_scale()), source_at.origin)
 			at.origin -= center
 			mm.set_instance_transform(i,at)
 		var instance := MultiMeshInstance3D.new()
@@ -218,6 +250,234 @@ func add_ground_cover(island: Node) -> void:
 		instance.visibility_range_end_margin = 12
 		root.add_child(instance)
 	add_ferns(root)
+	add_surface_layers(root)
+	add_footprint_layer(root)
+
+func add_surface_layers(parent: Node3D) -> void:
+	# These are small, low-poly foreground cues rather than a second forest.
+	# They sit on open terrain only and are kept in the cosmetic GroundCover root.
+	var random := RandomNumberGenerator.new()
+	random.seed = 651204
+	var groups := {"dry": {}, "litter": {}, "pebbles": {}}
+	for i in range(4800):
+		var p := Vector3(random.randf_range(-126,126),0,random.randf_range(-126,126))
+		var cell: Vector2i = world.board.cell_at(p)
+		if not world.board.is_open(cell): continue
+		p.y = world.board.layout.height_at(p.x,p.z)
+		if world.board.layout.water_level_at(p.x,p.z) > p.y-0.08: continue
+		if p.distance_to(world.hero.position) < 3.5: continue
+		var patch := sin(p.x*.19+sin(p.z*.13)*1.6)*cos(p.z*.27-p.x*.04)
+		if patch < -0.04: continue
+		var slope := Vector2(world.board.layout.height_at(p.x+.8,p.z)-world.board.layout.height_at(p.x-.8,p.z), world.board.layout.height_at(p.x,p.z+.8)-world.board.layout.height_at(p.x,p.z-.8)).length()
+		var roll := random.randf()
+		# Keep stones tied to exposed, uneven ground. A uniform scatter reads as
+		# gameplay glyphs at the tactical zoom, especially on the open clearing.
+		var stone_patch := slope > .28 or patch > .58
+		var kind := "pebbles" if stone_patch and roll > .86 else ("dry" if roll < (0.26 if slope > .55 else .15) else "litter")
+		var chunk := Vector2i(floori(p.x/24.0),floori(p.z/24.0))
+		if not groups[kind].has(chunk): groups[kind][chunk] = []
+		groups[kind][chunk].append({"position":p,"scale":random.randf_range(.72,1.28),"angle":random.randf()*TAU,"tone":random.randf()})
+	var configs := [
+		{"kind":"dry","mesh":make_dry_grass_mesh(),"limit":1500},
+		{"kind":"litter","mesh":make_leaf_litter_mesh(),"limit":900},
+		{"kind":"pebbles","mesh":make_pebble_mesh(),"limit":520}
+	]
+	var surface_material := make_ground_mark_material()
+	var pebble_material := make_pebble_material()
+	for config in configs:
+		var batches: Dictionary = groups[config.kind]
+		var emitted := 0
+		for chunk in batches:
+			if emitted >= config.limit: break
+			var entries: Array = batches[chunk]
+			var count := mini(entries.size(),config.limit-emitted)
+			if count <= 0: continue
+			var multi := MultiMesh.new()
+			multi.transform_format = MultiMesh.TRANSFORM_3D
+			multi.use_colors = true
+			multi.mesh = config.mesh
+			multi.instance_count = count
+			var center := Vector3((chunk.x+0.5)*24.0,0,(chunk.y+0.5)*24.0)
+			for i in range(count):
+				var entry: Dictionary = entries[i]
+				var p: Vector3 = entry.position
+				var scale: float = entry.scale
+				var local := p-center
+				var lift := .022 if config.kind == "pebbles" else .012
+				var normal := surface_normal(p)
+				var basis := surface_basis(p,entry.angle,Vector3.ONE*scale)
+				multi.set_instance_transform(i,Transform3D(basis,local+normal*lift))
+				var base := Color("6f8051")
+				if config.kind == "dry": base = Color("8e8554")
+				elif config.kind == "litter": base = Color("5d573b")
+				else: base = Color("596159")
+				var target := Color("a1a476") if config.kind != "pebbles" else Color("858875")
+				var tint_amount := .28 if config.kind != "pebbles" else .16
+				multi.set_instance_color(i,base.lerp(target,entry.tone*tint_amount))
+			var instance := MultiMeshInstance3D.new()
+			instance.name = "Surface_%s_%s_%s" % [config.kind,chunk.x,chunk.y]
+			instance.position = center
+			instance.multimesh = multi
+			instance.material_override = pebble_material if config.kind == "pebbles" else surface_material
+			instance.material_overlay = world.vision.overlay
+			instance.visibility_range_end = 105
+			instance.visibility_range_end_margin = 12
+			instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			parent.add_child(instance)
+			emitted += count
+
+func add_footprint_layer(parent: Node3D) -> void:
+	footprint_root = Node3D.new()
+	footprint_root.name = "Footprints"
+	parent.add_child(footprint_root)
+	footprint_multi = MultiMesh.new()
+	footprint_multi.transform_format = MultiMesh.TRANSFORM_3D
+	footprint_multi.use_colors = true
+	footprint_multi.mesh = make_pressed_grass_mesh()
+	footprint_multi.instance_count = 28
+	footprint_multi.visible_instance_count = 0
+	var instance := MultiMeshInstance3D.new()
+	instance.name = "PressedGrass"
+	instance.multimesh = footprint_multi
+	instance.material_override = make_ground_mark_material()
+	instance.material_overlay = world.vision.overlay
+	instance.visibility_range_end = 78
+	instance.visibility_range_end_margin = 8
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	footprint_root.add_child(instance)
+
+func update_footprints(dt: float) -> void:
+	if footprint_multi == null or world.hero == null: return
+	for mark in footprint_marks: mark.age += dt
+	footprint_marks = footprint_marks.filter(func(mark: Dictionary): return mark.age < 16.0)
+	var current: Vector3 = world.hero.position
+	if footprint_last == Vector3.INF: footprint_last = current
+	var moved := current.distance_to(footprint_last)
+	if moved > .42 and world.hero.health > 0 and not world.paused:
+		var delta := current-footprint_last
+		delta.y = 0
+		if delta.length() > .01:
+			var forward := delta.normalized()
+			var lateral := Vector3(-forward.z,0,forward.x)*.16*footprint_side
+			var at := current - forward*.12 + lateral
+			at.y = world.board.layout.height_at(at.x,at.z)+.01
+			footprint_marks.append({"position":at,"angle":atan2(forward.x,forward.z),"age":0.0,"side":footprint_side})
+			footprint_side *= -1.0
+			footprint_last = current
+	if footprint_marks.size() > 28: footprint_marks = footprint_marks.slice(footprint_marks.size()-28)
+	footprint_multi.visible_instance_count = footprint_marks.size()
+	for i in range(footprint_marks.size()):
+		var mark: Dictionary = footprint_marks[i]
+		var fade := 1.0-smoothstep(8.0,16.0,float(mark.age))
+		var at: Vector3 = mark.position
+		var normal := surface_normal(at)
+		footprint_multi.set_instance_transform(i,Transform3D(surface_basis(at,float(mark.angle),Vector3(.82,1.0,.64)),at+normal*.012))
+		footprint_multi.set_instance_color(i,Color(.26,.30,.20,.18*fade))
+
+func surface_normal(at: Vector3) -> Vector3:
+	var dx: float = world.board.layout.height_at(at.x+.45,at.z)-world.board.layout.height_at(at.x-.45,at.z)
+	var dz: float = world.board.layout.height_at(at.x,at.z+.45)-world.board.layout.height_at(at.x,at.z-.45)
+	return Vector3(-dx,2.0,-dz).normalized()
+
+func surface_basis(at: Vector3, yaw: float, scale: Vector3 = Vector3.ONE) -> Basis:
+	var normal := surface_normal(at)
+	var axis := Vector3.UP.cross(normal)
+	var align := Basis.IDENTITY
+	if axis.length_squared() > 0.000001:
+		align = Basis(axis.normalized(),acos(clampf(Vector3.UP.dot(normal),-1.0,1.0)))
+	return (align * Basis(Vector3.UP,yaw)).scaled(scale)
+
+func make_ground_mark_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = GroundMarkShader
+	return material
+
+func make_pebble_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.albedo_color = Color.WHITE
+	material.roughness = .96
+	material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+static func make_dry_grass_mesh() -> ArrayMesh:
+	return make_blade_cluster(Color("887b4e"),Color("b0a36a"),.28,5)
+
+static func make_leaf_litter_mesh() -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Asymmetric, partly overlapping leaves avoid a repeated rosette silhouette.
+	var centers := [Vector3(-.09,.018,-.02),Vector3(.03,.021,.07),Vector3(.08,.014,-.06),Vector3(-.01,.017,-.10)]
+	var angles := [-.52,1.18,2.55,-1.72]
+	var lengths := [.16,.13,.18,.11]
+	for i in range(centers.size()):
+		var angle: float = angles[i]
+		var direction := Vector3(cos(angle),0,sin(angle))
+		var side := Vector3(-direction.z,0,direction.x)*(.035+float(i%2)*.012)
+		var center: Vector3 = centers[i]
+		var tip := center+direction*float(lengths[i])+Vector3.UP*(.008+float(i%2)*.006)
+		for vertex in [center-side,center+side,tip,center-side,tip,center+side*.35]:
+			surface.set_color(Color("45412f").lerp(Color("6b6240"),float(i%3)/3.0))
+			surface.add_vertex(vertex)
+	surface.generate_normals()
+	var mesh := surface.commit()
+	return mesh
+
+static func make_pebble_mesh() -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# An uneven eight-sided chip avoids the bright, regular hexagon silhouette.
+	var lower := PackedVector3Array()
+	var upper := PackedVector3Array()
+	for i in range(8):
+		var angle := float(i)*TAU/8.0 + .12*sin(float(i)*2.7)
+		var radius := .085 + float((i*3)%5)*.012
+		lower.append(Vector3(cos(angle)*radius,.018+float(i%2)*.006,sin(angle)*radius*.72))
+		upper.append(Vector3(cos(angle)*radius*.68,sin(float(i)*1.9)*.012+.065,sin(angle)*radius*.52))
+	for i in range(8):
+		var next := (i+1)%8
+		for vertex in [lower[i],upper[next],upper[i],lower[i],lower[next],upper[next]]:
+			surface.set_color(Color("4f5750").lerp(Color("92927a"),clampf((vertex.y-.01)/.07,0,1)))
+			surface.add_vertex(vertex)
+	for i in range(8):
+		var next := (i+1)%8
+		for vertex in [Vector3(.012,.085,-.006),upper[i],upper[next]]:
+			surface.set_color(Color("8b8a73"))
+			surface.add_vertex(vertex)
+	surface.generate_normals()
+	return surface.commit()
+
+static func make_pressed_grass_mesh() -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	# Flattened radial blades read as a soft pressed mark from the tactical camera.
+	for i in range(5):
+		var angle := float(i)*TAU/5.0
+		var direction := Vector3(cos(angle),0,sin(angle))
+		var side := Vector3(-direction.z,0,direction.x)*.028
+		var base := direction*.015+Vector3.UP*.006
+		var tip := direction*(.16+float(i%2)*.035)+Vector3.UP*(.012+float(i%3)*.004)
+		for vertex in [base-side,tip,base+side,base-side,base+side,tip]:
+			surface.set_color(Color("34422f").lerp(Color("5c6740"),clampf(vertex.y/.018,0,1)))
+			surface.add_vertex(vertex)
+	surface.generate_normals()
+	return surface.commit()
+
+static func make_blade_cluster(bottom: Color, top: Color, height: float, count: int) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(count):
+		var angle := float(i)*TAU/count
+		var direction := Vector3(cos(angle),0,sin(angle))
+		var side := Vector3(-direction.z,0,direction.x)*.035
+		var base := direction*.03+Vector3.UP*.008
+		var tip := direction*(.11+float(i%3)*.03)+Vector3.UP*(height*(.72+float(i%3)*.08))
+		for vertex in [base-side,tip,base+side,base-side,base+side,tip]:
+			surface.set_color(bottom.lerp(top,clampf(vertex.y/maxf(height,.01),0,1)))
+			surface.add_vertex(vertex)
+	surface.generate_normals()
+	return surface.commit()
 
 func add_ferns(parent: Node3D) -> void:
 	var source: Node3D = (CinematicFernScene if cinematic_enabled else FernScene).instantiate()
@@ -478,12 +738,13 @@ func update_building(node: Node3D, data: Dictionary) -> void:
 			world.vision.shade(fortification)
 		node.get_node("Fortification").visible = complete
 	if data.kind == "fire":
+		var rain_dampen: float = 1.0 - (world.weather.rain * 0.24 if world.weather else 0.0)
 		node.get_node("FireLight").visible = complete
-		node.get_node("FireLight").light_energy = (0.85 if world.night else 0.28) + sin(clock*8)*0.025 + sin(clock*13)*0.018
+		node.get_node("FireLight").light_energy = ((0.85 if world.night else 0.28) + sin(clock*8)*0.025 + sin(clock*13)*0.018) * rain_dampen
 		node.get_node("Embers").emitting = complete and not world.paused
 		node.get_node("Smoke").emitting = complete and not world.paused
 		for name in ["Flame","FlameCore"]:
 			var flame: Node3D = model.get_node(name)
 			flame.visible = complete
-			flame.scale = Vector3(1+sin(clock*7)*0.09,1+sin(clock*11)*0.15,1+cos(clock*9)*0.08)
+			flame.scale = Vector3(1+sin(clock*7)*0.09,1+(sin(clock*11)*0.15)*rain_dampen,1+cos(clock*9)*0.08)
 	CampDetail.update(self, node, data)

@@ -68,7 +68,9 @@ func _initialize() -> void:
 	for p in adjacent: expect(board.is_open(board.cell_at(p)), "A route must not contain blocked cells")
 	var Regions = load("res://scripts/regions.gd")
 	expect(Regions.at(Vector3(50, 0, -50)) == "mountain", "Warcraft north must map to negative Godot Z")
-	expect(Regions.at(Vector3(-50, 0, -50)) == "ice", "Northwest is ice")
+	# The approved organic v3 map intentionally ships three authored biomes;
+	# northwest remains rainforest instead of importing the old reference ice.
+	expect(Regions.at(Vector3(-50, 0, -50)) == "rainforest", "Northwest remains rainforest on the organic map")
 	expect(Regions.at(Vector3(-50, 0, 50)) == "rainforest", "Southwest is rainforest")
 	expect(Regions.at(Vector3(50, 0, 50)) == "swamp", "Southeast is swamp")
 	expect(Regions.at(Vector3.ZERO) == "center", "Central gaps must not be filled with quadrant bonuses")

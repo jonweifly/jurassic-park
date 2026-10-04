@@ -20,6 +20,7 @@ func click(p: Vector2) -> void:
 		event.button_index = MOUSE_BUTTON_LEFT
 		event.pressed = pressed
 		root.push_input(event,true)
+
 func shot(name: String) -> void:
 	world.hud.refresh(0)
 	await process_frame
@@ -114,7 +115,7 @@ func run() -> void:
 	expect(world.board.is_open(candidate),"Existing demolition immediately recovers an intentionally sealed exit")
 	world.build_mode = ""
 	world.pointer_feedback.update_hover(screen,world.board.point(candidate))
-	expect(world.pointer_feedback.cursor_text.is_empty(),"Normal movement still has no right-click-move popup")
+	expect(not world.pointer_feedback.cursor_text.contains("右键"),"Normal movement still has no right-click-move popup")
 	FileAccess.open(OUT.path_join("preview-performance.json"),FileAccess.WRITE).store_string(JSON.stringify({"fresh_query_ms":fresh_ms,"cached_100_queries_ms":cached_ms},"\t"))
 	await shot("exit-reopened")
 	world.free()

@@ -14,13 +14,17 @@ var clock := 0.0
 var kind := 0
 var flash := 0.0
 var last_thunder := -1
+var last_kind := -1
 var preview_kind := -1 # Capture fixtures only; never persisted or exposed as a cheat UI.
 var drops: CPUParticles3D
+var splashes: CPUParticles3D
 var rain_material: ShaderMaterial
+var splash_material: ShaderMaterial
 var roof_texture: ImageTexture
 var roof_revision := -1
 var roof_bucket := Vector2i(-999,-999)
 var roof_count := -1
+var flash_overlay: ColorRect
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
@@ -51,16 +55,28 @@ func update() -> void:
 	rain = state.rain
 	cloud = state.cloud
 	wetness = state.wetness
+	if last_kind >= 0 and last_kind != kind and world.started and world.encounter:
+		world.encounter.weather_event(kind)
+	last_kind = kind
 	direction = Vector2(cos(clock*0.005+0.4),sin(clock*0.005+0.4))
 	var thunder_id := floori(clock/23.0)
 	var thunder_phase := fposmod(clock,23.0)
-	flash = 0.22 * (1.0-smoothstep(0.12,0.6,thunder_phase)) if kind == 3 and rain > 0.85 else 0.0
+	var storm := kind == 3 and rain > 0.85
+	# Keep the existing deterministic lightning cadence, but make the event a
+	# short cold pulse instead of a broad brightness change. The delayed thunder
+	# cue below remains the audio anchor for the same event.
+	flash = (0.20 + 0.02 * float(world.preferences.values.quality == 2)) * (1.0-smoothstep(0.12,0.6,thunder_phase)) if storm and not world.presentation_paused() else 0.0
 	# A single broad, soft flash, followed by delayed thunder; loading never replays old events.
 	if last_thunder == -1 or abs(thunder_id-last_thunder)>1: last_thunder = thunder_id
 	if thunder_phase >= 1.7 and last_thunder < thunder_id:
 		last_thunder = thunder_id
-		if kind == 3 and rain > 0.85 and not world.paused:
+		if storm and not world.paused:
 			world.sound.play_voice("thunder_%d" % (1+thunder_id%2),"Ambience",-8.0)
+	if flash_overlay == null and DisplayServer.get_name() != "headless" and is_instance_valid(world.hud) and world.hud.root:
+		create_flash_overlay()
+	if flash_overlay:
+		flash_overlay.visible = flash > 0.001
+		flash_overlay.modulate.a = flash * (0.92 if world.preferences.values.quality > 0 else 0.76)
 	if drops:
 		drops.emitting = rain > 0.05 and world.started and world.session.phase in ["playing","evacuate"]
 		var amount := 320 if world.preferences.values.quality == 0 else (600 if world.preferences.values.quality == 1 else 900)
@@ -70,14 +86,22 @@ func update() -> void:
 		drops.direction = Vector3(direction.x*wind*.35,-1,direction.y*wind*.35).normalized()
 		rain_material.set_shader_parameter("rain_gain",rain)
 		rain_material.set_shader_parameter("rain_drift",direction*wind*.35)
-		update_roofs()
+		if rain > 0.05: update_roofs()
+		update_splashes()
 
 func apply_lighting() -> void:
 	world.sun.light_energy *= lerpf(1.0,0.42,cloud) * lerpf(1.0,0.82,rain)
 	world.environment.ambient_light_energy *= lerpf(1.0,0.80,cloud)
 	world.environment.ambient_light_energy += flash
+	world.environment.ambient_light_color = world.environment.ambient_light_color.lerp(Color("d9efff"),flash*.72)
 	world.sun.light_color = world.sun.light_color.lerp(Color("a9bdc9"),cloud*.55+rain*.15)
+	# Keep the playable camp crisp while rain gathers a low, distant mist layer.
+	# Height fog is especially useful on the sloped island: banks recede softly
+	# without washing out the survivor, buildings, or nearby dinosaurs.
 	world.environment.fog_density = lerpf(0.0007,0.0027,rain)
+	world.environment.fog_height = lerpf(3.5,1.0,rain)
+	world.environment.fog_height_density = lerpf(0.010,0.042,rain)
+	world.environment.fog_sky_affect = lerpf(0.18,0.38,cloud)
 
 func create_rain() -> void:
 	var height_image: Image = world.board.layout.height_image()
@@ -110,6 +134,57 @@ func create_rain() -> void:
 	drops.mesh = mesh
 	drops.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	world.add_child(drops)
+	# A small camera-local sample of impact rings provides readable wet-ground
+	# feedback without collision queries for every falling drop.
+	splash_material = ShaderMaterial.new()
+	splash_material.shader = load("res://shaders/rain_splash.gdshader")
+	splash_material.set_shader_parameter("rain_gain",0.0)
+	splashes = CPUParticles3D.new()
+	splashes.name = "WeatherRainSplashes"
+	splashes.emitting = false
+	splashes.amount = 11
+	splashes.lifetime = 0.72
+	splashes.preprocess = 0.72
+	splashes.local_coords = false
+	splashes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	splashes.emission_box_extents = Vector3(13,0.015,13)
+	splashes.direction = Vector3.UP
+	splashes.spread = 180.0
+	splashes.gravity = Vector3.ZERO
+	splashes.initial_velocity_min = 0.0
+	splashes.initial_velocity_max = 0.0
+	splashes.randomness = 0.65
+	splashes.rotation_degrees.x = -90.0
+	var splash_mesh := QuadMesh.new()
+	splash_mesh.size = Vector2(0.78,0.78)
+	splash_mesh.material = splash_material
+	splashes.mesh = splash_mesh
+	splashes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(splashes)
+
+func create_flash_overlay() -> void:
+	if flash_overlay or not is_instance_valid(world.hud) or not world.hud.root: return
+	flash_overlay = ColorRect.new()
+	flash_overlay.name = "WeatherLightningFlash"
+	flash_overlay.color = Color("d9efff")
+	flash_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	flash_overlay.visible = false
+	world.hud.root.add_child(flash_overlay)
+	world.hud.root.move_child(flash_overlay,0)
+
+func update_splashes() -> void:
+	if not splashes: return
+	var quality := clampi(int(world.preferences.values.get("quality",2)),0,2)
+	var amount: int = [3,7,11][quality]
+	var active: bool = rain > 0.05 and world.started and world.session.phase in ["playing","evacuate"] and not world.presentation_paused()
+	splashes.amount = amount
+	splashes.emitting = active
+	splashes.speed_scale = 0.0 if world.presentation_paused() else 1.0
+	var focus: Vector3 = world.camera_rig.focus
+	splashes.position = Vector3(focus.x,world.board.layout.height_at(focus.x,focus.z)+0.045,focus.z)
+	splash_material.set_shader_parameter("rain_gain",rain)
+	splash_material.set_shader_parameter("weather_clock",clock)
 
 func update_roofs() -> void:
 	if not roof_texture: return

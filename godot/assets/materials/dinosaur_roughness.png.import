@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://r8uam88gq7jy"
 path.s3tc="res://.godot/imported/dinosaur_roughness.png-a3024ecb0001574c05a244aba9b59fbf.s3tc.ctex"
+path.etc2="res://.godot/imported/dinosaur_roughness.png-a3024ecb0001574c05a244aba9b59fbf.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/materials/dinosaur_roughness.png"
-dest_files=["res://.godot/imported/dinosaur_roughness.png-a3024ecb0001574c05a244aba9b59fbf.s3tc.ctex"]
+dest_files=["res://.godot/imported/dinosaur_roughness.png-a3024ecb0001574c05a244aba9b59fbf.s3tc.ctex", "res://.godot/imported/dinosaur_roughness.png-a3024ecb0001574c05a244aba9b59fbf.etc2.ctex"]
 
 [params]
 

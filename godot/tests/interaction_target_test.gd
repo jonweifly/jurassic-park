@@ -134,6 +134,23 @@ func run() -> void:
 	w.paused = true
 	w.interaction_targets.refresh(true)
 	for layer in w.interaction_targets.layers.values(): expect(not layer.root.visible, "Pause hides all target effects")
+	# A building must remain pickable while its render model is hidden during a
+	# vision/cinematic update; otherwise a repair click falls through to movement.
+	var repair_building: Dictionary = w.session.buildings[0]
+	repair_building.hp = maxf(1.0, w.Catalog.max_health(repair_building) * 0.5)
+	w.vision.explored[repair_building.cell] = true
+	var repair_visual: Node3D = w.visuals[repair_building.id]
+	repair_visual.hide()
+	w.paused = false
+	w.camera_focus = w.board.point(repair_building.cell)
+	w.camera_size = 18
+	w.update_camera(0)
+	await process_frame
+	var repair_screen: Vector2 = w.camera.unproject_position(w.board.point(repair_building.cell) + Vector3.UP * 2.0)
+	var repair_ground: Vector3 = w.ground_at(repair_screen)
+	var repair_target: Dictionary = w.context_at(w.action_point(repair_screen, repair_ground))
+	expect(repair_target.kind == "repair" and repair_target.id == repair_building.id, "Hidden damaged building keeps a stable repair selection target")
+	repair_visual.show()
 	w.free()
 	print("INTERACTION TARGET: ", checks, " checks, ", failures, " failures")
 	quit(0 if failures == 0 else 1)

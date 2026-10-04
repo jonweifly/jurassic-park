@@ -37,7 +37,8 @@ func run() -> void:
 				elif change > .02: modified += 1
 	expect(protected_error < .0001,"All traversable cells and building plots retain their original surface, not only their centres")
 	expect(modified > 1000 and maximum_change < .721,"Blocked slopes and shores become curved within a bounded height change")
-	var ground_node: MeshInstance3D = world.get_node("Island/ReferenceGround")
+	var ground_node: MeshInstance3D = world.get_node_or_null("Island/IslandGround")
+	if ground_node == null: ground_node = world.get_node("Island/ReferenceGround")
 	var arrays := ground_node.mesh.surface_get_arrays(0)
 	var terrain_vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var terrain_indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
@@ -86,6 +87,15 @@ func run() -> void:
 	expect(forms.size()>30,"Terrain shading follows actual ridges and concave banks")
 	var root_batches: Array = world.scenery.forest.batches.filter(func(batch):return str(batch.node.name).begins_with("RootFlares_"))
 	expect(not root_batches.is_empty(),"The live forest has physical trunk roots")
+	var pebble_count := 0
+	var pebble_mesh_vertices := 0
+	var pebble_materials_ok := true
+	for node in world.get_node("Island/GroundCover").find_children("*", "MultiMeshInstance3D", true, false):
+		if not str(node.name).begins_with("Surface_pebbles_"): continue
+		pebble_count += node.multimesh.instance_count
+		pebble_mesh_vertices = maxi(pebble_mesh_vertices, node.multimesh.mesh.surface_get_array_len(0))
+		pebble_materials_ok = pebble_materials_ok and node.material_override is StandardMaterial3D
+	expect(pebble_count <= 520 and pebble_mesh_vertices >= 72 and pebble_materials_ok,"Foreground stones stay sparse, irregular and opaque instead of reading as bright hex markers")
 	for quality in [0,1,2]:
 		world.preferences.values.quality = quality
 		world.preferences.apply(world,false)

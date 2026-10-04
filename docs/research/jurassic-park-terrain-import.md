@@ -11,7 +11,7 @@
 - 同一个导航格里的树木归入一个可采集组，共 2,991 组。采尽时清除整组，属于当前网格精度的简化；不等同于原版逐棵树的独立碰撞与生命值。
 - 区域边界按 JASS 的矩形并集判断，山地和雨林各有两块区域。材质配色、树种替身、纹理混合和程序噪声为原创视觉表达，不是原版美术复刻。
 
-导入工具：[import_reference_terrain.py](../../godot/tools/import_reference_terrain.py)；烘焙工具：[bake_reference.gd](../../godot/tools/bake_reference.gd)。布局输出为 `godot/data/terrain.json`，可编辑场景为 `godot/scenes/reference_island.tscn`。旧临时场景保留。
+这份历史记录描述了已移除的参考地形导入流程。当前可玩地图统一使用 `godot/data/maps/organic_island_v3.json` 和 `godot/scenes/original_island.tscn`；本研究文档只保留格式分析，不再对应可选地图或可运行导入工具。
 
 ## 玩法校准
 

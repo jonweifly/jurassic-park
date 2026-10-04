@@ -1,10 +1,17 @@
 extends RefCounted
+## Lower, wider-lens tactical camera: nearby geometry gets visible depth while
+## the ground focus remains unchanged for picking and navigation.
+const DEFAULT_YAW := PI / 4.0
+const DEFAULT_PITCH := deg_to_rad(44.0)
+const MIN_PITCH := deg_to_rad(30.0)
+const MAX_PITCH := deg_to_rad(72.0)
+const LOOK_HEIGHT := 0.72
 var world: Node
 var focus := Vector3.ZERO
-var yaw := PI / 4
-var target_yaw := PI / 4
-var pitch := deg_to_rad(48)
-var target_pitch := deg_to_rad(48)
+var yaw := DEFAULT_YAW
+var target_yaw := DEFAULT_YAW
+var pitch := DEFAULT_PITCH
+var target_pitch := DEFAULT_PITCH
 var following := false
 var dragging := false
 var initialized := false
@@ -27,8 +34,8 @@ func center(follow: bool = false) -> void:
 	world.camera_focus = world.hero.position
 
 func reset() -> void:
-	target_yaw = PI / 4
-	target_pitch = deg_to_rad(48)
+	target_yaw = DEFAULT_YAW
+	target_pitch = DEFAULT_PITCH
 	world.camera_size = 36
 	center(true)
 
@@ -48,7 +55,7 @@ func handle(event: InputEvent) -> bool:
 		else:
 			var previous_pitch := target_pitch
 			target_yaw -= event.relative.x * 0.006 * world.preferences.values.rotation_speed
-			target_pitch = clampf(target_pitch + event.relative.y * 0.004 * world.preferences.values.rotation_speed * (-1 if world.preferences.values.invert_y else 1), deg_to_rad(38), deg_to_rad(70))
+			target_pitch = clampf(target_pitch + event.relative.y * 0.004 * world.preferences.values.rotation_speed * (-1 if world.preferences.values.invert_y else 1), MIN_PITCH, MAX_PITCH)
 			if previous_pitch > deg_to_rad(44) and target_pitch <= deg_to_rad(44): center(true)
 		return true
 	if event is InputEventMouseButton and event.pressed:
@@ -91,8 +98,9 @@ func update(dt: float) -> void:
 	# A narrow lens gives useful depth while retaining the familiar RTS footprint.
 	# camera.size still represents the visible span at the focus, including old saves.
 	var distance: float = world.camera.size / (2.0 * tan(deg_to_rad(world.camera.fov) * 0.5)) if perspective else 68.0
+	var look_target := focus + Vector3.UP * LOOK_HEIGHT
 	var offset := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)) * distance
-	var desired_position := focus + offset
+	var desired_position := look_target + offset
 	# Raise the boom above intervening hills at low pitch.
 	var required_lift := 0.0
 	for i in range(1, 9):
@@ -106,9 +114,13 @@ func update(dt: float) -> void:
 		# Zoom already smooths its distance. Filtering absolute Y again makes it
 		# lag X/Z and rocks the lens; smooth only additional terrain clearance.
 		boom_height = lerpf(boom_height, required_lift, 1.0 - exp(-10.0 * dt))
-	desired_position.y += boom_height
+	# Clear a close hillside along the camera boom instead of lifting only Y.
+	# Moving on the existing view ray keeps the pitch stable while zooming, so
+	# terrain protection does not make the lens visibly rock.
+	if boom_height > 0.0:
+		desired_position += offset.normalized() * (boom_height / maxf(sin(pitch), 0.25))
 	world.camera.position = desired_position
-	world.camera.look_at(focus)
+	world.camera.look_at(look_target)
 	if not world.preferences.values.get("impact_motion", true): impact_strength = 0.0
 	if not world.presentation_paused() and dt > 0:
 		impact_clock += dt

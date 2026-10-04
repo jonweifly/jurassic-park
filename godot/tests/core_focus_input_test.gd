@@ -14,13 +14,16 @@ func expect(ok: bool, message: String) -> void:
 		push_error(message)
 
 func click(p: Vector2) -> void:
+	click_button(p, MOUSE_BUTTON_LEFT)
+
+func click_button(p: Vector2, button: MouseButton) -> void:
 	var motion := InputEventMouseMotion.new()
 	motion.position = p
 	root.push_input(motion, true)
 	for pressed in [true, false]:
 		var event := InputEventMouseButton.new()
 		event.position = p
-		event.button_index = MOUSE_BUTTON_LEFT
+		event.button_index = button
 		event.pressed = pressed
 		root.push_input(event, true)
 
@@ -82,6 +85,11 @@ func run() -> void:
 	world.selected_id = gate.id
 	await settle()
 	expect(world.hud.repair_button.visible and world.hud.refit_buttons.brace.visible, "Damaged gate offers repair and reinforcement")
+	world.order = "idle"
+	click_button(world.camera.unproject_position(world.board.point(gate.cell)), MOUSE_BUTTON_RIGHT)
+	await settle()
+	expect(world.selected_id == gate.id and world.order == "repair" and world.worker.target_id == gate.id, "Right-click damaged building repairs while preserving selection")
+	world.stop_order()
 	click(world.hud.repair_button.get_global_rect().get_center())
 	await settle()
 	expect(world.order == "repair" and world.worker.target_id == gate.id, "Repair button sends worker to gate without toggling it")

@@ -84,6 +84,71 @@ for name, duration in [("chop", 0.28), ("hammer", 0.24), ("mine", 0.38),
         values.append(v * fade)
     save(name, values)
 
+
+# Short alternates keep repeated work, combat, and interface events from
+# sounding like one sample fired on a timer. They share the same source and
+# loudness target as the prototype effects, but use different transients.
+def variant_transient(name, duration, kind, variant):
+    values = []
+    low = 0.0
+    for i in range(int(RATE * duration)):
+        t = i / RATE
+        noise = rng.uniform(-1, 1)
+        low += (0.10 if kind in ("step", "hit") else 0.16) * (noise - low)
+        decay = math.exp(-t * (17 if duration < 0.5 else 3.5))
+        if kind == "step":
+            v = low * (0.48 + variant * 0.08) + tone(t, 78 + variant * 33) * 0.22
+            if variant == 2: v += noise * math.exp(-t * 42) * 0.12
+        elif kind == "chop":
+            v = (low * 0.92 + tone(t, 128 + variant * 31) * 0.34) * decay
+        elif kind == "hammer":
+            ring = tone(t, 360 + variant * 90) * math.exp(-t * 13)
+            v = (noise * 0.16 + ring * 0.48 + tone(t, 830 + variant * 110) * 0.16) * decay
+        elif kind == "mine":
+            v = (noise * 0.16 + tone(t, 920 + variant * 420) * 0.28 + tone(t, 1980 + variant * 240) * 0.13) * decay
+        elif kind == "shot":
+            v = (noise * (0.54 + variant * 0.05) + low * 0.42 + tone(t, 112 + variant * 25) * 0.16) * decay
+        elif kind == "bow":
+            v = (tone(t, 250 - (205 + variant * 16) * t) * 0.40 + noise * 0.24) * decay
+        elif kind == "electric":
+            buzz = tone(t, 92 + variant * 23) + 0.35 * tone(t, 184 + variant * 46)
+            v = (noise * 0.24 + buzz * 0.30) * (0.5 + 0.5 * tone(t, 43 + variant * 7)) * decay
+        elif kind == "gate":
+            v = (low * 0.52 + tone(t, 120 + variant * 22) * 0.18 + tone(t, 264 + variant * 31) * 0.10) * math.sin(math.pi * t / duration)
+        elif kind == "hit":
+            v = (low * (0.90 + variant * 0.08) + tone(t, 76 + variant * 16) * 0.40) * decay
+        elif kind == "collapse":
+            v = (low * (1.2 + variant * 0.18) + noise * 0.20) * decay
+        else:  # roar
+            phase = math.tau * ((97 + variant * 9) * t - (18 + variant * 2) * t * t)
+            v = (math.sin(phase) * 0.28 + math.sin(phase * 0.49) * 0.23 + low * 0.85)
+            v *= math.sin(math.pi * t / duration) ** 0.6 * (0.8 + 0.2 * tone(t, 21 + variant * 3))
+        fade = min(1, t / 0.002, (duration - t) / 0.025)
+        values.append(v * fade)
+    save(name, values)
+
+
+for name, duration, kind, variant in [
+    ("step_2", .16, "step", 1), ("step_3", .16, "step", 2),
+    ("chop_2", .28, "chop", 1), ("hammer_2", .24, "hammer", 1),
+    ("mine_2", .38, "mine", 1), ("shot_2", .24, "shot", 1),
+    ("bow_2", .30, "bow", 1), ("electric_2", .40, "electric", 1),
+    ("gate_2", .85, "gate", 1), ("hit_2", .30, "hit", 1),
+    ("roar_2", 1.65, "roar", 1), ("collapse_2", .80, "collapse", 1),
+]:
+    variant_transient(name, duration, kind, variant)
+
+# Interface chimes use different intervals, not just a pitch-shifted copy.
+chime("click_soft", [590], .06)
+chime("click_confirm", [660, 880], .10)
+chime("ready_2", [330, 494, 659], .22)
+chime("deposit_2", [784, 1047], .13)
+chime("complete_2", [587, 740, 988], .16)
+chime("warning_2", [247, 330], .22)
+chime("rescue_2", [587, 784, 659, 1047], .25)
+chime("won_2", [587, 740, 880, 1175], .26)
+chime("lost_2", [330, 294, 220, 165], .30)
+
 for name in ("day", "night", "fire", "generator"):
     duration = 17
     values = []
@@ -110,4 +175,7 @@ for name in ("day", "night", "fire", "generator"):
             v *= 0.85 + 0.15 * tone(t, 7)
         values.append(v)
     save(name, values, loop=True)
+
+# Weather and jungle beds are owned by art/scripts/generate_environment_media.py
+# because they use stereo, 32 kHz source generation alongside the terrain media.
 print(f"Generated {len(list(OUT.glob('*.wav')))} original WAV sounds in {OUT}")

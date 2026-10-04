@@ -7,13 +7,20 @@ static func choose(world: Node, origin: Vector3) -> Vector3:
 	for y in range(30,61):
 		for x in range(40,90): candidates.append(Vector2i(x,y))
 	candidates.sort_custom(func(a,b): return board.point(a).distance_squared_to(preferred) < board.point(b).distance_squared_to(preferred))
+	# Map-authored clearings take priority; legacy maps retain their search area.
+	var authored: Array[Vector2i] = []
+	for site in board.layout.extraction_sites:
+		var coords: Array = site.world
+		authored.append(board.cell_at(Vector3(float(coords[0]), 0, float(coords[1]))))
+	candidates = authored + candidates
 	for cell in candidates:
+		if not board.inside(cell): continue
 		var p: Vector3 = board.point(cell)
 		var clear := true
 		for x in range(-3,4):
 			for y in range(-3,4):
 				var nearby := cell+Vector2i(x,y)
-				if not board.layout.walk[nearby.y*128+nearby.x] or (not board.is_open(nearby) and not world.trees.has(nearby)): clear = false
+				if not board.inside(nearby) or not board.layout.walk[nearby.y*128+nearby.x] or (not board.is_open(nearby) and not world.trees.has(nearby)): clear = false
 		if not clear: continue
 		var low := p.y
 		var high := p.y

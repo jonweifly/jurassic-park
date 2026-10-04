@@ -6,7 +6,8 @@ const ExpeditionCatalog = preload("res://scripts/expedition_catalog.gd")
 const Features = preload("res://scripts/feature_policy.gd")
 const Dinosaurs = preload("res://scripts/dinosaur_catalog.gd")
 const Hard = preload("res://scripts/hard_difficulty.gd")
-const MAP_ID := "reference-island-65065-v1"
+const MapCatalog = preload("res://scripts/map_catalog.gd")
+const MAP_ID := "organic-island-v3"
 const SESSION_FIELDS = ["wood", "gold", "elapsed", "phase", "buildings", "next_id", "harvest_level", "duration", "evacuation_elapsed", "kills", "mode", "technologies", "research_job", "completed_notice", "rescue_warned", "finale_wave", "next_dinosaur_id", "healing_spent", "boarding_progress", "adventure", "profession"]
 const SURVIVAL_FIELDS = ["hunger", "fatigue", "food", "raw_meat", "cooked_meat", "berries", "survival_clock"]
 const WORKER_FIELDS = ["cargo_kind", "cargo", "resource_kind", "resource_target", "target_id", "clock", "retry_clock", "delivered", "noise_clock", "recovery", "pose_clock"]
@@ -51,8 +52,8 @@ static func snapshot(w: Node) -> Dictionary:
 		animals.append({"pawn": fields(d, PAWN_FIELDS), "meta": metadata, "visual": visual_state(d)})
 		if d.get_instance_id() == w.hero.target_id: target_uid = d.get_meta("save_id")
 	return {
-		"version": VERSION, "map": MAP_ID, "terrain_revision": TERRAIN_REVISION, "saved_at": int(Time.get_unix_time_from_system() * 1000000),
-		"session": fields(w.session, SESSION_FIELDS + ["kills_by_species", "outfitting"]), "survival": fields(w.session, SURVIVAL_FIELDS), "worker": fields(w.worker, WORKER_FIELDS),
+		"version": VERSION, "map": w.map_id, "terrain_revision": TERRAIN_REVISION, "saved_at": int(Time.get_unix_time_from_system() * 1000000),
+		"session": fields(w.session, SESSION_FIELDS + ["kills_by_species", "outfitting", "deposit_reserves"]), "survival": fields(w.session, SURVIVAL_FIELDS), "worker": fields(w.worker, WORKER_FIELDS),
 		"hero": fields(w.hero, PAWN_FIELDS), "hero_visual": visual_state(w.hero), "animals": animals, "trees": stocks,
 		"explored": w.vision.explored.duplicate(), "rng_seed": w.rng.seed, "rng_state": w.rng.state,
 		"spawn_clocks": w.spawn_clocks.duplicate(true), "order": w.order, "order_target": w.order_target,
@@ -86,7 +87,7 @@ static func validate(data: Dictionary) -> String:
 	if not data.get("terrain_revision",0) is int: return "存档地形版本无效"
 	if data.get("terrain_revision",0) not in range(TERRAIN_REVISION+1): return "存档地形版本不兼容"
 	if data.get("version") != VERSION: return "存档版本不兼容"
-	if data.get("map") != MAP_ID: return "存档地图版本不兼容"
+	if not MapCatalog.is_valid(str(data.get("map", ""))): return "存档地图版本不兼容"
 	if not safe_data(data): return "存档含无效数据"
 	if data.has("defense_focus_uid") and (not data.defense_focus_uid is int or data.defense_focus_uid < -1): return "存档集火目标无效"
 	var shape := {"saved_at": TYPE_INT, "session": TYPE_DICTIONARY, "worker": TYPE_DICTIONARY, "hero": TYPE_DICTIONARY, "hero_visual": TYPE_DICTIONARY, "animals": TYPE_ARRAY, "trees": TYPE_DICTIONARY, "explored": TYPE_DICTIONARY, "rng_seed": TYPE_INT, "rng_state": TYPE_INT, "spawn_clocks": TYPE_ARRAY, "order": TYPE_STRING, "order_target": TYPE_VECTOR3, "target_uid": TYPE_INT, "selected_id": TYPE_INT, "noises": TYPE_ARRAY, "next_noise_id": TYPE_INT, "generator_clock": TYPE_FLOAT, "night": TYPE_BOOL, "camera": TYPE_DICTIONARY, "camera_focus": TYPE_VECTOR3, "camera_size": TYPE_FLOAT, "scenery_clock": TYPE_FLOAT}
@@ -140,6 +141,11 @@ static func validate(data: Dictionary) -> String:
 	pawn.free()
 	if not valid: return "存档实体字段不完整"
 	var s: Dictionary = data.session
+	if s.has("deposit_reserves"):
+		if not s.deposit_reserves is Dictionary: return "存档矿区余量无效"
+		for id in s.deposit_reserves:
+			var reserve: Variant = s.deposit_reserves[id]
+			if not id is String or not reserve is int or reserve < 0 or reserve > 10000: return "存档矿区余量无效"
 	# Older version-three saves retain their total without inventing species history.
 	if s.kills < 0: return "存档击杀总数无效"
 	if s.has("kills_by_species"):
@@ -168,6 +174,7 @@ static func validate(data: Dictionary) -> String:
 			if b.kind not in ["shelter", "gate"] or b.rotation < 0 or b.rotation >= TAU: return "存档建筑方向无效"
 			if not is_equal_approx(float(b.rotation) / (PI * 0.5), roundf(float(b.rotation) / (PI * 0.5))): return "存档建筑方向无效"
 		if b.has("refit") and (not b.refit is String or (not b.refit.is_empty() and not catalog.REFITS.has(b.refit))): return "存档建筑改造无效"
+		if b.has("deposit_id") and (b.kind != "fossil" or not b.deposit_id is String): return "存档矿区建筑无效"
 		if b.get("refit", "") in catalog.REFITS and b.kind not in catalog.REFITS[b.refit].kinds: return "存档建筑改造与类型不符"
 		if b.has("reinforced") and (not b.reinforced is bool or b.kind != "tower"): return "存档箭塔加固无效"
 		if b.has("priority") and (b.kind != "tower" or b.priority not in ["nearest", "large", "ranged"]): return "存档防御优先级无效"
@@ -298,6 +305,7 @@ static func write(w: Node, automatic: bool = false) -> String:
 static func apply(w: Node, data: Dictionary) -> void:
 	# Only call on a freshly instantiated island, after validate().
 	restore_fields(w.session, data.session, SESSION_FIELDS)
+	w.session.deposit_reserves = data.session.get("deposit_reserves", {}).duplicate(true)
 	w.session.outfitting = data.session.get("outfitting", {}).duplicate(true)
 	w.session.kills_by_species = data.session.get("kills_by_species", {}).duplicate(true)
 	var survival: Dictionary = data.get("survival", {})
@@ -378,6 +386,7 @@ static func apply(w: Node, data: Dictionary) -> void:
 	w.destination.visible = w.order == "move"
 	w.refresh_shelters()
 	w.update_shelter_visuals()
+	if w.narrative: w.narrative.reset(true)
 
 static func ground_point(w: Node, point: Vector3) -> Vector3:
 	point.y = w.board.layout.height_at(point.x,point.z)

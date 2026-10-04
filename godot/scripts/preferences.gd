@@ -1,6 +1,6 @@
 extends RefCounted
 ## Local presentation/input preferences; separate from single-run saves and simulation.
-const DEFAULTS = {"quality": 2, "fullscreen": true, "vsync": true, "fps": 0, "pan_speed": 1.0, "rotation_speed": 1.0, "zoom_speed": 1.0, "invert_y": false, "route_dots": true, "perspective": true, "impact_motion": true}
+const DEFAULTS = {"quality": 2, "fullscreen": true, "vsync": true, "fps": 0, "pan_speed": 1.0, "rotation_speed": 1.0, "zoom_speed": 1.0, "invert_y": false, "route_dots": false, "perspective": true, "impact_motion": true}
 const ACTIONS = {
 	"pan_up": ["镜头向前", KEY_W], "pan_down": ["镜头向后", KEY_S], "pan_left": ["镜头向左", KEY_A], "pan_right": ["镜头向右", KEY_D],
 	"rotate_left": ["镜头左转", KEY_Q], "rotate_right": ["镜头右转", KEY_E], "center": ["回到并跟随角色", KEY_SPACE], "follow": ["切换跟随", KEY_F], "reset_camera": ["重置镜头", KEY_HOME],
@@ -93,7 +93,8 @@ func apply(world: Node, display: bool = true) -> void:
 	for b in world.session.buildings:
 		if not world.visuals.has(b.id): continue
 		var dressing: Node = world.visuals[b.id].get_node_or_null("CampDressing")
-		if dressing: dressing.visible = b.remaining <= 0 and values.quality > 0
+		if dressing: dressing.visible = b.remaining <= 0 and values.quality > 0 and (b.kind != "tower" or b.get("refit", "").is_empty())
+		preload("res://scripts/camp_detail.gd").update(world.scenery, world.visuals[b.id], b)
 	if display and DisplayServer.get_name() != "headless":
 		Engine.max_fps = values.fps
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if values.vsync else DisplayServer.VSYNC_DISABLED)

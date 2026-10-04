@@ -24,6 +24,13 @@ func _draw() -> void:
 		if not world.vision.explored.has(cell): continue
 		var p: Vector2 = project(world.board.point(cell))
 		draw_rect(Rect2(p - Vector2.ONE, Vector2(3, 3)), Color("416443"))
+	if not world.board.layout.free_fossil_placement:
+		for zone in world.board.layout.gold_zones:
+			var coords: Array = zone.world
+			var point := Vector3(float(coords[0]), 0, float(coords[1]))
+			if not world.vision.explored.has(world.board.cell_at(point)): continue
+			var tint := Color("d7b75e") if int(world.session.deposit_reserves.get(str(zone.id), 0)) > 0 else Color("69736a")
+			draw_circle(project(point), 3.5, tint, false, 1.5)
 	for b in world.session.buildings:
 		if b.hp > 0: draw_rect(Rect2(project(world.board.point(b.cell)) - Vector2(2, 2), Vector2(4, 4)), Color("d6bf79"))
 	for b in world.session.buildings:

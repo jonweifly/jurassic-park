@@ -6,8 +6,13 @@ extends Node
 @export_node_path("Skeleton3D") var contact_rig_path := NodePath("")
 const SurvivorContact = preload("res://scripts/survivor_contact.gd")
 const SurvivorMotion = preload("res://scripts/survivor_motion.gd")
+const DinosaurDetail = preload("res://scripts/dinosaur_detail.gd")
 var contact: RefCounted
 var motion: RefCounted
+var dinosaur_detail: Node3D
+var rifle_sling: BoneAttachment3D
+var rifle_grip: Node3D
+var rifle_rest := Transform3D.IDENTITY
 @export_node_path("Node3D") var hand_socket_path := NodePath("../Model/ArmR")
 @export_node_path("Node3D") var cargo_socket_path := NodePath("../Model")
 @export_node_path("Node3D") var rifle_path := NodePath("../Model/ArmR/Rifle")
@@ -39,6 +44,11 @@ func _ready() -> void:
 	player = get_node(animator_path)
 	player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	if work_equipment: make_equipment()
+	if get_parent().is_dinosaur:
+		var dinosaur_rig := model.get_node_or_null("Rig/Skeleton3D") as Skeleton3D
+		if dinosaur_rig:
+			var kind := model.scene_file_path.get_file().get_basename().trim_suffix("_v2")
+			dinosaur_detail = DinosaurDetail.attach(self, dinosaur_rig, kind)
 	if not contact_rig_path.is_empty():
 		var rig := get_node_or_null(contact_rig_path) as Skeleton3D
 		if rig:
@@ -100,6 +110,15 @@ func make_equipment() -> void:
 	var hand: Node3D = get_node(hand_socket_path)
 	var cargo: Node3D = get_node(cargo_socket_path)
 	rifle = get_node_or_null(rifle_path)
+	if rifle:
+		rifle_grip = rifle.get_parent()
+		rifle_rest = rifle.transform
+		var rig := model.get_node_or_null("Rig/Skeleton3D") as Skeleton3D
+		if rig:
+			rifle_sling = BoneAttachment3D.new()
+			rifle_sling.name = "RifleSling"
+			rifle_sling.bone_name = "spine"
+			rig.add_child(rifle_sling)
 	# A single flared, tapered blade distinguishes the axe from the hammer.
 	axe = attach(null,hand,"WorkAxe",tool_grip)
 	box(axe,Vector3(0.065,0.065,0.84),Vector3(0,0,0.30),Color("825633"))
@@ -157,7 +176,12 @@ func show_equipment(action: String, carrying: bool, cargo_kind: String) -> void:
 	var carrying_visible := carrying and action not in ["chop","build","mine","death"]
 	bundle.visible = carrying_visible and cargo_kind != "gold"
 	ore.visible = carrying_visible and cargo_kind == "gold"
-	if rifle: rifle.visible = action == "attack" or (not carrying and action in ["idle","walk"])
+	if rifle:
+		var stowed := action != "attack" and rifle_sling != null
+		var socket: Node3D = rifle_sling if stowed else rifle_grip
+		if rifle.get_parent() != socket: rifle.reparent(socket, false)
+		rifle.transform = Transform3D(Basis.from_euler(Vector3(-PI / 2.0, 0, -0.22)), Vector3(0.25, -0.07, -0.29)) if stowed else rifle_rest
+		rifle.visible = action == "attack" or (not carrying and action in ["idle", "walk"])
 
 func face(direction: Vector3, dt: float, sharpness: float = 14.0) -> void:
 	if Vector2(direction.x,direction.z).is_zero_approx(): return
@@ -184,8 +208,22 @@ func seek_work(action: String, phase: float, dt: float) -> void:
 		var swing := lerpf(-52.0, 28.0, smoothstep(0.0, 0.68, progress))
 		if progress > 0.68: swing = lerpf(28.0, 8.0, smoothstep(0.68, 1.0, progress))
 		axe.rotation_degrees = tool_rotation_degrees + Vector3(swing, 0, 0)
+	elif action == "mine" and pickaxe:
+		# Mining is an overhead strike with a shorter, heavier follow-through;
+		# its arc stays visually distinct from the horizontal axe swing.
+		var progress := clampf(phase / 1.1, 0.0, 1.0)
+		var swing := lerpf(-68.0, 42.0, smoothstep(0.0, 0.70, progress))
+		if progress > 0.70: swing = lerpf(42.0, 0.0, smoothstep(0.70, 1.0, progress))
+		pickaxe.rotation_degrees = tool_rotation_degrees + Vector3(swing, 0, 0)
+	elif action == "build" and hammer:
+		var progress := clampf(phase / 0.9, 0.0, 1.0)
+		var swing := lerpf(-38.0, 24.0, smoothstep(0.0, 0.66, progress))
+		if progress > 0.66: swing = lerpf(24.0, 4.0, smoothstep(0.66, 1.0, progress))
+		hammer.rotation_degrees = tool_rotation_degrees + Vector3(swing, 0, 0)
 	else:
 		if axe: axe.rotation_degrees = tool_rotation_degrees
+		if pickaxe: pickaxe.rotation_degrees = tool_rotation_degrees
+		if hammer: hammer.rotation_degrees = tool_rotation_degrees
 	if motion: motion.work(action, phase)
 
 func locomotion(speed: float, dt: float) -> void:

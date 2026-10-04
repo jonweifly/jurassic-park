@@ -53,6 +53,7 @@ func run() -> void:
 		world.set_physics_process(false)
 		world.start_session(1500.0, "standard", content_seed)
 		world.spawn_clocks.clear()
+		for site in world.session.adventure.sites.values(): site.guarded = true
 		world.select_build("tent")
 		var center: Vector2i = world.board.cell_at(world.hero.position)
 		var placed := false

@@ -14,7 +14,10 @@ var recovery := 0.0
 var pose_clock := 0.0
 var broke_notified := false
 
-const WORK_DISTANCES := {"wood": 1.43, "gold": 1.7, "build": 3.0, "repair": 3.0, "return": 3.0, "heal": 3.0}
+# Resource contact includes the survivor's body radius and the one-cell
+# interaction buffer.  Two metres lets a command issued from the neighboring
+# grid cell begin the authored work animation without stepping into the tree.
+const WORK_DISTANCES := {"wood": 2.1, "gold": 1.7, "build": 3.0, "repair": 3.0, "return": 3.0, "heal": 3.0}
 
 func _init(owner_world: Node) -> void:
 	world = owner_world
@@ -177,7 +180,7 @@ func resume_harvest() -> void:
 			return
 	if resource_kind == "gold":
 		var field: Dictionary = world.building_at(world.board.cell_at(resource_target))
-		if field.is_empty() or field.kind != "fossil" or field.remaining > 0:
+		if field.is_empty() or field.kind != "fossil" or field.remaining > 0 or (field.has("deposit_id") and int(world.session.deposit_reserves.get(str(field.deposit_id), 0)) <= 0):
 			world.order = "idle"
 			return
 	if resource_kind.is_empty(): world.order = "idle"
@@ -272,7 +275,7 @@ func update(dt: float) -> void:
 		world.hero.work_pose("build", world.order_target, fmod(pose_clock, 0.9), dt)
 		if floori((previous - 0.65) / 0.9) < floori((pose_clock - 0.65) / 0.9):
 			world.sound.play_at("hammer", world.hero.visual.work_tip(), -3)
-			world.work_impact(world.order_target, Color("bfa47a"))
+			world.work_impact(world.order_target, Color("bfa47a"), "build")
 		if noise_clock <= 0:
 			world.dino_ai.emit_noise(world.hero.position, 5.0, "hero", world.survivor_id(world.hero))
 			noise_clock = 1.0
@@ -304,7 +307,7 @@ func update(dt: float) -> void:
 			world.clear_tree(world.board.cell_at(world.order_target))
 			world.dino_ai.emit_noise(world.hero.position, 14.0, "hero", world.survivor_id(world.hero))
 			world.sound.play_at("chop", world.hero.visual.work_tip())
-			world.work_impact(world.order_target, Color("ad8756"))
+			world.work_impact(world.order_target, Color("ad8756"), "chop")
 			world.stop_order()
 			world.hud.toast("道路已清开。左键下一棵树继续开路。")
 		return
@@ -332,9 +335,14 @@ func update(dt: float) -> void:
 		if field.is_empty() or field.kind != "fossil" or field.remaining > 0:
 			world.order = "idle"
 			return
-		if not field.has("reserves"): field.reserves = 10000 # Provisional deposit reserve.
-		amount = mini(amount, field.reserves)
-		field.reserves -= amount
+		if field.has("deposit_id"):
+			var deposit_id := str(field.deposit_id)
+			amount = mini(amount, int(world.session.deposit_reserves.get(deposit_id, 0)))
+			world.session.deposit_reserves[deposit_id] = int(world.session.deposit_reserves.get(deposit_id, 0)) - amount
+		else:
+			if not field.has("reserves"): field.reserves = 10000 # Provisional deposit reserve.
+			amount = mini(amount, field.reserves)
+			field.reserves -= amount
 		if amount <= 0:
 			world.order = "idle"
 			world.hud.toast("化石挖掘场已枯竭。")
@@ -342,6 +350,6 @@ func update(dt: float) -> void:
 	cargo_kind = world.order
 	world.dino_ai.emit_noise(world.hero.position, 6.0 if cargo_kind == "wood" else 7.0, "hero", world.survivor_id(world.hero))
 	world.sound.play_at("chop" if cargo_kind == "wood" else "mine", world.hero.visual.work_tip())
-	world.work_impact(world.order_target, Color("ad8756") if cargo_kind == "wood" else Color("bdb69c"))
+	world.work_impact(world.order_target, Color("ad8756") if cargo_kind == "wood" else Color("bdb69c"), "chop" if cargo_kind == "wood" else "mine")
 	cargo += amount
 	recovery = 0.25

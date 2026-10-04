@@ -57,7 +57,7 @@ func _ready() -> void:
 	var titles := VBoxContainer.new()
 	titles.add_theme_constant_override("separation",0)
 	header.add_child(titles)
-	label(titles,"JURASSIC  /  FIELD STATION",21,WHITE)
+	label(titles,"LOST ISLE  /  FIELD STATION",21,WHITE)
 	label(titles,"雨林检修站     ·     01 电影写实样板",13,MUTED)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL

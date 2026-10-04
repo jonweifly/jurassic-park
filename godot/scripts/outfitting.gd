@@ -280,6 +280,10 @@ func update(dt: float) -> void:
 	sync_visuals()
 	for id in data().sites:
 		var site: Dictionary = data().sites[id]
+		# A cleared spawn schedule is the deterministic no-encounter mode used
+		# by route/save simulations.  Do not reintroduce site guards behind the
+		# director's back while those tests (or a future sandbox mode) are active.
+		if world.spawn_clocks.is_empty(): continue
 		if site.guarded or site.status != "known": continue
 		var point: Vector3 = world.board.point(site.cell)
 		if not world.survivors().any(func(p): return p.health > 0 and p.position.distance_to(point) < 24): continue

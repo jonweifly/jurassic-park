@@ -49,7 +49,7 @@ func bake() -> void:
 	material.albedo_texture = texture
 	mesh.surface_set_material(0, material)
 	var ground := MeshInstance3D.new()
-	ground.name = "ReferenceGround"
+	ground.name = "IslandGround"
 	ground.mesh = mesh
 	island.add_child(ground)
 	ground.create_trimesh_collision()
@@ -61,7 +61,7 @@ func bake() -> void:
 	water_node.mesh = water_mesh
 	island.add_child(water_node)
 	var forest := Node3D.new()
-	forest.name = "TreesFromMap"
+	forest.name = "IslandTrees"
 	island.add_child(forest)
 	var models := {"broadleaf": load("res://scenes/models/broadleaf.tscn"), "snow_tree": load("res://scenes/models/snow_tree.tscn"), "rock": load("res://scenes/models/rock.tscn")}
 	var tree_cells: Dictionary = {}
@@ -93,8 +93,8 @@ func bake() -> void:
 	assign_owner(island, island)
 	var scene := PackedScene.new()
 	var err := scene.pack(island)
-	if err == OK: err = ResourceSaver.save(scene, "res://scenes/reference_island.tscn")
-	print("REFERENCE BAKE: ", tree_cells.size(), " tree clusters, save=", err)
+	if err == OK: err = ResourceSaver.save(scene, "res://scenes/original_island.tscn")
+	print("ORIGINAL ISLAND BAKE: ", tree_cells.size(), " tree clusters, save=", err)
 	quit(err)
 
 func add_triangle(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, palette: Array) -> void:

@@ -44,7 +44,7 @@ func _init(owner_hud: Node, commands: VBoxContainer, head: HBoxContainer, headin
 		var spec: Dictionary = Catalog.REFITS[option]
 		portraits[option] = load("res://assets/ui/towers/%s.png" % option)
 		var card: Button = hud.button("")
-		card.custom_minimum_size = Vector2(120, 98)
+		card.custom_minimum_size = Vector2(120, 88)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.pressed.connect(hud.world.refit_selected.bind(option))
 		cards.add_child(card)
@@ -61,7 +61,7 @@ func _init(owner_hud: Node, commands: VBoxContainer, head: HBoxContainer, headin
 		col.add_child(row)
 		var preview := TextureRect.new()
 		preview.texture = portraits[option]
-		preview.custom_minimum_size = Vector2(57, 57)
+		preview.custom_minimum_size = Vector2(49, 49)
 		preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -75,10 +75,10 @@ func _init(owner_hud: Node, commands: VBoxContainer, head: HBoxContainer, headin
 			line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			col.add_child(line)
 	completed = HBoxContainer.new()
-	completed.custom_minimum_size.y = 98
+	completed.custom_minimum_size.y = 88
 	panel.add_child(completed)
 	completed_icon = TextureRect.new()
-	completed_icon.custom_minimum_size = Vector2(90, 90)
+	completed_icon.custom_minimum_size = Vector2(78, 78)
 	completed_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	completed_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	completed.add_child(completed_icon)

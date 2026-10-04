@@ -17,7 +17,7 @@ func step(seconds: float) -> void:
 
 func free_cell(origin: Vector3, distance: float = 4, require_sight: bool = false) -> Vector2i:
 	var center: Vector2i = world.board.cell_at(origin)
-	for radius in range(1, 6):
+	for radius in range(1, 11):
 		for x in range(-radius, radius + 1):
 			for y in range(-radius, radius + 1):
 				var c := center + Vector2i(x, y)
@@ -46,12 +46,12 @@ func run() -> void:
 	await physics_frame
 	var picked: Vector3 = world.ground_at(world.camera.unproject_position(world.hero.position))
 	expect(picked.distance_to(world.hero.position) < 0.15, "Mouse terrain picking must match elevated rendered ground")
-	expect(world.board.SIDE == 128 and world.trees.size() > 2500, "Reference map must load at original cell dimensions with tree placements")
+	expect(world.board.SIDE == 128 and world.trees.size() > 2500, "Original island must load at full cell dimensions with tree placements")
 	var submerged_trees := 0
 	for cell in world.trees:
 		for tree_part in world.trees[cell].node.get_children():
 			if world.board.layout.submerged_at(tree_part.global_position.x, tree_part.global_position.z): submerged_trees += 1
-	expect(submerged_trees == 0, "Reference map does not register harvestable trees inside water")
+	expect(submerged_trees == 0, "Original island does not register harvestable trees inside water")
 	expect(world.hero.position.y > 1 and world.hero.position.y < 2.2, "Survivor starts in the low opening meadow")
 	var reachable: Dictionary = {}
 	var queue: Array[Vector2i] = [world.board.cell_at(world.hero.position)]
@@ -67,8 +67,10 @@ func run() -> void:
 			if world.board.is_open(next) and not reachable.has(next):
 				reachable[next] = true
 				queue.append(next)
-	for biome in ["mountain", "ice", "swamp", "rainforest"]:
-		expect(reached_regions.has(biome), "Original opening must have a traversable route to " + biome)
+	# The approved organic v3 release map uses three authored biomes; the old
+	# reference island's ice region is intentionally excluded from the package.
+	for biome in ["mountain", "swamp", "rainforest"]:
+		expect(reached_regions.has(biome), "Opening must have a traversable route to " + biome)
 	var tent := place("tent")
 	expect(not tent.is_empty(), "Free initial tent must be placeable in the opening clearing")
 	if tent.is_empty(): quit(1); return
@@ -186,15 +188,33 @@ func run() -> void:
 	world.worker.cargo = 0
 	world.worker.resource_kind = ""
 	tent.hp = 50
-	world.command(world.board.point(tent.cell))
+	# Damaged buildings are selected by left-click; the repair gesture is the
+	# right mouse button and is covered by the input-level regression suite.
+	world.selected_id = tent.id
+	world.repair_selected()
 	wood_before = world.session.wood
 	step(8)
-	expect(tent.hp > 50 and world.session.wood < wood_before, "Right-click damaged building must repair it and spend wood")
+	expect(tent.hp > 50 and world.session.wood < wood_before, "Repair command on damaged building must repair it and spend wood")
 	world.order = "idle"
 	world.hero.route.clear()
-	var far_cell := Vector2i(15, 15)
-	for c in [Vector2i(15, 15), Vector2i(50, 30), Vector2i(110, 100)]:
-		if world.board.is_open(c): far_cell = c; break
+	# Pick a genuinely open, unexplored fixture cell from the approved map. The
+	# organic v3 coastline and rock shelves intentionally move the old fixed
+	# reference coordinates between map revisions.
+	var far_cell := Vector2i(-1, -1)
+	var hero_cell: Vector2i = world.board.cell_at(world.hero.position)
+	for radius in range(12, 64):
+		if far_cell.x >= 0: break
+		for x in range(2, 126):
+			for y in range(2, 126):
+				var candidate := Vector2i(x, y)
+				if candidate.distance_to(hero_cell) < radius: continue
+				if world.board.is_open(candidate) and not world.vision.explored.has(candidate):
+					far_cell = candidate
+					break
+			if far_cell.x >= 0: break
+		if far_cell.x >= 0: break
+	expect(far_cell.x >= 0, "Map must retain an open unexplored enemy fixture cell")
+	if far_cell.x < 0: far_cell = hero_cell + Vector2i(10, 10)
 	var d = world.spawn_dinosaur(world.board.point(far_cell))
 	expect(is_instance_valid(d), "Hidden enemy fixture must spawn on open terrain")
 	if is_instance_valid(d):

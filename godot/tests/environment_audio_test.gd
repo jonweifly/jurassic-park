@@ -94,6 +94,8 @@ func run() -> void:
 	world.update_camera(0)
 	for i in range(20): sound._process(.1)
 	expect(world.weather.drops.emitting and world.weather.drops.amount == 900,"Native storm starts bounded high-quality rain emitter")
+	expect(world.weather.splashes != null and world.weather.splashes.emitting and world.weather.splashes.amount == 11,"Storm enables a bounded high-quality ground splash sample")
+	expect(world.weather.flash_overlay != null,"Storm creates a screen-space lightning flash layer")
 	expect(sound.loops.rain.volume_db > -15 and sound.loops.wind_gale.volume_db > -20,"Storm drives rain and gale ambience")
 	var ambience: float = sound.loops.rain.volume_db
 	sound.cooldowns.clear()
@@ -107,6 +109,7 @@ func run() -> void:
 	world.preferences.values.quality = 0
 	world.weather.update()
 	expect(world.weather.drops.amount == 320,"Low quality reduces rain particles without changing weather")
+	expect(world.weather.splashes.amount == 3,"Low quality reduces splash particles without changing weather")
 	world.weather.preview_kind = 0
 	world.weather.update()
 	expect(not world.weather.drops.emitting,"Clear weather stops rain emission")

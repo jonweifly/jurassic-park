@@ -25,6 +25,13 @@ func run() -> void:
 	make_world()
 	expect(world.coop.host("standard",port).is_empty(),"Coop host starts")
 	world.coop.make_pawn(2)
+	var map_packet: Dictionary = world.coop.replication.world_packet(true)
+	expect(map_packet.get("map_id", "") == world.map_id, "World snapshot identifies its map")
+	var original_wood: int = world.session.wood
+	map_packet.map_id = "deleted-map-fixture"
+	map_packet.session.wood = original_wood + 99
+	world.coop.replication.apply_world(map_packet)
+	expect(world.session.wood == original_wood, "World snapshot from another map is ignored")
 	world.spawn_clocks.clear()
 	var host: Node3D = world.hero
 	var guest: Node3D = world.coop.pawns[2]
@@ -155,6 +162,12 @@ func run() -> void:
 	expect(world.coop.host("standard",port,"",true).is_empty(),"New room restores saved coop world")
 	expect(world.coop.pawns.size()==2 and world.coop.partner.state.worker.cargo==3 and world.coop.partner.state.worker.cargo_kind=="gold","Restore preserves both survivors and does not duplicate cargo")
 	expect(world.coop.partner.state.order == "field" and world.outfitting.data().actors["2"].task == "explore", "Coop reload replans guest exploration instead of leaving stale task")
+	# Patrol fixtures from the earlier shared-AI assertions may land beside the
+	# supply landmark on the authored island. Remove only those unrelated threats
+	# so this section tests reload/reward ownership rather than combat interruption.
+	var supply_point: Vector3 = world.board.point(world.outfitting.data().sites["supplies"].cell)
+	for predator in world.dinosaurs:
+		if predator.position.distance_to(supply_point) < 10.0: predator.health = 0
 	for frame in range(3000):
 		world.coop.partner.tick(.05)
 		if world.coop.partner.state.order != "field": break
